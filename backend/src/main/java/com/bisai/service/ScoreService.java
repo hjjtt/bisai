@@ -35,8 +35,9 @@ public class ScoreService {
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
         }
-        // 异步执行解析（当前为同步，后续可用线程池优化）
         try {
+            submission.setParseStatus("PARSING");
+            submissionMapper.updateById(submission);
             aiService.doParse(submissionId);
             return Result.ok();
         } catch (Exception e) {
@@ -54,6 +55,8 @@ public class ScoreService {
             return Result.error(40401, "提交记录不存在");
         }
         try {
+            submission.setCheckStatus("CHECKING");
+            submissionMapper.updateById(submission);
             aiService.doCheck(submissionId);
             return Result.ok();
         } catch (Exception e) {
@@ -71,6 +74,8 @@ public class ScoreService {
             return Result.error(40401, "提交记录不存在");
         }
         try {
+            submission.setScoreStatus("SCORING");
+            submissionMapper.updateById(submission);
             aiService.doScore(submissionId);
             return Result.ok();
         } catch (Exception e) {

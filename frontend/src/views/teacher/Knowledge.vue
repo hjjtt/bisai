@@ -58,17 +58,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
-import { getKnowledgeList, deleteKnowledge } from '@/api/knowledge'
+import { getKnowledgeList, deleteKnowledge, uploadKnowledge } from '@/api/knowledge'
 
 const loading = ref(false)
 const uploading = ref(false)
 const showUploadDialog = ref(false)
 const documents = ref<any[]>([])
+const selectedFiles = ref<File[]>([])
+const polling = ref<number | null>(null)
 
-function handleFileChange() {}
+function handleFileChange(_: any, fileList: any[]) {
+  selectedFiles.value = fileList.map(item => item.raw).filter(Boolean)
+}
 
 async function handleToggle(row: any) {
   ElMessage.success(row.enabled ? '已启用' : '已停用')
@@ -84,10 +88,26 @@ async function handleDelete(id: number) {
   }
 }
 
-function handleUpload() {
-  uploading.value = false
-  showUploadDialog.value = false
-  ElMessage.success('上传成功')
+async function handleUpload() {
+  if (selectedFiles.value.length === 0) {
+    ElMessage.warning('请选择文件')
+    return
+  }
+  uploading.value = true
+  try {
+    for (const file of selectedFiles.value) {
+      await uploadKnowledge(file)
+    }
+    selectedFiles.value = []
+    showUploadDialog.value = false
+    ElMessage.success('上传成功，正在解析和向量化')
+    await loadDocuments()
+    startPolling()
+  } catch {
+    ElMessage.error('上传失败')
+  } finally {
+    uploading.value = false
+  }
 }
 
 async function loadDocuments() {
@@ -102,7 +122,31 @@ async function loadDocuments() {
   }
 }
 
-onMounted(loadDocuments)
+function hasRunningDocument() {
+  return documents.value.some(item => ['PENDING', 'PARSING', 'VECTORIZING'].includes(item.parseStatus) || ['PENDING', 'VECTORIZING'].includes(item.vectorStatus))
+}
+
+function startPolling() {
+  if (polling.value !== null) return
+  polling.value = window.setInterval(async () => {
+    await loadDocuments()
+    if (!hasRunningDocument()) stopPolling()
+  }, 3000)
+}
+
+function stopPolling() {
+  if (polling.value !== null) {
+    window.clearInterval(polling.value)
+    polling.value = null
+  }
+}
+
+onMounted(() => {
+  loadDocuments().then(() => {
+    if (hasRunningDocument()) startPolling()
+  })
+})
+onBeforeUnmount(stopPolling)
 </script>
 
 <style scoped>

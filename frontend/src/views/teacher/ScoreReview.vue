@@ -76,10 +76,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getScoreResults, saveTeacherScores, publishScore, returnSubmission, startScore } from '@/api/task'
+import { getScoreResults, saveTeacherScores, publishScore, returnSubmission, startScore, getSubmission } from '@/api/task'
 import type { ScoreResult } from '@/types'
 
 const route = useRoute()
@@ -90,6 +90,7 @@ const aiScoring = ref(false)
 const comment = ref('')
 const scores = ref<(ScoreResult & { maxScore?: number })[]>([])
 const submissionId = computed(() => Number(route.params.id) || 0)
+const polling = ref<number | null>(null)
 
 async function loadScores() {
   if (!submissionId.value) return
@@ -108,12 +109,33 @@ async function handleAiScore() {
   aiScoring.value = true
   try {
     await startScore(submissionId.value)
-    ElMessage.success('AI 评分完成')
-    loadScores()
+    ElMessage.success('AI 评分任务已启动')
+    startScorePolling()
   } catch {
     ElMessage.error('AI 评分失败，请检查是否已关联评分模板')
   } finally {
-    aiScoring.value = false
+    if (polling.value === null) aiScoring.value = false
+  }
+}
+
+function startScorePolling() {
+  if (polling.value !== null) return
+  polling.value = window.setInterval(async () => {
+    const res = await getSubmission(submissionId.value)
+    if (res.data.scoreStatus !== 'SCORING') {
+      stopScorePolling()
+      aiScoring.value = false
+      await loadScores()
+      if (res.data.scoreStatus === 'AI_SCORED') ElMessage.success('AI 评分完成')
+      if (res.data.scoreStatus === 'SCORE_FAILED') ElMessage.error('AI 评分失败')
+    }
+  }, 3000)
+}
+
+function stopScorePolling() {
+  if (polling.value !== null) {
+    window.clearInterval(polling.value)
+    polling.value = null
   }
 }
 
@@ -161,6 +183,7 @@ async function handleReturn() {
 }
 
 onMounted(loadScores)
+onBeforeUnmount(stopScorePolling)
 </script>
 
 <style scoped>

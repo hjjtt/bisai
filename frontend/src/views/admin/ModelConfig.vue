@@ -25,13 +25,13 @@
           <el-input v-model="form.textModelApiKey" type="password" show-password placeholder="ms-xxxxx" />
         </el-form-item>
         <el-form-item label="模型名称">
-          <el-input v-model="form.model" placeholder="Qwen/Qwen2.5-72B-Instruct" />
+          <el-input v-model="form.model" placeholder="Qwen/Qwen3.5-35B-A3B" />
         </el-form-item>
         <el-form-item label="超时时间(ms)">
           <el-input-number v-model="form.timeout" :min="5000" :max="120000" :step="5000" />
         </el-form-item>
         <el-form-item label="温度参数">
-          <el-slider v-model="form.temperature" :min="0" :max="1" :step="0.1" :format-tooltip="v => v.toFixed(1)" style="width: 300px" />
+          <el-slider v-model="form.temperature" :min="0" :max="1" :step="0.1" :format-tooltip="(v: number) => v.toFixed(1)" style="width: 300px" />
         </el-form-item>
         <el-form-item label="最大 Token 数">
           <el-input-number v-model="form.maxTokens" :min="256" :max="8192" :step="256" />
@@ -66,7 +66,7 @@ const testing = ref(false)
 const form = reactive({
   textModelApiUrl: 'https://api-inference.modelscope.cn/v1',
   textModelApiKey: '',
-  model: 'Qwen/Qwen2.5-72B-Instruct',
+  model: 'Qwen/Qwen3.5-35B-A3B',
   timeout: 30000,
   temperature: 0.3,
   maxTokens: 4096,

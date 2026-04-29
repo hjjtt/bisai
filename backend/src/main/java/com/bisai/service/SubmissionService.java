@@ -71,6 +71,7 @@ public class SubmissionService {
         submission.setStudentId(studentId);
         submission.setVersion(version);
         submission.setParseStatus("PENDING");
+        submission.setCheckStatus("NOT_CHECKED");
         submission.setScoreStatus("NOT_SCORED");
         submission.setSubmitTime(LocalDateTime.now());
         submissionMapper.insert(submission);

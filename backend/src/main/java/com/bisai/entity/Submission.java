@@ -16,9 +16,15 @@ public class Submission {
     private LocalDateTime submitTime;
     private Integer version;
     private String parseStatus;
+    private String checkStatus;
     private String scoreStatus;
     private BigDecimal totalScore;
     private String teacherComment;
+    private String parseSummary;
+    private String parseTopics;
+    private String parseCompleteness;
+    private String parseQuality;
+    private String parseSuggestions;
 
     @TableLogic
     private Integer deleted;

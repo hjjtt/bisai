@@ -6,10 +6,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -30,12 +30,17 @@ public class AiService {
     private final ScoreResultMapper scoreResultMapper;
     private final TrainingTaskMapper taskMapper;
     private final IndicatorMapper indicatorMapper;
+    private final ParseResultMapper parseResultMapper;
+    private final DocumentTextExtractor documentTextExtractor;
+    private final KnowledgeRetrievalService knowledgeRetrievalService;
+    private final ObjectMapper objectMapper;
 
     // ==================== 智能解析 ====================
 
     /**
      * 智能解析提交文件内容
      */
+    @Async("aiTaskExecutor")
     public void doParse(Long submissionId) {
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) return;
@@ -63,13 +68,21 @@ public class AiService {
                         .append(" | 类型: ").append(file.getFileType())
                         .append(" | 大小: ").append(file.getFileSize()).append("字节】\n");
 
-                String content = readFileContent(file);
+                DocumentTextExtractor.ExtractedText extracted = documentTextExtractor.extract(file);
+                String content = extracted.content();
+                if (documentTextExtractor.isImage(file)) {
+                    String vision = analyzeImage(file);
+                    if (vision != null && !vision.isBlank()) {
+                        content = content + "\n图片多模态分析:\n" + vision;
+                    }
+                }
                 if (content != null && !content.isEmpty()) {
                     // 截取前 8000 字符避免 token 过多
                     if (content.length() > 8000) {
                         content = content.substring(0, 8000) + "\n...(内容过长已截断)";
                     }
                     fileContent.append(content).append("\n\n");
+                    saveParseResult(submissionId, null, file.getId(), extracted.parserType(), content, null);
                 } else {
                     fileContent.append("(二进制文件，无法直接读取文本内容)\n\n");
                 }
@@ -86,10 +99,17 @@ public class AiService {
                     "只返回 JSON，不要其他内容。";
 
             String aiResult = aiClient.chat(systemPrompt, fileContent.toString());
+            JsonNode parsed = parseJson(aiResult);
+            submission.setParseSummary(parsed.path("summary").asText(""));
+            submission.setParseTopics(parsed.path("mainTopics").toString());
+            submission.setParseCompleteness(parsed.path("completeness").asText(""));
+            submission.setParseQuality(parsed.path("quality").asText(""));
+            submission.setParseSuggestions(parsed.path("suggestions").toString());
             log.info("解析结果(submissionId={}): {}", submissionId, aiResult.length() > 200 ? aiResult.substring(0, 200) + "..." : aiResult);
 
             submission.setParseStatus("SUCCESS");
             submissionMapper.updateById(submission);
+            saveParseResult(submissionId, null, null, "AI", fileContent.toString(), parsed);
 
         } catch (Exception e) {
             log.error("智能解析失败, submissionId={}: {}", submissionId, e.getMessage());
@@ -103,9 +123,12 @@ public class AiService {
     /**
      * 智能核查提交内容
      */
+    @Async("aiTaskExecutor")
     public void doCheck(Long submissionId) {
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) return;
+        submission.setCheckStatus("CHECKING");
+        submissionMapper.updateById(submission);
 
         try {
             // 获取任务信息和要求
@@ -122,7 +145,13 @@ public class AiService {
             StringBuilder fileContent = new StringBuilder();
             for (FileEntity file : files) {
                 fileContent.append("【").append(file.getOriginalName()).append("】\n");
-                String content = readFileContent(file);
+                String content = documentTextExtractor.extract(file).content();
+                if (documentTextExtractor.isImage(file)) {
+                    String vision = analyzeImage(file);
+                    if (vision != null && !vision.isBlank()) {
+                        content = content + "\n图片多模态分析:\n" + vision;
+                    }
+                }
                 if (content != null) {
                     if (content.length() > 4000) content = content.substring(0, 4000) + "...";
                     fileContent.append(content).append("\n\n");
@@ -172,11 +201,15 @@ public class AiService {
                 }
             }
 
+            submission.setCheckStatus("SUCCESS");
+            submissionMapper.updateById(submission);
             log.info("智能核查完成, submissionId={}, 检查项数={}", submissionId, items.size());
 
         } catch (Exception e) {
             log.error("智能核查失败, submissionId={}: {}", submissionId, e.getMessage());
-            throw new RuntimeException("智能核查失败: " + e.getMessage());
+            submission.setCheckStatus("CHECK_FAILED");
+            submissionMapper.updateById(submission);
+            saveCheckFailure(submissionId, e.getMessage());
         }
     }
 
@@ -185,9 +218,12 @@ public class AiService {
     /**
      * 智能评分 - 基于评价指标自动打分
      */
+    @Async("aiTaskExecutor")
     public void doScore(Long submissionId) {
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) return;
+        submission.setScoreStatus("SCORING");
+        submissionMapper.updateById(submission);
 
         try {
             // 获取任务和评分模板
@@ -223,7 +259,13 @@ public class AiService {
             StringBuilder fileContent = new StringBuilder();
             for (FileEntity file : files) {
                 fileContent.append("【").append(file.getOriginalName()).append("】\n");
-                String content = readFileContent(file);
+                String content = documentTextExtractor.extract(file).content();
+                if (documentTextExtractor.isImage(file)) {
+                    String vision = analyzeImage(file);
+                    if (vision != null && !vision.isBlank()) {
+                        content = content + "\n图片多模态分析:\n" + vision;
+                    }
+                }
                 if (content != null) {
                     if (content.length() > 3000) content = content.substring(0, 3000) + "...";
                     fileContent.append(content).append("\n\n");
@@ -232,6 +274,7 @@ public class AiService {
 
             // 获取任务要求
             String requirements = task.getRequirements() != null ? task.getRequirements() : "";
+            String knowledgeContext = knowledgeRetrievalService.retrieveContext(task, requirements + "\n" + fileContent, 5);
 
             // 构建评分指标描述
             StringBuilder indicatorDesc = new StringBuilder();
@@ -273,6 +316,7 @@ public class AiService {
 
             String userMessage = "## 任务要求\n" + requirements +
                     "\n\n## 评分指标\n" + indicatorDesc +
+                    (knowledgeContext.isBlank() ? "" : "\n## 知识库参考资料\n" + knowledgeContext) +
                     "\n## 学生提交内容\n" + fileContent;
 
             JsonNode result = aiClient.chatAsJson(systemPrompt, userMessage);
@@ -292,15 +336,19 @@ public class AiService {
 
                     // 查找对应的指标
                     Indicator matchedIndicator = findIndicator(indicators, indName);
+                    if (matchedIndicator == null) {
+                        log.warn("AI评分指标匹配失败，使用首个指标兜底, submissionId={}, indicatorName={}", submissionId, indName);
+                        matchedIndicator = indicators.get(0);
+                    }
 
                     ScoreResult sr = new ScoreResult();
                     sr.setSubmissionId(submissionId);
-                    sr.setIndicatorId(matchedIndicator != null ? matchedIndicator.getId() : null);
+                    sr.setIndicatorId(matchedIndicator.getId());
                     sr.setAutoScore(BigDecimal.valueOf(scoreItem.path("score").asDouble(0)));
                     sr.setReason(scoreItem.path("reason").asText(""));
                     sr.setEvidence(scoreItem.path("evidence").asText(""));
                     sr.setIndicatorName(indName);
-                    sr.setMaxScore(matchedIndicator != null ? matchedIndicator.getMaxScore() : new BigDecimal("100"));
+                    sr.setMaxScore(matchedIndicator.getMaxScore());
                     sr.setCreatedAt(LocalDateTime.now());
                     sr.setUpdatedAt(LocalDateTime.now());
                     scoreResultMapper.insert(sr);
@@ -327,63 +375,68 @@ public class AiService {
 
     // ==================== 辅助方法 ====================
 
-    /**
-     * 读取文件文本内容
-     */
-    private String readFileContent(FileEntity file) {
+    private String analyzeImage(FileEntity file) {
         try {
             Path path = Path.of(file.getFilePath());
-            if (!Files.exists(path)) return null;
-
-            String fileType = file.getFileType();
-            // 文本类文件直接读取
-            if ("TXT".equalsIgnoreCase(fileType) || "MD".equalsIgnoreCase(fileType)
-                    || "CSV".equalsIgnoreCase(fileType) || "JAVA".equalsIgnoreCase(fileType)
-                    || "PY".equalsIgnoreCase(fileType) || "HTML".equalsIgnoreCase(fileType)
-                    || "CSS".equalsIgnoreCase(fileType) || "JS".equalsIgnoreCase(fileType)
-                    || "JSON".equalsIgnoreCase(fileType) || "XML".equalsIgnoreCase(fileType)
-                    || "SQL".equalsIgnoreCase(fileType)) {
-                return Files.readString(path);
-            }
-
-            // Word/Excel/PDF 等二进制文件，返回基础信息
-            if ("DOC".equalsIgnoreCase(fileType) || "DOCX".equalsIgnoreCase(fileType)
-                    || "PDF".equalsIgnoreCase(fileType) || "XLS".equalsIgnoreCase(fileType)
-                    || "XLSX".equalsIgnoreCase(fileType)) {
-                return "(该文件为" + fileType + "格式，内容需要专业解析工具读取。文件名: " + file.getOriginalName()
-                        + ", 大小: " + formatFileSize(file.getFileSize()) + ")";
-            }
-
-            // 图片文件
-            if ("JPG".equalsIgnoreCase(fileType) || "JPEG".equalsIgnoreCase(fileType)
-                    || "PNG".equalsIgnoreCase(fileType)) {
-                return "(图片文件: " + file.getOriginalName() + ", 大小: " + formatFileSize(file.getFileSize()) + ")";
-            }
-
-            // 压缩包
-            if ("ZIP".equalsIgnoreCase(fileType) || "RAR".equalsIgnoreCase(fileType)) {
-                return "(压缩文件: " + file.getOriginalName() + ", 大小: " + formatFileSize(file.getFileSize()) + ")";
-            }
-
-            return null;
+            String fileType = file.getFileType() == null ? "png" : file.getFileType().toLowerCase(Locale.ROOT);
+            String mimeType = "jpg".equals(fileType) ? "image/jpeg" : "image/" + fileType;
+            return aiClient.analyzeImage(path, mimeType, "请分析这张学生提交图片中的文字、图表、代码或实验结果，提取可用于核查和评分的关键信息。");
         } catch (Exception e) {
-            log.warn("读取文件内容失败: {}", file.getFilePath());
+            log.warn("图片多模态分析失败 fileId={}: {}", file.getId(), e.getMessage());
             return null;
         }
     }
 
-    private String formatFileSize(Long bytes) {
-        if (bytes == null) return "0B";
-        if (bytes < 1024) return bytes + "B";
-        if (bytes < 1024 * 1024) return String.format("%.1fKB", bytes / 1024.0);
-        return String.format("%.1fMB", bytes / (1024.0 * 1024));
+    private JsonNode parseJson(String aiResult) throws Exception {
+        String json = aiResult;
+        if (json.contains("```json")) {
+            json = json.substring(json.indexOf("```json") + 7, json.lastIndexOf("```"));
+        } else if (json.contains("```")) {
+            json = json.substring(json.indexOf("```") + 3, json.lastIndexOf("```"));
+        }
+        return objectMapper.readTree(json.trim());
+    }
+
+    private void saveParseResult(Long submissionId, Long knowledgeDocumentId, Long fileId, String parserType, String content, JsonNode parsed) {
+        ParseResult result = new ParseResult();
+        result.setSubmissionId(submissionId);
+        result.setKnowledgeDocumentId(knowledgeDocumentId);
+        result.setFileId(fileId);
+        result.setParserType(parserType);
+        result.setContent(content);
+        if (parsed != null) {
+            result.setSummary(parsed.path("summary").asText(""));
+            result.setMainTopics(parsed.path("mainTopics").toString());
+            result.setCompleteness(parsed.path("completeness").asText(""));
+            result.setQuality(parsed.path("quality").asText(""));
+            result.setSuggestions(parsed.path("suggestions").toString());
+        }
+        result.setCreatedAt(LocalDateTime.now());
+        parseResultMapper.insert(result);
+    }
+
+    private void saveCheckFailure(Long submissionId, String message) {
+        checkResultMapper.delete(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CheckResult>()
+                        .eq(CheckResult::getSubmissionId, submissionId)
+        );
+        CheckResult failure = new CheckResult();
+        failure.setSubmissionId(submissionId);
+        failure.setCheckType("系统核查");
+        failure.setCheckItem("AI核查任务");
+        failure.setResult("FAIL");
+        failure.setDescription("AI核查失败: " + (message == null ? "未知错误" : message));
+        failure.setSuggestion("请检查模型配置、网络或重试核查任务。");
+        failure.setRiskLevel("HIGH");
+        failure.setCreatedAt(LocalDateTime.now());
+        checkResultMapper.insert(failure);
     }
 
     /**
      * 根据名称模糊匹配指标
      */
     private Indicator findIndicator(List<Indicator> indicators, String name) {
-        if (name == null || name.isEmpty()) return null;
+        if (name == null || name.isEmpty()) return indicators.isEmpty() ? null : indicators.get(0);
         for (Indicator ind : indicators) {
             if (name.contains(ind.getName()) || ind.getName().contains(name)) {
                 return ind;

@@ -33,5 +33,8 @@ export type ParseStatus = 'PENDING' | 'PARSING' | 'SUCCESS' | 'FAILED'
 // 评分状态
 export type ScoreStatus = 'NOT_SCORED' | 'SCORING' | 'AI_SCORED' | 'TEACHER_CONFIRMED' | 'PUBLISHED' | 'SCORE_FAILED' | 'RETURNED'
 
+// 核查状态
+export type CheckStatus = 'NOT_CHECKED' | 'CHECKING' | 'SUCCESS' | 'CHECK_FAILED'
+
 // 消息类型
 export type MessageType = 'SUBMIT' | 'RESUBMIT' | 'SCORE_COMPLETE' | 'SCORE_PUBLISH' | 'BATCH_FAIL' | 'QUOTA_WARNING'
