@@ -1,0 +1,77 @@
+<template>
+  <div class="system-logs">
+    <el-card>
+      <template #header><span>系统日志</span></template>
+
+      <el-tabs v-model="activeTab">
+        <!-- 操作日志 -->
+        <el-tab-pane label="操作日志" name="operation">
+          <el-table :data="operationLogs" stripe v-loading="loading">
+            <el-table-column prop="username" label="操作人" width="100" />
+            <el-table-column prop="action" label="操作类型" width="150" />
+            <el-table-column prop="description" label="操作描述" min-width="200" />
+            <el-table-column prop="ip" label="IP 地址" width="140" />
+            <el-table-column prop="createdAt" label="操作时间" width="170" />
+          </el-table>
+        </el-tab-pane>
+
+        <!-- 模型调用日志 -->
+        <el-tab-pane label="模型调用日志" name="model">
+          <el-table :data="modelLogs" stripe v-loading="loading">
+            <el-table-column prop="modelType" label="模型类型" width="120" />
+            <el-table-column prop="inputTokens" label="输入 Token" width="120" />
+            <el-table-column prop="outputTokens" label="输出 Token" width="120" />
+            <el-table-column prop="duration" label="耗时(ms)" width="100" />
+            <el-table-column prop="status" label="状态" width="80" />
+            <el-table-column prop="createdAt" label="调用时间" width="170" />
+          </el-table>
+        </el-tab-pane>
+      </el-tabs>
+
+      <el-pagination
+        v-model:current-page="pagination.page"
+        v-model:page-size="pagination.size"
+        :total="pagination.total"
+        layout="total, prev, pager, next"
+        @change="loadLogs"
+        style="margin-top: 16px; justify-content: flex-end"
+      />
+    </el-card>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, watch, onMounted } from 'vue'
+import { getOperationLogs, getModelCallLogs } from '@/api/system'
+
+const activeTab = ref('operation')
+const loading = ref(false)
+const operationLogs = ref<any[]>([])
+const modelLogs = ref<any[]>([])
+const pagination = reactive({ page: 1, size: 20, total: 0 })
+
+async function loadLogs() {
+  loading.value = true
+  try {
+    if (activeTab.value === 'operation') {
+      const res = await getOperationLogs({ page: pagination.page, size: pagination.size })
+      operationLogs.value = (res.data as any).items || []
+      pagination.total = (res.data as any).total || 0
+    } else {
+      const res = await getModelCallLogs({ page: pagination.page, size: pagination.size })
+      modelLogs.value = (res.data as any).items || []
+      pagination.total = (res.data as any).total || 0
+    }
+  } catch { /* ignore */ }
+  finally {
+    loading.value = false
+  }
+}
+
+watch(activeTab, () => {
+  pagination.page = 1
+  loadLogs()
+})
+
+onMounted(loadLogs)
+</script>
