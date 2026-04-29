@@ -1,0 +1,53 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/bisai?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 200MB
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+  devtools:
+    restart:
+      enabled: true
+      additional-paths: src/main/java
+    livereload:
+      enabled: true
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 文件存储
+file:
+  upload-path: ./data/files/
+  allowed-types: .doc,.docx,.pdf,.jpg,.jpeg,.png,.xls,.xlsx,.zip
+  max-size: 209715200
+
+# JWT
+jwt:
+  secret: bisai-smart-evaluation-system-jwt-secret-key-2024
+  expiration: 86400000
+
+# AI 模型配置 (ModelScope)
+ai:
+  base-url: https://api-inference.modelscope.cn/v1
+  api-key: ms-cb4b0861-40d9-4697-86ac-b8764e1cdbd1
+  model: Qwen/Qwen2.5-72B-Instruct
+  max-tokens: 4096
+  temperature: 0.3
