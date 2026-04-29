@@ -103,15 +103,39 @@ CREATE TABLE IF NOT EXISTS `submission` (
     `submit_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '提交时间',
     `version` INT NOT NULL DEFAULT 1 COMMENT '提交版本号',
     `parse_status` VARCHAR(32) NOT NULL DEFAULT 'PENDING' COMMENT '解析状态',
+    `check_status` VARCHAR(32) NOT NULL DEFAULT 'NOT_CHECKED' COMMENT '核查状态',
     `score_status` VARCHAR(32) NOT NULL DEFAULT 'NOT_SCORED' COMMENT '评分状态',
     `total_score` DECIMAL(5,2) DEFAULT NULL COMMENT '最终总分',
     `teacher_comment` TEXT DEFAULT NULL COMMENT '教师评语',
+    `parse_summary` TEXT DEFAULT NULL COMMENT 'AI解析摘要',
+    `parse_topics` TEXT DEFAULT NULL COMMENT 'AI解析主题JSON',
+    `parse_completeness` VARCHAR(32) DEFAULT NULL COMMENT '完整度评估',
+    `parse_quality` VARCHAR(32) DEFAULT NULL COMMENT '质量评估',
+    `parse_suggestions` TEXT DEFAULT NULL COMMENT '改进建议JSON',
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_task_student` (`task_id`, `student_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='成果提交表';
+
+CREATE TABLE IF NOT EXISTS `parse_result` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '解析结果ID',
+    `submission_id` BIGINT DEFAULT NULL COMMENT '提交ID',
+    `knowledge_document_id` BIGINT DEFAULT NULL COMMENT '知识库文档ID',
+    `file_id` BIGINT DEFAULT NULL COMMENT '文件ID',
+    `parser_type` VARCHAR(64) NOT NULL COMMENT '解析方式',
+    `content` LONGTEXT DEFAULT NULL COMMENT '解析文本',
+    `summary` TEXT DEFAULT NULL COMMENT '摘要',
+    `main_topics` TEXT DEFAULT NULL COMMENT '主题JSON',
+    `completeness` VARCHAR(32) DEFAULT NULL COMMENT '完整度',
+    `quality` VARCHAR(32) DEFAULT NULL COMMENT '质量',
+    `suggestions` TEXT DEFAULT NULL COMMENT '建议JSON',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_submission_id` (`submission_id`),
+    KEY `idx_knowledge_document_id` (`knowledge_document_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='解析结果表';
 
 -- 文件表
 CREATE TABLE IF NOT EXISTS `file` (
@@ -190,6 +214,32 @@ CREATE TABLE IF NOT EXISTS `knowledge_document` (
     PRIMARY KEY (`id`),
     KEY `idx_knowledge_base_id` (`knowledge_base_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识库文档表';
+
+CREATE TABLE IF NOT EXISTS `document_chunk` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '切片ID',
+    `knowledge_document_id` BIGINT NOT NULL COMMENT '知识库文档ID',
+    `chunk_index` INT NOT NULL COMMENT '切片序号',
+    `content` TEXT NOT NULL COMMENT '切片内容',
+    `token_count` INT NOT NULL DEFAULT 0 COMMENT '估算token数',
+    `embedding` LONGTEXT DEFAULT NULL COMMENT '向量JSON',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_knowledge_document_id` (`knowledge_document_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识库文档切片表';
+
+CREATE TABLE IF NOT EXISTS `ai_call_log` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'AI调用ID',
+    `model` VARCHAR(128) NOT NULL COMMENT '模型名称',
+    `call_type` VARCHAR(32) NOT NULL COMMENT '调用类型',
+    `input_tokens` INT NOT NULL DEFAULT 0 COMMENT '输入token',
+    `output_tokens` INT NOT NULL DEFAULT 0 COMMENT '输出token',
+    `total_tokens` INT NOT NULL DEFAULT 0 COMMENT '总token',
+    `success` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否成功',
+    `error_message` TEXT DEFAULT NULL COMMENT '错误信息',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI调用日志表';
 
 -- 消息表
 CREATE TABLE IF NOT EXISTS `message` (

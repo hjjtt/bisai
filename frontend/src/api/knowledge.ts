@@ -7,6 +7,7 @@ export interface KnowledgeDocument {
   knowledgeBaseId?: number
   courseName?: string
   parseStatus: string
+  vectorStatus: string
   vectorized: boolean
   updateTime: string
 }

@@ -1,4 +1,4 @@
-import type { TaskStatus, ParseStatus, ScoreStatus, FileType } from './common'
+import type { TaskStatus, ParseStatus, ScoreStatus, CheckStatus, FileType } from './common'
 
 // 实训任务
 export interface TrainingTask {
@@ -26,6 +26,7 @@ export interface Submission {
   submitTime: string
   version: number
   parseStatus: ParseStatus
+  checkStatus?: CheckStatus
   scoreStatus: ScoreStatus
   totalScore?: number
 }

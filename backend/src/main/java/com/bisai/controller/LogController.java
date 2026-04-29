@@ -6,6 +6,8 @@ import com.bisai.common.Result;
 import com.bisai.dto.OperationLogDTO;
 import com.bisai.dto.PageQuery;
 import com.bisai.entity.OperationLog;
+import com.bisai.entity.AiCallLog;
+import com.bisai.mapper.AiCallLogMapper;
 import com.bisai.mapper.OperationLogMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -21,6 +23,7 @@ import java.util.stream.Collectors;
 public class LogController {
 
     private final OperationLogMapper operationLogMapper;
+    private final AiCallLogMapper aiCallLogMapper;
 
     @GetMapping("/operation")
     public Result<PageResult<OperationLogDTO>> operationLogs(PageQuery query) {
@@ -38,8 +41,11 @@ public class LogController {
     }
 
     @GetMapping("/model-call")
-    public Result<PageResult<Object>> modelCallLogs(PageQuery query) {
-        // MVP 阶段暂无模型调用日志表，返回空列表
-        return Result.ok(new PageResult<>(java.util.Collections.emptyList(), query.getPage(), query.getSize(), 0L));
+    public Result<PageResult<AiCallLog>> modelCallLogs(PageQuery query) {
+        Page<AiCallLog> page = new Page<>(query.getPage(), query.getSize());
+        LambdaQueryWrapper<AiCallLog> wrapper = new LambdaQueryWrapper<>();
+        wrapper.orderByDesc(AiCallLog::getCreatedAt);
+        Page<AiCallLog> result = aiCallLogMapper.selectPage(page, wrapper);
+        return Result.ok(new PageResult<>(result.getRecords(), result.getCurrent(), result.getSize(), result.getTotal()));
     }
 }
