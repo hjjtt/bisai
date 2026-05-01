@@ -35,4 +35,6 @@ public class Submission {
     private String studentName;
     @TableField(exist = false)
     private String taskTitle;
+    @TableField(exist = false)
+    private String className;
 }

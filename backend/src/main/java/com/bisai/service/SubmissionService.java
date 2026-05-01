@@ -33,19 +33,41 @@ public class SubmissionService {
     private String uploadPath;
 
     public Result<PageResult<Submission>> listSubmissions(PageQuery query, Long taskId, Long studentId) {
-        Page<Submission> page = new Page<>(query.getPage(), query.getSize());
-        LambdaQueryWrapper<Submission> wrapper = new LambdaQueryWrapper<>();
-
+        List<Submission> records;
+        long total;
+        
         if (taskId != null) {
-            wrapper.eq(Submission::getTaskId, taskId);
+            records = submissionMapper.selectByTaskIdWithDetail(taskId);
+            total = records.size();
+            
+            if (studentId != null) {
+                records = records.stream()
+                        .filter(s -> s.getStudentId().equals(studentId))
+                        .toList();
+                total = records.size();
+            }
+        } else {
+            records = submissionMapper.selectWithDetail();
+            total = records.size();
+            
+            if (studentId != null) {
+                records = records.stream()
+                        .filter(s -> s.getStudentId().equals(studentId))
+                        .toList();
+                total = records.size();
+            }
         }
-        if (studentId != null) {
-            wrapper.eq(Submission::getStudentId, studentId);
-        }
-        wrapper.orderByDesc(Submission::getCreatedAt);
-
-        Page<Submission> result = submissionMapper.selectPage(page, wrapper);
-        return Result.ok(new PageResult<>(result.getRecords(), result.getCurrent(), result.getSize(), result.getTotal()));
+        
+        int pageNum = query.getPage() - 1;
+        int pageSize = query.getSize();
+        int fromIndex = pageNum * pageSize;
+        int toIndex = Math.min(fromIndex + pageSize, records.size());
+        
+        List<Submission> pageRecords = fromIndex >= records.size() 
+                ? List.of() 
+                : records.subList(fromIndex, toIndex);
+        
+        return Result.ok(new PageResult<>(pageRecords, query.getPage(), pageSize, total));
     }
 
     public Result<Submission> getSubmission(Long id) {
