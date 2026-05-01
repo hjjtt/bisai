@@ -18,7 +18,9 @@
     <description>实训成果智能核查与评价系统后端</description>
 
     <properties>
-        <java.version>20</java.version>
+        <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <mybatis-plus.version>3.5.9</mybatis-plus.version>
         <jjwt.version>0.12.6</jjwt.version>
         <spring-ai.version>1.1.4</spring-ai.version>

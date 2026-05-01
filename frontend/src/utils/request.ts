@@ -23,7 +23,12 @@ service.interceptors.request.use(
 
 // 响应拦截器
 service.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse>) => {
+  (response) => {
+    // 如果是文件下载（responseType 为 blob），直接返回完整的 response 对象
+    if (response.config.responseType === 'blob') {
+      return response
+    }
+
     const { code, message } = response.data
     if (code === 0) {
       return response.data as any

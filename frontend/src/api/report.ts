@@ -1,13 +1,18 @@
 import { post, get, put } from '@/utils/request'
+import request from '@/utils/request'
 import type { Message, PageResponse, PageRequest } from '@/types'
 
-// 报表导出
+// 报表导出 - 直接下载文件
 export function exportStudentReport(submissionId: number, format: 'PDF' | 'WORD') {
-  return post<{ fileId: number; fileName: string }>(`/reports/student/${submissionId}`, { format })
+  return request.post(`/reports/student/${submissionId}`, { format }, {
+    responseType: 'blob'
+  })
 }
 
 export function exportClassReport(taskId: number, format: 'PDF' | 'EXCEL') {
-  return post<{ fileId: number; fileName: string }>(`/reports/class/${taskId}`, { format })
+  return request.post(`/reports/class/${taskId}`, { format }, {
+    responseType: 'blob'
+  })
 }
 
 // 消息

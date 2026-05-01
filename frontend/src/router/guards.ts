@@ -167,6 +167,12 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/teacher/BatchProgress.vue'),
         meta: { title: '批量任务', icon: 'Loading' },
       },
+      {
+        path: 'reports',
+        name: 'AdminReports',
+        component: () => import('@/views/teacher/Reports.vue'),
+        meta: { title: '报表中心', icon: 'DataAnalysis' },
+      },
     ],
   },
 ]
