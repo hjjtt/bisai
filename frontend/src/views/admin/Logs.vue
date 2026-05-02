@@ -20,11 +20,18 @@
         <!-- 模型调用日志 -->
         <el-tab-pane label="模型调用日志" name="model">
           <el-table :data="modelLogs" stripe v-loading="loading">
-            <el-table-column prop="modelType" label="模型类型" width="120" />
-            <el-table-column prop="inputTokens" label="输入 Token" width="120" />
-            <el-table-column prop="outputTokens" label="输出 Token" width="120" />
-            <el-table-column prop="duration" label="耗时(ms)" width="100" />
-            <el-table-column prop="status" label="状态" width="80" />
+            <el-table-column prop="model" label="模型类型" width="150" />
+            <el-table-column prop="callType" label="调用类型" width="100" />
+            <el-table-column prop="inputTokens" label="输入 Token" width="100" />
+            <el-table-column prop="outputTokens" label="输出 Token" width="100" />
+            <el-table-column prop="totalTokens" label="总 Token" width="100" />
+            <el-table-column label="状态" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.success ? 'success' : 'danger'" size="small">
+                  {{ row.success ? '成功' : '失败' }}
+                </el-tag>
+              </template>
+            </el-table-column>
             <el-table-column label="调用时间" width="170">
               <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
             </el-table-column>
@@ -59,11 +66,13 @@ interface OperationLog {
 }
 
 interface ModelCallLog {
-  modelType: string
+  model: string
+  callType: string
   inputTokens: number
   outputTokens: number
-  duration: number
-  status: string
+  totalTokens: number
+  success: boolean
+  errorMessage?: string
   createdAt: string
 }
 

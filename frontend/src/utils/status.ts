@@ -22,7 +22,7 @@ export function getCheckStatusLabel(status?: string): string {
 
 export function getScoreStatusType(status: string): string {
   const map: Record<string, string> = {
-    NOT_SCORED: 'info', SCORING: 'warning', AI_SCORED: '', TEACHER_CONFIRMED: 'success',
+    NOT_SCORED: 'info', SCORING: 'warning', AI_SCORED: 'primary', TEACHER_CONFIRMED: 'success',
     PUBLISHED: 'success', SCORE_FAILED: 'danger', RETURNED: 'warning',
   }
   return map[status] || 'info'
@@ -52,8 +52,8 @@ export function getRoleLabel(role: string): string {
 }
 
 export function getRoleType(role: string): string {
-  const map: Record<string, string> = { STUDENT: '', TEACHER: 'success', ADMIN: 'warning' }
-  return map[role] || ''
+  const map: Record<string, string> = { STUDENT: 'info', TEACHER: 'success', ADMIN: 'warning' }
+  return map[role] || 'info'
 }
 
 export function getKnowledgeStatusType(status: string): string {

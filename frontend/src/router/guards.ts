@@ -26,6 +26,12 @@ export const studentRoutes: RouteRecordRaw[] = [
         meta: { title: '任务详情', hidden: true },
       },
       {
+        path: 'submissions',
+        name: 'StudentMySubmissions',
+        component: () => import('@/views/student/MySubmissions.vue'),
+        meta: { title: '我的提交', icon: 'UploadFilled' },
+      },
+      {
         path: 'submit/:taskId',
         name: 'StudentSubmit',
         component: () => import('@/views/student/Submit.vue'),

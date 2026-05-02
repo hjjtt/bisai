@@ -35,8 +35,8 @@
             <div class="card-header">
               <span class="title">系统核查概览</span>
               <el-radio-group v-model="timeRange" size="small">
-                <el-radio-button label="7d">近7天</el-radio-button>
-                <el-radio-button label="30d">近30天</el-radio-button>
+                <el-radio-button value="7d">近7天</el-radio-button>
+                <el-radio-button value="30d">近30天</el-radio-button>
               </el-radio-group>
             </div>
           </template>
