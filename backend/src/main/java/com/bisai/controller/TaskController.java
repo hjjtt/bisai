@@ -51,13 +51,13 @@ public class TaskController {
 
     // 批量解析 - 对任务下所有提交触发解析
     @PostMapping("/{id}/batch-parse")
-    public Result<Void> batchParse(@PathVariable Long id) {
+    public Result<Map<String, Object>> batchParse(@PathVariable Long id) {
         return taskService.batchParse(id);
     }
 
     // 批量评分 - 对任务下所有提交触发评分
     @PostMapping("/{id}/batch-score")
-    public Result<Void> batchScore(@PathVariable Long id) {
+    public Result<Map<String, Object>> batchScore(@PathVariable Long id) {
         return taskService.batchScore(id);
     }
 

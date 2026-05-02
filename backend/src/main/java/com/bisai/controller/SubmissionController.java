@@ -26,8 +26,14 @@ public class SubmissionController {
     @GetMapping
     public Result<PageResult<Submission>> list(PageQuery query,
                                                 @RequestParam(required = false) Long taskId,
-                                                @RequestParam(required = false) Long studentId) {
-        return submissionService.listSubmissions(query, taskId, studentId);
+                                                @RequestParam(required = false) Long studentId,
+                                                Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("STUDENT");
+        return submissionService.listSubmissions(query, taskId, studentId, userId, role);
     }
 
     @GetMapping("/{id}")
@@ -103,5 +109,21 @@ public class SubmissionController {
     @PutMapping("/{id}/return")
     public Result<Void> returnSubmission(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return scoreService.returnSubmission(id, body.get("reason"));
+    }
+
+    // 客观评分
+    @GetMapping("/{id}/objective-score")
+    public Result<Map<String, Object>> getObjectiveScore(@PathVariable Long id) {
+        return scoreService.calculateObjectiveScore(id);
+    }
+
+    // 成绩修正
+    @PutMapping("/{id}/correct")
+    public Result<Void> correctScore(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        Long indicatorId = body.get("indicatorId") != null ? Long.valueOf(body.get("indicatorId").toString()) : null;
+        java.math.BigDecimal newScore = new java.math.BigDecimal(body.get("newScore").toString());
+        String reason = (String) body.get("reason");
+        return scoreService.correctScore(id, indicatorId, newScore, reason, userId);
     }
 }

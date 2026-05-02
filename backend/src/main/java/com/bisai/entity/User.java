@@ -16,6 +16,9 @@ public class User {
     private String realName;
     private Long classId;
     private String status;
+    private Boolean mustChangePassword;
+    private LocalDateTime lastPasswordChangeAt;
+    private LocalDateTime lastLoginAt;
 
     @TableLogic
     private Integer deleted;

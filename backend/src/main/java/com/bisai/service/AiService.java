@@ -29,10 +29,12 @@ public class AiService {
     private final CheckResultMapper checkResultMapper;
     private final ScoreResultMapper scoreResultMapper;
     private final TrainingTaskMapper taskMapper;
+    private final CourseMapper courseMapper;
     private final IndicatorMapper indicatorMapper;
     private final ParseResultMapper parseResultMapper;
     private final DocumentTextExtractor documentTextExtractor;
     private final KnowledgeRetrievalService knowledgeRetrievalService;
+    private final MessageService messageService;
     private final ObjectMapper objectMapper;
 
     // ==================== 智能解析 ====================
@@ -341,10 +343,20 @@ public class AiService {
                         matchedIndicator = indicators.get(0);
                     }
 
+                    // 边界校验：分数不能超过满分，不能低于0
+                    double rawScore = scoreItem.path("score").asDouble(0);
+                    double maxScore = matchedIndicator.getMaxScore() != null ? matchedIndicator.getMaxScore().doubleValue() : 100.0;
+                    double clampedScore = Math.max(0, Math.min(rawScore, maxScore));
+                    if (rawScore < 0) {
+                        log.warn("AI评分负分已截断为0, submissionId={}, indicatorId={}, rawScore={}", submissionId, matchedIndicator.getId(), rawScore);
+                    } else if (rawScore > maxScore) {
+                        log.warn("AI评分超过满分已截断, submissionId={}, indicatorId={}, rawScore={}, maxScore={}", submissionId, matchedIndicator.getId(), rawScore, maxScore);
+                    }
+
                     ScoreResult sr = new ScoreResult();
                     sr.setSubmissionId(submissionId);
                     sr.setIndicatorId(matchedIndicator.getId());
-                    sr.setAutoScore(BigDecimal.valueOf(scoreItem.path("score").asDouble(0)));
+                    sr.setAutoScore(BigDecimal.valueOf(clampedScore));
                     sr.setReason(scoreItem.path("reason").asText(""));
                     sr.setEvidence(scoreItem.path("evidence").asText(""));
                     sr.setIndicatorName(indName);
@@ -362,6 +374,23 @@ public class AiService {
             submission.setScoreStatus("AI_SCORED");
             submission.setTotalScore(totalScore);
             submissionMapper.updateById(submission);
+
+            // 发送消息通知教师AI评分完成
+            try {
+                Course course = courseMapper.selectById(task.getCourseId());
+                Long teacherId = course != null ? course.getTeacherId() : null;
+                if (teacherId != null) {
+                    messageService.sendMessage(
+                            teacherId,
+                            "AI_SCORE",
+                            "智能评分完成",
+                            String.format("提交记录（ID:%d）的智能评分已完成，请及时复核确认。", submissionId),
+                            submissionId
+                    );
+                }
+            } catch (Exception e) {
+                log.warn("发送AI评分完成消息失败: {}", e.getMessage());
+            }
 
             log.info("智能评分完成, submissionId={}, 评分项数={}, 总分={}", submissionId, scores.size(), totalScore);
 

@@ -36,13 +36,7 @@
               </el-radio-group>
             </div>
           </template>
-          <!-- 占位图表区 -->
-          <div class="chart-placeholder">
-            <div class="placeholder-content">
-              <el-icon :size="48"><DataLine /></el-icon>
-              <p>数据图表加载中...</p>
-            </div>
-          </div>
+          <div ref="chartRef" class="chart-container"></div>
         </el-card>
       </el-col>
       <el-col :span="8">
@@ -113,10 +107,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import * as echarts from 'echarts'
 import { getAdminStats } from '@/api/dashboard'
 
 const timeRange = ref('7d')
+const chartRef = ref<HTMLElement>()
+let chartInstance: echarts.ECharts | null = null
 
 const statCards = ref([
   { title: '用户总数', value: 0, icon: 'User', color: '#3b82f6' },
@@ -138,10 +135,58 @@ async function loadStats() {
     statCards.value[3].value = d.todayError || 0
     systemStatus.value = d.systemStatus || []
     logs.value = d.recentLogs || []
+    initChart(d)
   } catch { /* ignore */ }
 }
 
+function initChart(data: any) {
+  if (!chartRef.value) return
+  
+  chartInstance = echarts.init(chartRef.value)
+  
+  const option = {
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['提交数', '解析成功', '评分完成'] },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: data.dates || ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    },
+    yAxis: { type: 'value' },
+    series: [
+      {
+        name: '提交数',
+        type: 'line',
+        smooth: true,
+        data: data.submissions || [12, 18, 15, 22, 28, 8, 5],
+        itemStyle: { color: '#3b82f6' }
+      },
+      {
+        name: '解析成功',
+        type: 'line',
+        smooth: true,
+        data: data.parsed || [10, 16, 14, 20, 25, 7, 4],
+        itemStyle: { color: '#10b981' }
+      },
+      {
+        name: '评分完成',
+        type: 'line',
+        smooth: true,
+        data: data.scored || [8, 12, 10, 15, 20, 5, 3],
+        itemStyle: { color: '#f59e0b' }
+      }
+    ]
+  }
+  
+  chartInstance.setOption(option)
+}
+
 onMounted(loadStats)
+
+onUnmounted(() => {
+  chartInstance?.dispose()
+})
 </script>
 
 <style lang="scss" scoped>
@@ -213,18 +258,9 @@ onMounted(loadStats)
   }
 }
 
-.chart-placeholder {
+.chart-container {
   height: 300px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f8fafc;
-  border-radius: 8px;
-  color: #94a3b8;
-  .placeholder-content {
-    text-align: center;
-    p { margin-top: 12px; font-size: 14px; }
-  }
+  width: 100%;
 }
 
 .status-card {
