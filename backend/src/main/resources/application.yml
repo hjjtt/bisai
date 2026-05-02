@@ -55,6 +55,7 @@ file:
   upload-path: ./data/files/
   allowed-types: .doc,.docx,.pdf,.jpg,.jpeg,.png,.xls,.xlsx,.zip
   max-size: 209715200
+  max-versions: 5
 
 # JWT
 jwt:
@@ -72,3 +73,4 @@ ai:
   temperature: 0.3
   daily-token-limit: 200000
   daily-call-limit: 1000
+  rerank-model:

@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS `user` (
     `real_name` VARCHAR(64) NOT NULL COMMENT '真实姓名',
     `class_id` BIGINT DEFAULT NULL COMMENT '学生所属班级ID',
     `status` VARCHAR(32) NOT NULL DEFAULT 'ENABLED' COMMENT '状态: ENABLED/DISABLED',
+    `must_change_password` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否首次登录必须修改密码',
+    `last_password_change_at` DATETIME DEFAULT NULL COMMENT '最近密码修改时间',
+    `last_login_at` DATETIME DEFAULT NULL COMMENT '最近登录时间',
     `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -105,7 +108,8 @@ CREATE TABLE IF NOT EXISTS `submission` (
     `parse_status` VARCHAR(32) NOT NULL DEFAULT 'PENDING' COMMENT '解析状态',
     `check_status` VARCHAR(32) NOT NULL DEFAULT 'NOT_CHECKED' COMMENT '核查状态',
     `score_status` VARCHAR(32) NOT NULL DEFAULT 'NOT_SCORED' COMMENT '评分状态',
-    `total_score` DECIMAL(5,2) DEFAULT NULL COMMENT '最终总分',
+    `total_score` DECIMAL(5,2) DEFAULT NULL COMMENT '教师确认后的最终总分',
+    `auto_total_score` DECIMAL(5,2) DEFAULT NULL COMMENT '系统建议总分',
     `teacher_comment` TEXT DEFAULT NULL COMMENT '教师评语',
     `parse_summary` TEXT DEFAULT NULL COMMENT 'AI解析摘要',
     `parse_topics` TEXT DEFAULT NULL COMMENT 'AI解析主题JSON',
@@ -280,6 +284,61 @@ CREATE TABLE IF NOT EXISTS `system_config` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_config_key` (`config_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统配置表';
+
+-- 异步任务表
+CREATE TABLE IF NOT EXISTS `async_task` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '任务ID',
+    `task_type` VARCHAR(32) NOT NULL COMMENT '任务类型: PARSE/CHECK/SCORE/EXPORT',
+    `biz_id` BIGINT NOT NULL COMMENT '业务ID(提交ID)',
+    `status` VARCHAR(32) NOT NULL DEFAULT 'PENDING' COMMENT '状态: PENDING/RUNNING/SUCCESS/FAILED/RETRYING',
+    `retry_count` INT NOT NULL DEFAULT 0 COMMENT '已重试次数',
+    `max_retry` INT NOT NULL DEFAULT 3 COMMENT '最大重试次数',
+    `next_run_at` DATETIME DEFAULT NULL COMMENT '下次执行时间',
+    `error_message` TEXT DEFAULT NULL COMMENT '错误信息',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_status` (`status`),
+    KEY `idx_biz_id` (`biz_id`),
+    KEY `idx_next_run_at` (`next_run_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='异步任务表';
+
+-- 评分校准表
+CREATE TABLE IF NOT EXISTS `score_calibration` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '校准记录ID',
+    `task_id` BIGINT NOT NULL COMMENT '实训任务ID',
+    `submission_id` BIGINT NOT NULL COMMENT '校准样本提交ID',
+    `indicator_id` BIGINT NOT NULL COMMENT '指标ID',
+    `calibration_score` DECIMAL(5,2) NOT NULL COMMENT '校准分数',
+    `calibration_reason` TEXT DEFAULT NULL COMMENT '校准理由',
+    `typical_advantages` TEXT DEFAULT NULL COMMENT '典型优点',
+    `typical_problems` TEXT DEFAULT NULL COMMENT '典型问题',
+    `deduction_basis` TEXT DEFAULT NULL COMMENT '扣分依据',
+    `confirmed_by` BIGINT DEFAULT NULL COMMENT '确认人ID',
+    `confirmed_at` DATETIME DEFAULT NULL COMMENT '确认时间',
+    `deleted` TINYINT NOT NULL DEFAULT 0,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_task_id` (`task_id`),
+    KEY `idx_submission_id` (`submission_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评分校准表';
+
+-- 成绩修正表
+CREATE TABLE IF NOT EXISTS `score_correction` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '修正记录ID',
+    `submission_id` BIGINT NOT NULL COMMENT '提交ID',
+    `indicator_id` BIGINT DEFAULT NULL COMMENT '指标ID，为空表示修正总分',
+    `original_score` DECIMAL(5,2) NOT NULL COMMENT '原始分数',
+    `new_score` DECIMAL(5,2) NOT NULL COMMENT '修正后分数',
+    `reason` TEXT NOT NULL COMMENT '修正原因',
+    `corrected_by` BIGINT NOT NULL COMMENT '修正人ID',
+    `corrected_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '修正时间',
+    `deleted` TINYINT NOT NULL DEFAULT 0,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_submission_id` (`submission_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='成绩修正表';
 
 -- 初始化管理员账号 (密码: admin123，BCrypt加密)
 INSERT INTO `user` (`username`, `password`, `role`, `real_name`, `status`) VALUES

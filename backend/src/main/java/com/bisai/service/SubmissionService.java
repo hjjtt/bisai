@@ -3,10 +3,14 @@ package com.bisai.service;
 import com.bisai.common.PageResult;
 import com.bisai.common.Result;
 import com.bisai.dto.PageQuery;
+import com.bisai.entity.Course;
 import com.bisai.entity.Submission;
 import com.bisai.entity.FileEntity;
+import com.bisai.entity.TrainingTask;
+import com.bisai.mapper.CourseMapper;
 import com.bisai.mapper.FileMapper;
 import com.bisai.mapper.SubmissionMapper;
+import com.bisai.mapper.TrainingTaskMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -28,18 +32,46 @@ public class SubmissionService {
 
     private final SubmissionMapper submissionMapper;
     private final FileMapper fileMapper;
+    private final TrainingTaskMapper taskMapper;
+    private final CourseMapper courseMapper;
+    private final MessageService messageService;
 
     @Value("${file.upload-path}")
     private String uploadPath;
 
-    public Result<PageResult<Submission>> listSubmissions(PageQuery query, Long taskId, Long studentId) {
+    @Value("${file.max-versions:5}")
+    private int maxVersions;
+
+    public Result<PageResult<Submission>> listSubmissions(PageQuery query, Long taskId, Long studentId, Long userId, String role) {
         Page<Submission> page = new Page<>(query.getPage(), query.getSize());
         LambdaQueryWrapper<Submission> wrapper = new LambdaQueryWrapper<>();
 
-        if (taskId != null) {
+        // 数据权限隔离
+        if ("STUDENT".equals(role)) {
+            // 学生只能查看自己的提交
+            wrapper.eq(Submission::getStudentId, userId);
+        } else if ("TEACHER".equals(role)) {
+            // 教师只能查看自己课程下的提交
+            if (taskId != null) {
+                wrapper.eq(Submission::getTaskId, taskId);
+            } else {
+                // 查询该教师所有课程下的任务提交
+                List<Long> taskIds = taskMapper.selectList(
+                        new LambdaQueryWrapper<TrainingTask>()
+                                .exists("SELECT 1 FROM course c WHERE c.id = training_task.course_id AND c.teacher_id = {0}", userId)
+                ).stream().map(TrainingTask::getId).toList();
+                if (taskIds.isEmpty()) {
+                    return Result.ok(new PageResult<>(List.of(), page.getCurrent(), page.getSize(), 0));
+                }
+                wrapper.in(Submission::getTaskId, taskIds);
+            }
+        }
+        // 管理员不添加额外过滤
+
+        if (taskId != null && !"TEACHER".equals(role)) {
             wrapper.eq(Submission::getTaskId, taskId);
         }
-        if (studentId != null) {
+        if (studentId != null && !"STUDENT".equals(role)) {
             wrapper.eq(Submission::getStudentId, studentId);
         }
         wrapper.orderByDesc(Submission::getCreatedAt);
@@ -64,6 +96,24 @@ public class SubmissionService {
                         .eq(Submission::getStudentId, studentId)
         );
         int version = count.intValue() + 1;
+
+        // 检查版本数量限制
+        if (count >= maxVersions) {
+            // 删除最早的提交记录及其关联文件
+            List<Submission> oldSubmissions = submissionMapper.selectList(
+                    new LambdaQueryWrapper<Submission>()
+                            .eq(Submission::getTaskId, taskId)
+                            .eq(Submission::getStudentId, studentId)
+                            .orderByAsc(Submission::getVersion)
+                            .last("LIMIT " + (count.intValue() - maxVersions + 1))
+            );
+            for (Submission old : oldSubmissions) {
+                // 逻辑删除旧提交关联的文件
+                fileMapper.delete(new LambdaQueryWrapper<FileEntity>().eq(FileEntity::getSubmissionId, old.getId()));
+                // 逻辑删除旧提交
+                submissionMapper.deleteById(old.getId());
+            }
+        }
 
         // 创建提交记录
         Submission submission = new Submission();
@@ -97,6 +147,27 @@ public class SubmissionService {
             fileEntity.setFileHash(cn.hutool.crypto.digest.DigestUtil.md5Hex(file.getInputStream()));
             fileEntity.setVersion(version);
             fileMapper.insert(fileEntity);
+        }
+
+        // 发送消息通知教师
+        try {
+            TrainingTask task = taskMapper.selectById(taskId);
+            if (task != null) {
+                Course course = courseMapper.selectById(task.getCourseId());
+                if (course != null && course.getTeacherId() != null) {
+                    String courseName = course.getName() != null ? course.getName() : "";
+                    messageService.sendMessage(
+                            course.getTeacherId(),
+                            "SUBMISSION",
+                            "学生提交实训成果",
+                            String.format("学生（ID:%d）已提交任务「%s」的成果文件（课程：%s，版本：%d），请及时处理。",
+                                    studentId, task.getTitle(), courseName, version),
+                            submission.getId()
+                    );
+                }
+            }
+        } catch (Exception e) {
+            // 消息发送失败不影响主流程
         }
 
         return Result.ok();

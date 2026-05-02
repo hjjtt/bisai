@@ -19,6 +19,7 @@ public class Submission {
     private String checkStatus;
     private String scoreStatus;
     private BigDecimal totalScore;
+    private BigDecimal autoTotalScore;
     private String teacherComment;
     private String parseSummary;
     private String parseTopics;
