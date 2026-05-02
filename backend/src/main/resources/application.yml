@@ -5,7 +5,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/bisai?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
-    password: 123456
+    password: ${DB_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
   servlet:
     multipart:
@@ -26,7 +26,7 @@ spring:
       embedding: openai
     openai:
       base-url: https://api-inference.modelscope.cn
-      api-key: ${ai.api-key}
+      api-key: ${ai.api-key:YOUR_MODELSCOPE_API_KEY}
       chat:
         completions-path: /v1/chat/completions
         options:
@@ -59,13 +59,13 @@ file:
 
 # JWT
 jwt:
-  secret: bisai-smart-evaluation-system-jwt-secret-key-2024
+  secret: ${JWT_SECRET:bisai-smart-evaluation-system-jwt-secret-key-2024}
   expiration: 86400000
 
 # AI 模型配置 (ModelScope)
 ai:
   base-url: https://api-inference.modelscope.cn/v1
-  api-key: YOUR_MODELSCOPE_API_KEY
+  api-key: ${AI_API_KEY:YOUR_MODELSCOPE_API_KEY}
   model: Qwen/Qwen3.5-35B-A3B
   embedding-model: damo/nlp_corom_sentence-embedding_chinese-base
   vision-model: Qwen/Qwen3.5-35B-A3B

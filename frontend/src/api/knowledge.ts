@@ -1,4 +1,4 @@
-import { get, del, post, upload } from '@/utils/request'
+import { get, del, post, put, upload } from '@/utils/request'
 import type { PageResponse, PageRequest } from '@/types'
 
 export interface KnowledgeDocument {
@@ -9,6 +9,7 @@ export interface KnowledgeDocument {
   parseStatus: string
   vectorStatus: string
   vectorized: boolean
+  enabled: boolean
   updateTime: string
 }
 
@@ -27,4 +28,8 @@ export function uploadKnowledge(file: File, courseId?: number) {
 
 export function deleteKnowledge(id: number) {
   return del(`/knowledge/${id}`)
+}
+
+export function toggleKnowledgeStatus(id: number, enabled: boolean) {
+  return put(`/knowledge/${id}/toggle`, { enabled })
 }

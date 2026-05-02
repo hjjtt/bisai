@@ -64,8 +64,13 @@ public class AsyncTaskService {
     /**
      * 执行单个任务
      */
-    private synchronized void executeTask(AsyncTask task) {
-        // 更新状态为运行中
+    private void executeTask(AsyncTask task) {
+        // 使用乐观锁防止重复执行
+        AsyncTask fresh = asyncTaskMapper.selectById(task.getId());
+        if (fresh == null || !"PENDING".equals(fresh.getStatus()) && !"RETRYING".equals(fresh.getStatus())) {
+            return;
+        }
+
         task.setStatus("RUNNING");
         asyncTaskMapper.updateById(task);
 

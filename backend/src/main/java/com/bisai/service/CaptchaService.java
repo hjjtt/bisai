@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Service
@@ -76,9 +77,9 @@ public class CaptchaService {
     public void recordFailure(String username) {
         LoginFailureEntry entry = failureStore.computeIfAbsent(username,
                 k -> new LoginFailureEntry(0, null));
-        entry.failCount++;
+        int count = entry.failCount.incrementAndGet();
 
-        if (entry.failCount >= MAX_FAILURES) {
+        if (count >= MAX_FAILURES) {
             entry.lockUntil = LocalDateTime.now().plusMinutes(LOCK_DURATION_MINUTES);
             log.warn("用户 {} 登录失败次数过多，账号锁定 {} 分钟", username, LOCK_DURATION_MINUTES);
         }
@@ -96,7 +97,7 @@ public class CaptchaService {
      */
     public int getFailureCount(String username) {
         LoginFailureEntry entry = failureStore.get(username);
-        return entry != null ? entry.failCount : 0;
+        return entry != null ? entry.failCount.get() : 0;
     }
 
     private void cleanupExpiredCaptchas() {
@@ -107,11 +108,11 @@ public class CaptchaService {
     private record CaptchaEntry(String code, LocalDateTime expireTime) {}
 
     private static class LoginFailureEntry {
-        int failCount;
-        LocalDateTime lockUntil;
+        final AtomicInteger failCount = new AtomicInteger(0);
+        volatile LocalDateTime lockUntil;
 
         LoginFailureEntry(int failCount, LocalDateTime lockUntil) {
-            this.failCount = failCount;
+            this.failCount.set(failCount);
             this.lockUntil = lockUntil;
         }
     }

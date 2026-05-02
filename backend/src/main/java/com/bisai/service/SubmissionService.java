@@ -15,6 +15,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SubmissionService {
@@ -41,6 +44,10 @@ public class SubmissionService {
 
     @Value("${file.max-versions:5}")
     private int maxVersions;
+
+    private static final java.util.Set<String> ALLOWED_EXTENSIONS = java.util.Set.of(
+            "DOC", "DOCX", "PDF", "JPG", "JPEG", "PNG", "XLS", "XLSX", "ZIP"
+    );
 
     public Result<PageResult<Submission>> listSubmissions(PageQuery query, Long taskId, Long studentId, Long userId, String role) {
         Page<Submission> page = new Page<>(query.getPage(), query.getSize());
@@ -80,22 +87,43 @@ public class SubmissionService {
         return Result.ok(new PageResult<>(result.getRecords(), result.getCurrent(), result.getSize(), result.getTotal()));
     }
 
-    public Result<Submission> getSubmission(Long id) {
+    public Result<Submission> getSubmission(Long id, Long userId, String role) {
         Submission submission = submissionMapper.selectById(id);
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
         }
+        // 数据权限校验
+        if ("STUDENT".equals(role) && !submission.getStudentId().equals(userId)) {
+            return Result.error(40301, "无权查看此提交");
+        }
+        if ("TEACHER".equals(role)) {
+            Course course = courseMapper.selectOne(
+                    new LambdaQueryWrapper<Course>()
+                            .exists("SELECT 1 FROM training_task tt WHERE tt.course_id = course.id AND tt.id = {0}", submission.getTaskId())
+                            .eq(Course::getTeacherId, userId)
+            );
+            if (course == null) {
+                return Result.error(40301, "无权查看此提交");
+            }
+        }
         return Result.ok(submission);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> uploadFiles(Long taskId, Long studentId, MultipartFile[] files) throws IOException {
-        // 查询当前版本号
-        Long count = submissionMapper.selectCount(
+        // 通过数据库 MAX 查询确定当前最大版本号，避免并发冲突
+        List<Submission> existing = submissionMapper.selectList(
                 new LambdaQueryWrapper<Submission>()
                         .eq(Submission::getTaskId, taskId)
                         .eq(Submission::getStudentId, studentId)
+                        .select(Submission::getVersion)
         );
-        int version = count.intValue() + 1;
+        int version = existing.stream()
+                .map(Submission::getVersion)
+                .filter(v -> v != null)
+                .max(Integer::compareTo)
+                .orElse(0) + 1;
+        long count = existing.size();
 
         // 检查版本数量限制
         if (count >= maxVersions) {
@@ -105,7 +133,7 @@ public class SubmissionService {
                             .eq(Submission::getTaskId, taskId)
                             .eq(Submission::getStudentId, studentId)
                             .orderByAsc(Submission::getVersion)
-                            .last("LIMIT " + (count.intValue() - maxVersions + 1))
+                            .last("LIMIT " + ((int) count - maxVersions + 1))
             );
             for (Submission old : oldSubmissions) {
                 // 逻辑删除旧提交关联的文件
@@ -131,6 +159,19 @@ public class SubmissionService {
             String originalName = file.getOriginalFilename();
             String ext = originalName != null && originalName.contains(".")
                     ? originalName.substring(originalName.lastIndexOf(".")) : "";
+            String extUpper = ext.replace(".", "").toUpperCase();
+
+            // 校验文件扩展名
+            if (extUpper.isEmpty() || !ALLOWED_EXTENSIONS.contains(extUpper)) {
+                return Result.error(40001, "不支持的文件类型: " + ext);
+            }
+
+            // 校验 MIME 类型
+            String contentType = file.getContentType();
+            if (contentType != null && !isValidMimeType(contentType, extUpper)) {
+                log.warn("文件MIME类型不匹配: originalName={}, contentType={}, ext={}", originalName, contentType, ext);
+            }
+
             String storedName = UUID.randomUUID().toString() + ext;
 
             Path dir = Paths.get(uploadPath, "submissions", String.valueOf(taskId), String.valueOf(studentId), String.valueOf(version));
@@ -178,5 +219,21 @@ public class SubmissionService {
                 new LambdaQueryWrapper<FileEntity>().eq(FileEntity::getSubmissionId, submissionId)
         );
         return Result.ok(files);
+    }
+
+    private boolean isValidMimeType(String contentType, String ext) {
+        java.util.Map<String, java.util.List<String>> mimeMap = java.util.Map.of(
+                "PDF", java.util.List.of("application/pdf"),
+                "DOC", java.util.List.of("application/msword"),
+                "DOCX", java.util.List.of("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+                "XLS", java.util.List.of("application/vnd.ms-excel"),
+                "XLSX", java.util.List.of("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                "JPG", java.util.List.of("image/jpeg"),
+                "JPEG", java.util.List.of("image/jpeg"),
+                "PNG", java.util.List.of("image/png"),
+                "ZIP", java.util.List.of("application/zip", "application/x-zip-compressed")
+        );
+        java.util.List<String> valid = mimeMap.get(ext);
+        return valid != null && valid.stream().anyMatch(contentType::startsWith);
     }
 }

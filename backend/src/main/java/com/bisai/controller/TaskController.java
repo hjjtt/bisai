@@ -6,6 +6,7 @@ import com.bisai.dto.PageQuery;
 import com.bisai.entity.TrainingTask;
 import com.bisai.service.TaskService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -30,33 +31,39 @@ public class TaskController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<TrainingTask> create(@RequestBody TrainingTask task) {
         return taskService.createTask(task);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<TrainingTask> update(@PathVariable Long id, @RequestBody TrainingTask task) {
         return taskService.updateTask(id, task);
     }
 
     @PutMapping("/{id}/publish")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Void> publish(@PathVariable Long id) {
         return taskService.publishTask(id);
     }
 
     @PutMapping("/{id}/close")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Void> close(@PathVariable Long id) {
         return taskService.closeTask(id);
     }
 
     // 批量解析 - 对任务下所有提交触发解析
     @PostMapping("/{id}/batch-parse")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Map<String, Object>> batchParse(@PathVariable Long id) {
         return taskService.batchParse(id);
     }
 
     // 批量评分 - 对任务下所有提交触发评分
     @PostMapping("/{id}/batch-score")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Map<String, Object>> batchScore(@PathVariable Long id) {
         return taskService.batchScore(id);
     }

@@ -48,9 +48,6 @@
                 <el-icon><Bell /></el-icon>
               </el-badge>
             </el-tooltip>
-            <el-tooltip content="搜索" placement="bottom">
-              <el-icon><Search /></el-icon>
-            </el-tooltip>
           </div>
           <el-dropdown @command="handleCommand">
             <div class="user-info">
@@ -60,9 +57,7 @@
             </div>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="profile">个人中心</el-dropdown-item>
-                <el-dropdown-item command="password">修改密码</el-dropdown-item>
-                <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
+                <el-dropdown-item command="logout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -78,23 +73,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Fold, Expand, Bell, Search, UserFilled, Monitor } from '@element-plus/icons-vue'
+import { Fold, Expand, Bell, Monitor } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
+import { useAppStore } from '@/store/app'
 import { studentRoutes, teacherRoutes, adminRoutes } from '@/router/guards'
+import type { RouteRecordRaw } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const appStore = useAppStore()
 
-const sidebarCollapsed = ref(false)
+const sidebarCollapsed = computed({
+  get: () => appStore.sidebarCollapsed,
+  set: (val: boolean) => { appStore.sidebarCollapsed = val },
+})
 const userInfo = computed(() => userStore.userInfo)
-// 修复：role 在 store 中是一个函数，需要执行
-const userRole = computed(() => userStore.role())
+const userRole = computed(() => userStore.role)
 
 const toggleSidebar = () => {
-  sidebarCollapsed.value = !sidebarCollapsed.value
+  appStore.toggleSidebar()
 }
 
 const currentRoute = computed(() => route.path)
@@ -103,23 +103,28 @@ const currentTitle = computed(() => {
   return (route.meta.title as string) || ''
 })
 
-const menuItems = computed(() => {
+interface MenuItem {
+  path: string
+  title: string
+  icon: string
+}
+
+const menuItems = computed((): MenuItem[] => {
   const role = userRole.value
-  let routes: any[] = []
-  
+  let routes: RouteRecordRaw[] = []
+
   if (role === 'STUDENT') routes = studentRoutes[0].children || []
   else if (role === 'TEACHER') routes = teacherRoutes[0].children || []
   else if (role === 'ADMIN') routes = adminRoutes[0].children || []
-  
+
   return routes.filter(r => !r.meta?.hidden).map(r => {
-    // 基础路径处理
     const basePath = role === 'ADMIN' ? '/admin' : role === 'TEACHER' ? '/teacher' : '/student'
     const fullPath = r.path === '' ? basePath : `${basePath}/${r.path}`
-    
+
     return {
       path: fullPath,
-      title: r.meta?.title,
-      icon: r.meta?.icon
+      title: r.meta?.title as string,
+      icon: r.meta?.icon as string,
     }
   })
 })
@@ -150,7 +155,7 @@ const handleCommand = (command: string) => {
     padding: 0 16px;
     gap: 12px;
     background-color: #0f172a;
-    
+
     .logo-circle {
       width: 32px;
       height: 32px;
@@ -174,16 +179,16 @@ const handleCommand = (command: string) => {
   .sidebar-menu {
     border-right: none;
     padding-top: 12px;
-    
+
     :deep(.el-menu-item) {
       height: 50px;
       line-height: 50px;
-      
+
       &:hover {
         color: #fff !important;
         background-color: rgba(255, 255, 255, 0.05) !important;
       }
-      
+
       &.is-active {
         background-color: #3b82f6 !important;
         color: #fff !important;
@@ -229,7 +234,7 @@ const handleCommand = (command: string) => {
       color: #64748b;
       font-size: 18px;
       cursor: pointer;
-      
+
       .el-icon:hover {
         color: #3b82f6;
       }
@@ -240,12 +245,12 @@ const handleCommand = (command: string) => {
       align-items: center;
       gap: 8px;
       cursor: pointer;
-      
+
       .welcome {
         font-size: 13px;
         color: #94a3b8;
       }
-      
+
       .username {
         font-size: 14px;
         color: #1e293b;

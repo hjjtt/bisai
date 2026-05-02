@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { UserInfo } from '@/types'
 import { setToken, setUserInfo, clearAuth, getToken, getUserInfo } from '@/utils/auth'
 
@@ -23,10 +23,10 @@ export const useUserStore = defineStore('user', () => {
     clearAuth()
   }
 
-  const role = () => userInfo.value?.role ?? null
-  const isStudent = () => role() === 'STUDENT'
-  const isTeacher = () => role() === 'TEACHER'
-  const isAdmin = () => role() === 'ADMIN'
+  const role = computed(() => userInfo.value?.role ?? null)
+  const isStudent = computed(() => role.value === 'STUDENT')
+  const isTeacher = computed(() => role.value === 'TEACHER')
+  const isAdmin = computed(() => role.value === 'ADMIN')
 
   return {
     token,

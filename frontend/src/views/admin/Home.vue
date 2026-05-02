@@ -7,17 +7,21 @@
           <div class="card-body">
             <div class="stat-info">
               <div class="stat-label">{{ item.title }}</div>
-              <div class="stat-value">{{ item.value.toLocaleString() }}</div>
+              <div class="stat-value" v-if="statsLoading">
+                <el-icon class="is-loading"><Loading /></el-icon>
+              </div>
+              <div class="stat-value" v-else>{{ item.value.toLocaleString() }}</div>
             </div>
             <div class="stat-icon" :style="{ background: item.color + '15', color: item.color }">
               <el-icon><component :is="item.icon" /></el-icon>
             </div>
           </div>
           <div class="card-footer">
-            <span class="trend up">
-              <el-icon><CaretTop /></el-icon> 12%
+            <span class="trend" :class="item.trend >= 0 ? 'up' : 'down'">
+              <el-icon><CaretTop v-if="item.trend >= 0" /><CaretBottom v-else /></el-icon>
+              {{ item.trend >= 0 ? '+' : '' }}{{ item.trend }}%
             </span>
-            <span class="footer-text">较上月有所增长</span>
+            <span class="footer-text">较上期统计</span>
           </div>
         </el-card>
       </el-col>
@@ -26,7 +30,7 @@
     <!-- 图表与列表区 -->
     <el-row :gutter="20" class="mt-20">
       <el-col :span="16">
-        <el-card shadow="never">
+        <el-card shadow="never" v-loading="statsLoading">
           <template #header>
             <div class="card-header">
               <span class="title">系统核查概览</span>
@@ -55,20 +59,21 @@
               <el-tag :type="status.type" size="small" effect="plain">{{ status.text }}</el-tag>
             </div>
           </div>
+          <el-empty v-if="systemStatus.length === 0 && !statsLoading" description="暂无状态数据" :image-size="60" />
           <div class="usage-stats">
             <div class="usage-item">
               <div class="usage-header">
                 <span>API 调用频率 (每日)</span>
-                <span>45%</span>
+                <span>{{ apiUsage }}%</span>
               </div>
-              <el-progress :percentage="45" :show-text="false" />
+              <el-progress :percentage="apiUsage" :show-text="false" />
             </div>
             <div class="usage-item">
               <div class="usage-header">
                 <span>服务器负载</span>
-                <span>28%</span>
+                <span>{{ serverLoad }}%</span>
               </div>
-              <el-progress :percentage="28" :show-text="false" status="success" />
+              <el-progress :percentage="serverLoad" :show-text="false" :status="serverLoad < 50 ? 'success' : 'warning'" />
             </div>
           </div>
         </el-card>
@@ -82,10 +87,10 @@
           <template #header>
             <div class="card-header">
               <span class="title">最近操作日志</span>
-              <el-button type="primary" link>查看全部</el-button>
+              <el-button type="primary" link @click="$router.push('/admin/logs')">查看全部</el-button>
             </div>
           </template>
-          <el-table :data="logs" style="width: 100%" size="small">
+          <el-table :data="logs" style="width: 100%" size="small" v-loading="statsLoading">
             <el-table-column prop="time" label="操作时间" width="180" />
             <el-table-column prop="user" label="操作员" width="150" />
             <el-table-column prop="type" label="操作类型" width="150">
@@ -95,11 +100,14 @@
             </el-table-column>
             <el-table-column prop="content" label="详情" />
             <el-table-column label="状态" width="120">
-              <template #default>
-                <el-tag type="success" size="small" effect="dark">成功</el-tag>
+              <template #default="{ row }">
+                <el-tag :type="row.status === '失败' ? 'danger' : 'success'" size="small" effect="dark">
+                  {{ row.status || '成功' }}
+                </el-tag>
               </template>
             </el-table-column>
           </el-table>
+          <el-empty v-if="!statsLoading && logs.length === 0" description="暂无操作日志" :image-size="60" />
         </el-card>
       </el-col>
     </el-row>
@@ -109,49 +117,65 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
+import { Loading } from '@element-plus/icons-vue'
 import { getAdminStats } from '@/api/dashboard'
+import type { SystemStatusItem, LogEntry, BaseStats } from '@/types'
 
 const timeRange = ref('7d')
 const chartRef = ref<HTMLElement>()
+const statsLoading = ref(true)
 let chartInstance: echarts.ECharts | null = null
 
 const statCards = ref([
-  { title: '用户总数', value: 0, icon: 'User', color: '#3b82f6' },
-  { title: '活跃班级', value: 0, icon: 'School', color: '#10b981' },
-  { title: '核查任务', value: 0, icon: 'Document', color: '#f59e0b' },
-  { title: '系统异常', value: 0, icon: 'Warning', color: '#ef4444' },
+  { title: '用户总数', value: 0, trend: 0, icon: 'User', color: '#3b82f6' },
+  { title: '活跃班级', value: 0, trend: 0, icon: 'School', color: '#10b981' },
+  { title: '核查任务', value: 0, trend: 0, icon: 'Document', color: '#f59e0b' },
+  { title: '系统异常', value: 0, trend: 0, icon: 'Warning', color: '#ef4444' },
 ])
 
-const systemStatus = ref<any[]>([])
-const logs = ref<any[]>([])
+const systemStatus = ref<SystemStatusItem[]>([])
+const logs = ref<LogEntry[]>([])
+const apiUsage = ref(0)
+const serverLoad = ref(0)
 
 async function loadStats() {
+  statsLoading.value = true
   try {
     const res = await getAdminStats()
-    const d = res.data as any
+    const d = res.data as BaseStats
     statCards.value[0].value = d.userCount || 0
+    statCards.value[0].trend = d.userTrend || 0
     statCards.value[1].value = d.classCount || 0
+    statCards.value[1].trend = d.classTrend || 0
     statCards.value[2].value = d.taskCount || 0
+    statCards.value[2].trend = d.taskTrend || 0
     statCards.value[3].value = d.todayError || 0
+    statCards.value[3].trend = d.errorTrend || 0
     systemStatus.value = d.systemStatus || []
     logs.value = d.recentLogs || []
+    apiUsage.value = d.apiUsage || 0
+    serverLoad.value = d.serverLoad || 0
     initChart(d)
-  } catch { /* ignore */ }
+  } catch (e) {
+    console.error('加载管理统计失败:', e)
+  } finally {
+    statsLoading.value = false
+  }
 }
 
-function initChart(data: any) {
+function initChart(data: BaseStats) {
   if (!chartRef.value) return
-  
+
   chartInstance = echarts.init(chartRef.value)
-  
-  const option = {
+
+  const option: echarts.EChartsOption = {
     tooltip: { trigger: 'axis' },
     legend: { data: ['提交数', '解析成功', '评分完成'] },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
     xAxis: {
       type: 'category',
       boundaryGap: false,
-      data: data.dates || ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+      data: data.dates || [],
     },
     yAxis: { type: 'value' },
     series: [
@@ -159,33 +183,41 @@ function initChart(data: any) {
         name: '提交数',
         type: 'line',
         smooth: true,
-        data: data.submissions || [12, 18, 15, 22, 28, 8, 5],
-        itemStyle: { color: '#3b82f6' }
+        data: data.submissions || [],
+        itemStyle: { color: '#3b82f6' },
       },
       {
         name: '解析成功',
         type: 'line',
         smooth: true,
-        data: data.parsed || [10, 16, 14, 20, 25, 7, 4],
-        itemStyle: { color: '#10b981' }
+        data: data.parsed || [],
+        itemStyle: { color: '#10b981' },
       },
       {
         name: '评分完成',
         type: 'line',
         smooth: true,
-        data: data.scored || [8, 12, 10, 15, 20, 5, 3],
-        itemStyle: { color: '#f59e0b' }
-      }
-    ]
+        data: data.scored || [],
+        itemStyle: { color: '#f59e0b' },
+      },
+    ],
   }
-  
+
   chartInstance.setOption(option)
 }
 
-onMounted(loadStats)
+function handleResize() {
+  chartInstance?.resize()
+}
+
+onMounted(() => {
+  loadStats()
+  window.addEventListener('resize', handleResize)
+})
 
 onUnmounted(() => {
   chartInstance?.dispose()
+  window.removeEventListener('resize', handleResize)
 })
 </script>
 

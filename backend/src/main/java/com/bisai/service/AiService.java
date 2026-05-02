@@ -237,13 +237,23 @@ public class AiService {
                 return;
             }
 
-            // 获取评分指标
-            List<Indicator> indicators = indicatorMapper.selectList(
+            // 获取评分指标（一次性查询所有指标，避免 N+1）
+            List<Indicator> allIndicators = indicatorMapper.selectList(
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Indicator>()
                             .eq(Indicator::getTemplateId, task.getTemplateId())
-                            .isNull(Indicator::getParentId)
                             .orderByAsc(Indicator::getSortOrder)
             );
+
+            // 按 parentId 分组
+            java.util.Map<Long, List<Indicator>> childrenMap = new java.util.HashMap<>();
+            List<Indicator> indicators = new java.util.ArrayList<>();
+            for (Indicator ind : allIndicators) {
+                if (ind.getParentId() == null) {
+                    indicators.add(ind);
+                } else {
+                    childrenMap.computeIfAbsent(ind.getParentId(), k -> new java.util.ArrayList<>()).add(ind);
+                }
+            }
 
             if (indicators.isEmpty()) {
                 log.warn("评分模板没有指标, templateId={}", task.getTemplateId());
@@ -289,12 +299,8 @@ public class AiService {
                 }
                 indicatorDesc.append("\n");
 
-                // 获取子指标
-                List<Indicator> children = indicatorMapper.selectList(
-                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Indicator>()
-                                .eq(Indicator::getParentId, ind.getId())
-                                .orderByAsc(Indicator::getSortOrder)
-                );
+                // 从内存中获取子指标
+                List<Indicator> children = childrenMap.getOrDefault(ind.getId(), List.of());
                 for (Indicator child : children) {
                     indicatorDesc.append("  - ").append(child.getName())
                             .append(" (满分: ").append(child.getMaxScore()).append("分)\n");

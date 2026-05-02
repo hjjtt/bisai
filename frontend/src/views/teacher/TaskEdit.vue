@@ -17,10 +17,10 @@
           </el-select>
         </el-form-item>
         <el-form-item label="开始时间" prop="startTime">
-          <el-date-picker v-model="form.startTime" type="datetime" placeholder="选择开始时间" style="width: 100%" />
+          <el-date-picker v-model="form.startTime" type="datetime" placeholder="选择开始时间" style="width: 100%" value-format="YYYY-MM-DD HH:mm:ss" />
         </el-form-item>
         <el-form-item label="截止时间" prop="endTime">
-          <el-date-picker v-model="form.endTime" type="datetime" placeholder="选择截止时间" style="width: 100%" />
+          <el-date-picker v-model="form.endTime" type="datetime" placeholder="选择截止时间" style="width: 100%" value-format="YYYY-MM-DD HH:mm:ss" />
         </el-form-item>
         <el-form-item label="实训要求" prop="requirements">
           <el-input v-model="form.requirements" type="textarea" :rows="6" placeholder="请输入实训要求" />
@@ -60,14 +60,14 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { getTask, createTask, updateTask } from '@/api/task'
 import { getCourseList, getTemplateList } from '@/api/course'
-import type { FileType } from '@/types'
+import type { FileType, Course, EvaluationTemplate } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
 const formRef = ref<FormInstance>()
 const saving = ref(false)
-const courses = ref<any[]>([])
-const templates = ref<any[]>([])
+const courses = ref<Course[]>([])
+const templates = ref<EvaluationTemplate[]>([])
 
 const taskId = computed(() => {
   const id = route.params.id
@@ -79,8 +79,8 @@ const form = reactive({
   title: '',
   courseId: undefined as number | undefined,
   templateId: undefined as number | undefined,
-  startTime: '',
-  endTime: '',
+  startTime: '' as string,
+  endTime: '' as string,
   requirements: '',
   allowResubmit: true,
   allowedFileTypes: ['DOC', 'DOCX', 'PDF'] as FileType[],
@@ -98,7 +98,7 @@ const rules: FormRules = {
   endTime: [
     { required: true, message: '请选择截止时间', trigger: 'change' },
     {
-      validator: (_rule: any, value: any, callback: any) => {
+      validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
         if (value && form.startTime && new Date(value) <= new Date(form.startTime)) {
           callback(new Error('截止时间必须晚于开始时间'))
         } else {
@@ -133,7 +133,8 @@ async function handleSave() {
       ElMessage.success('创建成功')
     }
     router.push('/teacher/tasks')
-  } catch {
+  } catch (e) {
+    console.error('保存任务失败:', e)
     ElMessage.error(isEdit.value ? '保存失败' : '创建失败')
   } finally {
     saving.value = false
@@ -148,7 +149,8 @@ async function loadOptions() {
     ])
     courses.value = courseRes.data.items
     templates.value = templateRes.data.items
-  } catch {
+  } catch (e) {
+    console.error('加载选项失败:', e)
     ElMessage.error('加载选项失败')
   }
 }
@@ -158,7 +160,8 @@ async function loadTask() {
   try {
     const res = await getTask(taskId.value)
     Object.assign(form, res.data)
-  } catch {
+  } catch (e) {
+    console.error('加载任务失败:', e)
     ElMessage.error('加载任务失败')
   }
 }

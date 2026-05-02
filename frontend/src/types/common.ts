@@ -38,3 +38,45 @@ export type CheckStatus = 'NOT_CHECKED' | 'CHECKING' | 'SUCCESS' | 'CHECK_FAILED
 
 // 消息类型
 export type MessageType = 'SUBMIT' | 'RESUBMIT' | 'SCORE_COMPLETE' | 'SCORE_PUBLISH' | 'BATCH_FAIL' | 'QUOTA_WARNING'
+
+// 批量任务进度
+export interface BatchProgress {
+  total: number
+  success: number
+  failed: number
+  running: number
+}
+
+// 仪表盘统计基础类型
+export interface BaseStats {
+  userCount?: number
+  userTrend?: number
+  classCount?: number
+  classTrend?: number
+  taskCount?: number
+  taskTrend?: number
+  todayError?: number
+  errorTrend?: number
+  apiUsage?: number
+  serverLoad?: number
+  systemStatus?: SystemStatusItem[]
+  recentLogs?: LogEntry[]
+  dates?: string[]
+  submissions?: number[]
+  parsed?: number[]
+  scored?: number[]
+}
+
+export interface SystemStatusItem {
+  name: string
+  type: 'success' | 'warning' | 'danger' | 'info'
+  text: string
+}
+
+export interface LogEntry {
+  time: string
+  user: string
+  type: string
+  content: string
+  status?: string
+}

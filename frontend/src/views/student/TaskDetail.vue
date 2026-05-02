@@ -5,13 +5,13 @@
       <el-descriptions :column="2" border v-if="task">
         <el-descriptions-item label="任务名称">{{ task.title }}</el-descriptions-item>
         <el-descriptions-item label="所属课程">{{ task.courseName }}</el-descriptions-item>
-        <el-descriptions-item label="开始时间">{{ task.startTime }}</el-descriptions-item>
-        <el-descriptions-item label="截止时间">{{ task.endTime }}</el-descriptions-item>
+        <el-descriptions-item label="开始时间">{{ formatDate(task.startTime) }}</el-descriptions-item>
+        <el-descriptions-item label="截止时间">{{ formatDate(task.endTime) }}</el-descriptions-item>
         <el-descriptions-item label="允许重新提交">
           <el-tag :type="task.allowResubmit ? 'success' : 'danger'">{{ task.allowResubmit ? '是' : '否' }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag>{{ task.status }}</el-tag>
+          <el-tag>{{ getTaskStatusLabel(task.status) }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="允许文件类型" :span="2">
           <el-tag v-for="ft in (task.allowedFileTypes || [])" :key="ft" size="small" style="margin-right: 4px">{{ ft }}</el-tag>
@@ -26,9 +26,9 @@
       <div v-if="mySubmission" class="submit-status">
         <el-descriptions :column="3" border size="small">
           <el-descriptions-item label="提交状态">已提交（版本 {{ mySubmission.version }}）</el-descriptions-item>
-          <el-descriptions-item label="提交时间">{{ mySubmission.submitTime }}</el-descriptions-item>
+          <el-descriptions-item label="提交时间">{{ formatDate(mySubmission.submitTime) }}</el-descriptions-item>
           <el-descriptions-item label="评分状态">
-            <el-tag :type="getScoreStatusType(mySubmission.scoreStatus)" size="small">{{ mySubmission.scoreStatus }}</el-tag>
+            <el-tag :type="getScoreStatusType(mySubmission.scoreStatus)" size="small">{{ getScoreStatusLabel(mySubmission.scoreStatus) }}</el-tag>
           </el-descriptions-item>
         </el-descriptions>
         <div style="margin-top: 16px; text-align: right">
@@ -51,6 +51,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getTask, getSubmissions } from '@/api/task'
+import { getTaskStatusLabel, getScoreStatusType, getScoreStatusLabel } from '@/utils/status'
+import { formatDate } from '@/utils/date'
 import { getUserInfo } from '@/utils/auth'
 import type { TrainingTask, Submission } from '@/types'
 
@@ -61,21 +63,14 @@ const mySubmission = ref<Submission | null>(null)
 
 const taskId = computed(() => Number(route.params.id) || 0)
 
-function getScoreStatusType(status: string) {
-  const map: Record<string, string> = {
-    NOT_SCORED: 'info', SCORING: 'warning', AI_SCORED: '', TEACHER_CONFIRMED: 'success',
-    PUBLISHED: 'success', SCORE_FAILED: 'danger', RETURNED: 'warning',
-  }
-  return map[status] || 'info'
-}
-
 async function loadTask() {
   if (!taskId.value) return
   loading.value = true
   try {
     const res = await getTask(taskId.value)
     task.value = res.data
-  } catch {
+  } catch (e) {
+    console.error('加载任务失败:', e)
     ElMessage.error('加载任务失败')
   } finally {
     loading.value = false
@@ -85,15 +80,15 @@ async function loadTask() {
 async function loadMySubmission() {
   if (!taskId.value) return
   try {
-    const userInfo = getUserInfo()
-    if (!userInfo?.id) return
-    const res = await getSubmissions({ taskId: taskId.value, studentId: userInfo.id, size: 1 })
+    const info = getUserInfo()
+    if (!info?.id) return
+    const res = await getSubmissions({ taskId: taskId.value, studentId: info.id, size: 1 })
     const items = res.data.items
     if (items.length > 0) {
       mySubmission.value = items[0]
     }
-  } catch {
-    // 忽略：可能还没有提交过
+  } catch (e) {
+    console.error('加载提交状态失败:', e)
   }
 }
 

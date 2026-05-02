@@ -4,6 +4,7 @@ import com.bisai.common.Result;
 import com.bisai.entity.ScoreCalibration;
 import com.bisai.service.CalibrationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,6 +14,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/calibration")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
 public class CalibrationController {
 
     private final CalibrationService calibrationService;

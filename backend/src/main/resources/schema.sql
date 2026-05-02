@@ -1,4 +1,4 @@
-CREATE DATABASE IF NOT EXISTS bisai DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE DATABASE IF NOT EXISTS bisai DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 USE bisai;
 
 -- 用户表
@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS `class` (
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='班级表';
 
 -- 课程表
@@ -44,7 +45,9 @@ CREATE TABLE IF NOT EXISTS `course` (
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    KEY `idx_teacher_id` (`teacher_id`),
+    KEY `idx_class_id` (`class_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='课程表';
 
 -- 评价模板表
@@ -52,13 +55,14 @@ CREATE TABLE IF NOT EXISTS `evaluation_template` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '模板ID',
     `name` VARCHAR(128) NOT NULL COMMENT '模板名称',
     `description` TEXT DEFAULT NULL COMMENT '模板说明',
-    `total_score` DECIMAL(5,2) NOT NULL DEFAULT 100.00 COMMENT '模板总分',
+    `total_score` DECIMAL(6,2) NOT NULL DEFAULT 100.00 COMMENT '模板总分',
     `creator_id` BIGINT NOT NULL COMMENT '创建人ID',
     `status` VARCHAR(32) NOT NULL DEFAULT 'ENABLED' COMMENT '状态',
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    KEY `idx_creator_id` (`creator_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评价模板表';
 
 -- 评价指标表
@@ -67,8 +71,8 @@ CREATE TABLE IF NOT EXISTS `indicator` (
     `template_id` BIGINT NOT NULL COMMENT '所属模板ID',
     `parent_id` BIGINT DEFAULT NULL COMMENT '父级指标ID',
     `name` VARCHAR(128) NOT NULL COMMENT '指标名称',
-    `weight` DECIMAL(5,2) NOT NULL COMMENT '权重',
-    `max_score` DECIMAL(5,2) NOT NULL COMMENT '满分',
+    `weight` DECIMAL(6,2) NOT NULL COMMENT '权重',
+    `max_score` DECIMAL(6,2) NOT NULL COMMENT '满分',
     `score_rule` TEXT DEFAULT NULL COMMENT '评分规则',
     `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序',
     `deleted` TINYINT NOT NULL DEFAULT 0,
@@ -95,7 +99,9 @@ CREATE TABLE IF NOT EXISTS `training_task` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_course_id` (`course_id`)
+    KEY `idx_course_id` (`course_id`),
+    KEY `idx_template_id` (`template_id`),
+    KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='实训任务表';
 
 -- 成果提交表
@@ -108,8 +114,8 @@ CREATE TABLE IF NOT EXISTS `submission` (
     `parse_status` VARCHAR(32) NOT NULL DEFAULT 'PENDING' COMMENT '解析状态',
     `check_status` VARCHAR(32) NOT NULL DEFAULT 'NOT_CHECKED' COMMENT '核查状态',
     `score_status` VARCHAR(32) NOT NULL DEFAULT 'NOT_SCORED' COMMENT '评分状态',
-    `total_score` DECIMAL(5,2) DEFAULT NULL COMMENT '教师确认后的最终总分',
-    `auto_total_score` DECIMAL(5,2) DEFAULT NULL COMMENT '系统建议总分',
+    `total_score` DECIMAL(6,2) DEFAULT NULL COMMENT '教师确认后的最终总分',
+    `auto_total_score` DECIMAL(6,2) DEFAULT NULL COMMENT '系统建议总分',
     `teacher_comment` TEXT DEFAULT NULL COMMENT '教师评语',
     `parse_summary` TEXT DEFAULT NULL COMMENT 'AI解析摘要',
     `parse_topics` TEXT DEFAULT NULL COMMENT 'AI解析主题JSON',
@@ -120,7 +126,10 @@ CREATE TABLE IF NOT EXISTS `submission` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_task_student` (`task_id`, `student_id`)
+    KEY `idx_task_student` (`task_id`, `student_id`),
+    KEY `idx_student_id` (`student_id`),
+    KEY `idx_parse_status` (`parse_status`),
+    KEY `idx_score_status` (`score_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='成果提交表';
 
 CREATE TABLE IF NOT EXISTS `parse_result` (
@@ -135,7 +144,9 @@ CREATE TABLE IF NOT EXISTS `parse_result` (
     `completeness` VARCHAR(32) DEFAULT NULL COMMENT '完整度',
     `quality` VARCHAR(32) DEFAULT NULL COMMENT '质量',
     `suggestions` TEXT DEFAULT NULL COMMENT '建议JSON',
+    `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_submission_id` (`submission_id`),
     KEY `idx_knowledge_document_id` (`knowledge_document_id`)
@@ -155,7 +166,9 @@ CREATE TABLE IF NOT EXISTS `file` (
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_submission_id` (`submission_id`)
+    KEY `idx_submission_id` (`submission_id`),
+    KEY `idx_knowledge_document_id` (`knowledge_document_id`),
+    KEY `idx_file_hash` (`file_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文件表';
 
 -- 核查结果表
@@ -169,7 +182,9 @@ CREATE TABLE IF NOT EXISTS `check_result` (
     `evidence` TEXT DEFAULT NULL COMMENT '证据片段',
     `suggestion` TEXT DEFAULT NULL COMMENT '修改建议',
     `risk_level` VARCHAR(16) DEFAULT 'LOW' COMMENT '风险等级',
+    `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_submission_id` (`submission_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='核查结果表';
@@ -179,15 +194,18 @@ CREATE TABLE IF NOT EXISTS `score_result` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '评分结果ID',
     `submission_id` BIGINT NOT NULL COMMENT '提交ID',
     `indicator_id` BIGINT NOT NULL COMMENT '指标ID',
-    `auto_score` DECIMAL(5,2) DEFAULT NULL COMMENT '系统建议分',
-    `teacher_score` DECIMAL(5,2) DEFAULT NULL COMMENT '教师确认分',
-    `final_score` DECIMAL(5,2) DEFAULT NULL COMMENT '最终得分',
+    `auto_score` DECIMAL(6,2) DEFAULT NULL COMMENT '系统建议分',
+    `teacher_score` DECIMAL(6,2) DEFAULT NULL COMMENT '教师确认分',
+    `final_score` DECIMAL(6,2) DEFAULT NULL COMMENT '最终得分',
     `reason` TEXT DEFAULT NULL COMMENT '评分理由',
     `evidence` TEXT DEFAULT NULL COMMENT '评分证据',
+    `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_submission_id` (`submission_id`)
+    KEY `idx_submission_id` (`submission_id`),
+    KEY `idx_indicator_id` (`indicator_id`),
+    UNIQUE KEY `uk_submission_indicator` (`submission_id`, `indicator_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评分结果表';
 
 -- 知识库表
@@ -200,7 +218,8 @@ CREATE TABLE IF NOT EXISTS `knowledge_base` (
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    KEY `idx_course_id` (`course_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识库表';
 
 -- 知识库文档表
@@ -216,7 +235,9 @@ CREATE TABLE IF NOT EXISTS `knowledge_document` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_knowledge_base_id` (`knowledge_base_id`)
+    KEY `idx_knowledge_base_id` (`knowledge_base_id`),
+    KEY `idx_file_id` (`file_id`),
+    KEY `idx_parse_vector_status` (`parse_status`, `vector_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识库文档表';
 
 CREATE TABLE IF NOT EXISTS `document_chunk` (
@@ -228,7 +249,8 @@ CREATE TABLE IF NOT EXISTS `document_chunk` (
     `embedding` LONGTEXT DEFAULT NULL COMMENT '向量JSON',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_knowledge_document_id` (`knowledge_document_id`)
+    KEY `idx_knowledge_document_id` (`knowledge_document_id`),
+    UNIQUE KEY `uk_document_chunk_index` (`knowledge_document_id`, `chunk_index`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识库文档切片表';
 
 CREATE TABLE IF NOT EXISTS `ai_call_log` (
@@ -256,7 +278,8 @@ CREATE TABLE IF NOT EXISTS `message` (
     `related_id` BIGINT DEFAULT NULL COMMENT '关联业务ID',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_user_id` (`user_id`)
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_user_is_read` (`user_id`, `is_read`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='消息表';
 
 -- 操作日志表
@@ -300,7 +323,7 @@ CREATE TABLE IF NOT EXISTS `async_task` (
     PRIMARY KEY (`id`),
     KEY `idx_status` (`status`),
     KEY `idx_biz_id` (`biz_id`),
-    KEY `idx_next_run_at` (`next_run_at`)
+    KEY `idx_status_next_run_at` (`status`, `next_run_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='异步任务表';
 
 -- 评分校准表
@@ -309,7 +332,7 @@ CREATE TABLE IF NOT EXISTS `score_calibration` (
     `task_id` BIGINT NOT NULL COMMENT '实训任务ID',
     `submission_id` BIGINT NOT NULL COMMENT '校准样本提交ID',
     `indicator_id` BIGINT NOT NULL COMMENT '指标ID',
-    `calibration_score` DECIMAL(5,2) NOT NULL COMMENT '校准分数',
+    `calibration_score` DECIMAL(6,2) NOT NULL COMMENT '校准分数',
     `calibration_reason` TEXT DEFAULT NULL COMMENT '校准理由',
     `typical_advantages` TEXT DEFAULT NULL COMMENT '典型优点',
     `typical_problems` TEXT DEFAULT NULL COMMENT '典型问题',
@@ -321,7 +344,8 @@ CREATE TABLE IF NOT EXISTS `score_calibration` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_task_id` (`task_id`),
-    KEY `idx_submission_id` (`submission_id`)
+    KEY `idx_submission_id` (`submission_id`),
+    KEY `idx_indicator_id` (`indicator_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评分校准表';
 
 -- 成绩修正表
@@ -329,17 +353,53 @@ CREATE TABLE IF NOT EXISTS `score_correction` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '修正记录ID',
     `submission_id` BIGINT NOT NULL COMMENT '提交ID',
     `indicator_id` BIGINT DEFAULT NULL COMMENT '指标ID，为空表示修正总分',
-    `original_score` DECIMAL(5,2) NOT NULL COMMENT '原始分数',
-    `new_score` DECIMAL(5,2) NOT NULL COMMENT '修正后分数',
+    `original_score` DECIMAL(6,2) NOT NULL COMMENT '原始分数',
+    `new_score` DECIMAL(6,2) NOT NULL COMMENT '修正后分数',
     `reason` TEXT NOT NULL COMMENT '修正原因',
     `corrected_by` BIGINT NOT NULL COMMENT '修正人ID',
     `corrected_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '修正时间',
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_submission_id` (`submission_id`)
+    KEY `idx_submission_id` (`submission_id`),
+    KEY `idx_indicator_id` (`indicator_id`),
+    KEY `idx_corrected_by` (`corrected_by`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='成绩修正表';
 
 -- 初始化管理员账号 (密码: admin123，BCrypt加密)
 INSERT INTO `user` (`username`, `password`, `role`, `real_name`, `status`) VALUES
 ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'ADMIN', '系统管理员', 'ENABLED');
+
+-- ============================================================
+-- 增量迁移 SQL（已有数据库执行以下语句完成升级）
+-- ============================================================
+
+-- DB-42: 补充缺失索引
+ALTER TABLE `file` ADD INDEX `idx_knowledge_document_id` (`knowledge_document_id`);
+ALTER TABLE `file` ADD INDEX `idx_file_hash` (`file_hash`);
+ALTER TABLE `score_correction` ADD INDEX `idx_indicator_id` (`indicator_id`);
+ALTER TABLE `score_correction` ADD INDEX `idx_corrected_by` (`corrected_by`);
+ALTER TABLE `score_calibration` ADD INDEX `idx_indicator_id` (`indicator_id`);
+ALTER TABLE `class` ADD UNIQUE INDEX `uk_name` (`name`);
+
+-- P2-25: 核心业务表添加逻辑删除字段
+ALTER TABLE `parse_result` ADD COLUMN `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除' AFTER `suggestions`;
+ALTER TABLE `check_result` ADD COLUMN `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除' AFTER `risk_level`;
+ALTER TABLE `score_result` ADD COLUMN `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除' AFTER `evidence`;
+
+-- P2-26: 补全 updated_at 字段
+ALTER TABLE `parse_result` ADD COLUMN `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER `deleted`;
+ALTER TABLE `check_result` ADD COLUMN `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER `deleted`;
+
+-- P3-35: 分数精度提升 DECIMAL(5,2) → DECIMAL(6,2)
+ALTER TABLE `evaluation_template` MODIFY `total_score` DECIMAL(6,2) NOT NULL DEFAULT 100.00;
+ALTER TABLE `indicator` MODIFY `weight` DECIMAL(6,2) NOT NULL, MODIFY `max_score` DECIMAL(6,2) NOT NULL;
+ALTER TABLE `submission` MODIFY `total_score` DECIMAL(6,2) DEFAULT NULL, MODIFY `auto_total_score` DECIMAL(6,2) DEFAULT NULL;
+ALTER TABLE `score_result` MODIFY `auto_score` DECIMAL(6,2) DEFAULT NULL, MODIFY `teacher_score` DECIMAL(6,2) DEFAULT NULL, MODIFY `final_score` DECIMAL(6,2) DEFAULT NULL;
+ALTER TABLE `score_calibration` MODIFY `calibration_score` DECIMAL(6,2) NOT NULL;
+ALTER TABLE `score_correction` MODIFY `original_score` DECIMAL(6,2) NOT NULL, MODIFY `new_score` DECIMAL(6,2) NOT NULL;
+
+-- DB-44: parse_result 添加 CHECK 约束（确保至少一个外键不为 NULL）
+ALTER TABLE `parse_result` ADD CONSTRAINT `chk_parse_result_ref` CHECK (
+    submission_id IS NOT NULL OR knowledge_document_id IS NOT NULL OR file_id IS NOT NULL
+);

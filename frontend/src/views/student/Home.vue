@@ -19,7 +19,10 @@
       <el-col :span="6" v-for="item in statCards" :key="item.title">
         <el-card shadow="never" class="stat-card">
           <div class="stat-label">{{ item.title }}</div>
-          <div class="stat-content">
+          <div class="stat-content" v-if="loading">
+            <el-icon class="is-loading" style="font-size: 24px"><Loading /></el-icon>
+          </div>
+          <div class="stat-content" v-else>
             <span class="stat-number">{{ item.value }}</span>
             <span class="stat-unit">项</span>
           </div>
@@ -32,12 +35,14 @@
         <h3 class="title">近期实训任务</h3>
         <el-button type="primary" link @click="$router.push('/student/tasks')">查看全部</el-button>
       </div>
-      
-      <el-card shadow="never" class="task-card-wrapper">
+
+      <el-card shadow="never" class="task-card-wrapper" v-loading="loading">
         <el-table :data="recentTasks" style="width: 100%">
           <el-table-column prop="title" label="任务名称" min-width="200" />
           <el-table-column prop="courseName" label="所属课程" width="180" />
-          <el-table-column prop="endTime" label="截止日期" width="180" />
+          <el-table-column label="截止日期" width="180">
+            <template #default="{ row }">{{ formatDateShort(row.endTime) }}</template>
+          </el-table-column>
           <el-table-column label="提交状态" width="120">
             <template #default="{ row }">
               <el-tag :type="getSubmitStatusType(row.submitStatus)" size="small">
@@ -51,7 +56,7 @@
             </template>
           </el-table-column>
         </el-table>
-        <div v-if="recentTasks.length === 0" class="empty-state">
+        <div v-if="!loading && recentTasks.length === 0" class="empty-state">
           <el-empty description="暂无进行中的实训任务" :image-size="100" />
         </div>
       </el-card>
@@ -61,13 +66,26 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { Loading } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import { getStudentStats } from '@/api/dashboard'
+import { getSubmitStatusType } from '@/utils/status'
+import { formatDateShort } from '@/utils/date'
+import type { TrainingTask } from '@/types'
+
+interface StudentStats {
+  ongoingTasks: number
+  submittedCount: number
+  pendingFeedback: number
+  unreadMessages: number
+  recentTasks: TrainingTask[]
+}
 
 const userStore = useUserStore()
 const userInfo = computed(() => userStore.userInfo)
 
 const today = new Date()
+const loading = ref(true)
 
 const statCards = ref([
   { title: '进行中任务', value: 0 },
@@ -76,23 +94,23 @@ const statCards = ref([
   { title: '系统通知', value: 0 },
 ])
 
-const recentTasks = ref<any[]>([])
-
-function getSubmitStatusType(status: string) {
-  const map: Record<string, string> = { '已提交': 'success', '未提交': 'info', '待提交': 'warning' }
-  return map[status] || 'info'
-}
+const recentTasks = ref<TrainingTask[]>([])
 
 async function loadStats() {
+  loading.value = true
   try {
     const res = await getStudentStats()
-    const d = res.data as any
-    statCards.value[0].value = d.ongoingTasks
-    statCards.value[1].value = d.submittedCount
-    statCards.value[2].value = d.pendingFeedback
-    statCards.value[3].value = d.unreadMessages
+    const d = res.data as StudentStats
+    statCards.value[0].value = d.ongoingTasks || 0
+    statCards.value[1].value = d.submittedCount || 0
+    statCards.value[2].value = d.pendingFeedback || 0
+    statCards.value[3].value = d.unreadMessages || 0
     recentTasks.value = d.recentTasks || []
-  } catch { /* ignore */ }
+  } catch (e) {
+    console.error('加载学生统计失败:', e)
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(loadStats)
@@ -129,7 +147,7 @@ onMounted(loadStats)
     align-items: center;
     gap: 12px;
     color: #1e293b;
-    
+
     .day {
       font-size: 40px;
       font-weight: 700;

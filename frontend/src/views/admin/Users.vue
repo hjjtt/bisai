@@ -98,6 +98,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { getUserList, createUser, updateUser, resetPassword, toggleUserStatus } from '@/api/user'
 import { getClassList } from '@/api/course'
+import { getRoleLabel, getRoleType } from '@/utils/status'
 import type { UserInfo, ClassInfo, UserRole } from '@/types'
 
 const loading = ref(false)
@@ -126,23 +127,14 @@ const formRules: FormRules = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
 }
 
-function getRoleLabel(role: string) {
-  const map: Record<string, string> = { STUDENT: '学生', TEACHER: '教师', ADMIN: '管理员' }
-  return map[role] || role
-}
-
-function getRoleType(role: string) {
-  const map: Record<string, string> = { STUDENT: '', TEACHER: 'success', ADMIN: 'warning' }
-  return map[role] || ''
-}
-
 async function loadUsers() {
   loading.value = true
   try {
     const res = await getUserList({ page: pagination.page, size: pagination.size, keyword: keyword.value, role: roleFilter.value })
     users.value = res.data.items
     pagination.total = res.data.total
-  } catch {
+  } catch (e) {
+    console.error('加载用户列表失败:', e)
     ElMessage.error('加载用户列表失败')
   } finally {
     loading.value = false
@@ -153,7 +145,9 @@ async function loadClasses() {
   try {
     const res = await getClassList({ size: 100 })
     classes.value = res.data.items
-  } catch { /* ignore */ }
+  } catch (e) {
+    console.error('加载班级列表失败:', e)
+  }
 }
 
 function showDialog(user?: UserInfo) {
@@ -181,7 +175,8 @@ async function handleSaveUser() {
     }
     dialogVisible.value = false
     loadUsers()
-  } catch {
+  } catch (e) {
+    console.error('保存用户失败:', e)
     ElMessage.error('操作失败')
   } finally {
     saving.value = false
@@ -194,8 +189,8 @@ async function toggleStatus(user: UserInfo) {
     await toggleUserStatus(user.id, newStatus)
     ElMessage.success('操作成功')
     loadUsers()
-  } catch {
-    // 操作取消或失败
+  } catch (e) {
+    console.error('切换用户状态失败:', e)
   }
 }
 
@@ -226,12 +221,6 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
 
-  .header-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: #1e293b;
-  }
-
   .header-actions {
     display: flex;
     gap: 12px;
@@ -241,7 +230,7 @@ onMounted(() => {
 
 :deep(.el-table) {
   margin-top: 8px;
-  
+
   th.el-table__cell {
     background-color: #f8fafc;
     color: #64748b;
@@ -261,7 +250,6 @@ onMounted(() => {
   justify-content: flex-end;
 }
 
-// 表单样式
 :deep(.el-form-item__label) {
   font-weight: 500;
   color: #475569;

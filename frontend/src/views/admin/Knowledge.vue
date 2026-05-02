@@ -18,10 +18,10 @@
       <!-- 核心数据表格 -->
       <el-table :data="knowledgeList" stripe v-loading="loading" style="width: 100%">
         <el-table-column prop="name" label="资源名称" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="course" label="关联课程" width="150" />
+        <el-table-column prop="courseName" label="关联课程" width="150" />
         <el-table-column label="解析状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.parseStatus)" size="small" effect="plain">
+            <el-tag :type="getKnowledgeStatusType(row.parseStatus)" size="small" effect="plain">
               {{ row.parseStatus }}
             </el-tag>
           </template>
@@ -32,11 +32,11 @@
             <el-icon v-else color="#94a3b8"><Loading /></el-icon>
           </template>
         </el-table-column>
-        <el-table-column prop="updateTime" label="最后更新" width="180" color="#64748b" />
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="最后更新" width="180">
+          <template #default="{ row }">{{ formatDate(row.updateTime) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link>查看</el-button>
-            <el-button type="primary" link>重新解析</el-button>
             <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -68,8 +68,9 @@
             class="upload-demo"
             drag
             action="#"
-            multiple
             :auto-upload="false"
+            :on-change="handleFileChange"
+            :limit="1"
           >
             <el-icon class="el-icon--upload"><upload-filled /></el-icon>
             <div class="el-upload__text">
@@ -95,8 +96,10 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Upload, UploadFilled, CircleCheck, Loading } from '@element-plus/icons-vue'
-import { getKnowledgeList, deleteKnowledge, type KnowledgeDocument } from '@/api/knowledge'
+import { getKnowledgeList, deleteKnowledge, uploadKnowledge, type KnowledgeDocument } from '@/api/knowledge'
 import { getCourseList } from '@/api/course'
+import { getKnowledgeStatusType } from '@/utils/status'
+import { formatDate } from '@/utils/date'
 import type { Course } from '@/types'
 
 const loading = ref(false)
@@ -106,6 +109,7 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
 const courses = ref<Course[]>([])
+const selectedFile = ref<File | null>(null)
 
 const uploadForm = ref({
   courseId: ''
@@ -123,7 +127,8 @@ const loadData = async () => {
     })
     knowledgeList.value = res.data.items
     total.value = res.data.total
-  } catch {
+  } catch (e) {
+    console.error('加载知识库列表失败:', e)
     ElMessage.error('加载知识库列表失败')
   } finally {
     loading.value = false
@@ -138,34 +143,44 @@ const handleDelete = async (row: KnowledgeDocument) => {
     loadData()
   } catch (err) {
     if (err !== 'cancel') {
+      console.error('删除知识库文档失败:', err)
       ElMessage.error('删除失败')
     }
   }
 }
 
-const getStatusType = (status: string) => {
-  switch (status) {
-    case 'SUCCESS':
-    case '已完成': return 'success'
-    case 'PROCESSING':
-    case '解析中': return 'warning'
-    case 'FAILED':
-    case '失败': return 'danger'
-    default: return 'info'
-  }
+const handleFileChange = (_: any, fileList: { raw: File }[]) => {
+  selectedFile.value = fileList.length > 0 ? fileList[0].raw : null
 }
 
-const handleUpload = () => {
-  ElMessage.success('资源上传任务已提交，系统正在后台解析中...')
-  showUploadDialog.value = false
+const handleUpload = async () => {
+  if (!uploadForm.value.courseId) {
+    ElMessage.warning('请选择关联课程')
+    return
+  }
+  if (!selectedFile.value) {
+    ElMessage.warning('请选择文件')
+    return
+  }
+  try {
+    await uploadKnowledge(selectedFile.value, Number(uploadForm.value.courseId))
+    ElMessage.success('资源上传成功，系统正在后台解析...')
+    showUploadDialog.value = false
+    selectedFile.value = null
+    uploadForm.value.courseId = ''
+    loadData()
+  } catch (e) {
+    console.error('上传知识库文档失败:', e)
+    ElMessage.error('上传失败')
+  }
 }
 
 async function loadCourses() {
   try {
     const res = await getCourseList({ size: 100 })
     courses.value = res.data.items
-  } catch {
-    // 忽略
+  } catch (e) {
+    console.error('加载课程列表失败:', e)
   }
 }
 
@@ -200,7 +215,7 @@ onMounted(() => {
 
 :deep(.el-table) {
   margin-top: 12px;
-  
+
   th.el-table__cell {
     background-color: #f8fafc;
     color: #64748b;

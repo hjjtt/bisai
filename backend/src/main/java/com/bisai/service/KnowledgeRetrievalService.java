@@ -50,6 +50,10 @@ public class KnowledgeRetrievalService {
     private static final int RERANK_TOP_K = 20;
     private static final int RERANK_LIMIT = 5;
 
+    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
+
     public String retrieveContext(TrainingTask task, String query, int limit) {
         if (task == null || task.getCourseId() == null || query == null || query.isBlank()) {
             return "";
@@ -117,7 +121,6 @@ public class KnowledgeRetrievalService {
                     .toList();
 
             String body = objectMapper.writeValueAsString(new RerankRequest(query, texts, rerankModel));
-            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/rerank"))
                     .header("Content-Type", "application/json")
@@ -126,7 +129,7 @@ public class KnowledgeRetrievalService {
                     .timeout(Duration.ofSeconds(15))
                     .build();
 
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             JsonNode root = objectMapper.readTree(response.body());
             JsonNode results = root.path("results");
 

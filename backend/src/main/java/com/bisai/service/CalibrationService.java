@@ -13,6 +13,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,7 @@ public class CalibrationService {
     /**
      * 保存校准样本
      */
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> saveCalibration(Long taskId, Long submissionId, List<Map<String, Object>> items, Long confirmedBy) {
         TrainingTask task = taskMapper.selectById(taskId);
         if (task == null) {
@@ -51,11 +53,18 @@ public class CalibrationService {
 
         // 保存新的校准记录
         for (Map<String, Object> item : items) {
+            Object indicatorIdObj = item.get("indicatorId");
+            Object scoreObj = item.get("score");
+            if (indicatorIdObj == null || scoreObj == null) {
+                log.warn("校准项缺少必要字段 indicatorId 或 score，跳过: {}", item);
+                continue;
+            }
+
             ScoreCalibration calibration = new ScoreCalibration();
             calibration.setTaskId(taskId);
             calibration.setSubmissionId(submissionId);
-            calibration.setIndicatorId(Long.valueOf(item.get("indicatorId").toString()));
-            calibration.setCalibrationScore(new java.math.BigDecimal(item.get("score").toString()));
+            calibration.setIndicatorId(Long.valueOf(indicatorIdObj.toString()));
+            calibration.setCalibrationScore(new java.math.BigDecimal(scoreObj.toString()));
             calibration.setCalibrationReason((String) item.get("reason"));
             calibration.setTypicalAdvantages((String) item.get("advantages"));
             calibration.setTypicalProblems((String) item.get("problems"));

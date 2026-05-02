@@ -18,5 +18,8 @@ public class CheckResult {
     private String evidence;
     private String suggestion;
     private String riskLevel;
+    @TableLogic
+    private Integer deleted;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

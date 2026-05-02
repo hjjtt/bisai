@@ -149,7 +149,10 @@ public class ReportService {
                                      User student, List<ScoreResult> scores, List<CheckResult> checks,
                                      List<FileEntity> files, Map<Long, String> indicatorNameMap) throws Exception {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        String fileName = "学生报告_" + (student != null ? student.getRealName() : submission.getStudentId()) + "_" + timestamp + ".pdf";
+        String studentLabel = student != null && student.getRealName() != null ? student.getRealName() : String.valueOf(submission.getStudentId());
+        String fileName = "学生报告_" + studentLabel + "_" + timestamp + ".pdf";
+        // 过滤文件名中的特殊字符
+        fileName = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
         Path reportDir = Path.of(uploadPath, "reports");
         java.nio.file.Files.createDirectories(reportDir);
         Path filePath = reportDir.resolve(fileName);
@@ -278,7 +281,9 @@ public class ReportService {
      */
     private String generateExcelReport(TrainingTask task, List<Submission> submissions) throws Exception {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        String fileName = "班级报表_" + task.getTitle() + "_" + timestamp + ".xlsx";
+        String taskLabel = task.getTitle() != null ? task.getTitle() : "task-" + task.getId();
+        String fileName = "班级报表_" + taskLabel + "_" + timestamp + ".xlsx";
+        fileName = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
         Path reportDir = Path.of(uploadPath, "reports");
         java.nio.file.Files.createDirectories(reportDir);
         Path filePath = reportDir.resolve(fileName);
@@ -291,24 +296,30 @@ public class ReportService {
                         .orderByAsc(Indicator::getSortOrder)
         );
 
-        // 构建Excel数据
+        // 构建Excel数据 - 批量查询避免N+1
+        Set<Long> studentIds = submissions.stream().map(Submission::getStudentId).collect(Collectors.toSet());
+        Set<Long> subIds = submissions.stream().map(Submission::getId).collect(Collectors.toSet());
+
+        Map<Long, User> studentMap = userMapper.selectBatchIds(studentIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        List<ScoreResult> allScores = scoreResultMapper.selectList(
+                new LambdaQueryWrapper<ScoreResult>().in(ScoreResult::getSubmissionId, subIds)
+        );
+        Map<Long, Map<Long, Double>> scoreBySubmission = allScores.stream()
+                .collect(Collectors.groupingBy(ScoreResult::getSubmissionId,
+                        Collectors.toMap(ScoreResult::getIndicatorId,
+                                sr -> sr.getFinalScore() != null ? sr.getFinalScore().doubleValue() : 0)));
+
         List<ClassReportRow> rows = new ArrayList<>();
         for (Submission sub : submissions) {
             ClassReportRow row = new ClassReportRow();
-            User student = userMapper.selectById(sub.getStudentId());
+            User student = studentMap.get(sub.getStudentId());
             row.setStudentName(student != null ? student.getRealName() : "-");
             row.setStudentUsername(student != null ? student.getUsername() : "-");
             row.setTotalScore(sub.getTotalScore() != null ? sub.getTotalScore().doubleValue() : 0);
 
-            // 获取该提交的各指标得分
-            List<ScoreResult> scores = scoreResultMapper.selectList(
-                    new LambdaQueryWrapper<ScoreResult>().eq(ScoreResult::getSubmissionId, sub.getId())
-            );
-            Map<Long, Double> scoreMap = scores.stream()
-                    .collect(Collectors.toMap(ScoreResult::getIndicatorId,
-                            sr -> sr.getFinalScore() != null ? sr.getFinalScore().doubleValue() : 0));
-
-            // 动态设置指标得分
+            Map<Long, Double> scoreMap = scoreBySubmission.getOrDefault(sub.getId(), Map.of());
             List<Double> indicatorScores = new ArrayList<>();
             for (Indicator ind : indicators) {
                 indicatorScores.add(scoreMap.getOrDefault(ind.getId(), 0.0));
