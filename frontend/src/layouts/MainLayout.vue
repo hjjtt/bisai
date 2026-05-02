@@ -43,11 +43,41 @@
         </div>
         <div class="header-right">
           <div class="header-actions">
-            <el-tooltip content="通知" placement="bottom">
-              <el-badge is-dot class="notice-badge">
-                <el-icon><Bell /></el-icon>
-              </el-badge>
-            </el-tooltip>
+            <el-popover
+              trigger="click"
+              placement="bottom-end"
+              :width="360"
+              @show="loadMessages"
+            >
+              <template #reference>
+                <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="notice-badge">
+                  <el-icon :size="20" style="cursor: pointer"><Bell /></el-icon>
+                </el-badge>
+              </template>
+              <div class="notification-panel">
+                <div class="panel-header">
+                  <span>消息通知</span>
+                  <el-button type="primary" link size="small" @click="handleMarkAllRead">全部已读</el-button>
+                </div>
+                <el-scrollbar height="300px">
+                  <div v-if="messages.length === 0" class="empty-state">暂无消息</div>
+                  <div
+                    v-for="msg in messages"
+                    :key="msg.id"
+                    class="message-item"
+                    :class="{ 'is-read': msg.isRead }"
+                    @click="handleReadMessage(msg)"
+                  >
+                    <div class="msg-title">{{ msg.title }}</div>
+                    <div class="msg-content">{{ msg.content }}</div>
+                    <div class="msg-time">{{ formatDate(msg.createdAt) }}</div>
+                  </div>
+                </el-scrollbar>
+                <div class="panel-footer">
+                  <el-button type="primary" link @click="$router.push('/admin/logs')">查看全部消息</el-button>
+                </div>
+              </div>
+            </el-popover>
           </div>
           <el-dropdown @command="handleCommand">
             <div class="user-info">
@@ -73,13 +103,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Fold, Expand, Bell, Monitor } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import { useAppStore } from '@/store/app'
 import { studentRoutes, teacherRoutes, adminRoutes } from '@/router/guards'
 import type { RouteRecordRaw } from 'vue-router'
+import { getMessages, markMessageRead, markAllMessagesRead, getUnreadCount } from '@/api/report'
+import { formatDate } from '@/utils/date'
+import type { Message } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -135,6 +168,56 @@ const handleCommand = (command: string) => {
     router.push('/login')
   }
 }
+
+// 通知功能
+const messages = ref<Message[]>([])
+const unreadCount = ref(0)
+
+async function loadMessages() {
+  try {
+    const res = await getMessages({ page: 1, size: 10 })
+    messages.value = res.data.items
+  } catch {
+    // 忽略
+  }
+}
+
+async function loadUnreadCount() {
+  try {
+    const res = await getUnreadCount()
+    unreadCount.value = res.data
+  } catch {
+    // 忽略
+  }
+}
+
+async function handleReadMessage(msg: Message) {
+  if (!msg.isRead) {
+    try {
+      await markMessageRead(msg.id)
+      msg.isRead = true
+      unreadCount.value = Math.max(0, unreadCount.value - 1)
+    } catch {
+      // 忽略
+    }
+  }
+}
+
+async function handleMarkAllRead() {
+  try {
+    await markAllMessagesRead()
+    messages.value.forEach(m => m.isRead = true)
+    unreadCount.value = 0
+  } catch {
+    // 忽略
+  }
+}
+
+onMounted(() => {
+  loadUnreadCount()
+  // 每 30 秒刷新一次未读数量
+  setInterval(loadUnreadCount, 30000)
+})
 </script>
 
 <style lang="scss" scoped>
@@ -270,5 +353,66 @@ const handleCommand = (command: string) => {
   background-color: #f1f5f9;
   padding: 24px;
   overflow-y: auto;
+}
+
+.notification-panel {
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-weight: 600;
+    color: #1e293b;
+  }
+
+  .empty-state {
+    padding: 40px 0;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 14px;
+  }
+
+  .message-item {
+    padding: 12px 0;
+    border-bottom: 1px solid #f8fafc;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover {
+      background: #f8fafc;
+    }
+
+    &.is-read {
+      opacity: 0.6;
+    }
+
+    .msg-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+
+    .msg-content {
+      font-size: 12px;
+      color: #64748b;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .msg-time {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+  }
+
+  .panel-footer {
+    padding: 12px 0;
+    text-align: center;
+    border-top: 1px solid #f1f5f9;
+  }
 }
 </style>

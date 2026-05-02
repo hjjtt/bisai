@@ -11,6 +11,7 @@ import com.bisai.mapper.CourseMapper;
 import com.bisai.mapper.FileMapper;
 import com.bisai.mapper.SubmissionMapper;
 import com.bisai.mapper.TrainingTaskMapper;
+import com.bisai.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -37,6 +39,7 @@ public class SubmissionService {
     private final FileMapper fileMapper;
     private final TrainingTaskMapper taskMapper;
     private final CourseMapper courseMapper;
+    private final UserMapper userMapper;
     private final MessageService messageService;
 
     @Value("${file.upload-path}")
@@ -84,6 +87,34 @@ public class SubmissionService {
         wrapper.orderByDesc(Submission::getCreatedAt);
 
         Page<Submission> result = submissionMapper.selectPage(page, wrapper);
+
+        // 批量填充任务标题和学生姓名
+        if (!result.getRecords().isEmpty()) {
+            Set<Long> taskIds = result.getRecords().stream()
+                    .map(Submission::getTaskId)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toSet());
+            Set<Long> studentIds = result.getRecords().stream()
+                    .map(Submission::getStudentId)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toSet());
+
+            java.util.Map<Long, String> taskTitleMap = new java.util.HashMap<>();
+            if (!taskIds.isEmpty()) {
+                taskMapper.selectBatchIds(taskIds).forEach(t -> taskTitleMap.put(t.getId(), t.getTitle()));
+            }
+
+            java.util.Map<Long, String> studentNameMap = new java.util.HashMap<>();
+            if (!studentIds.isEmpty()) {
+                userMapper.selectBatchIds(studentIds).forEach(u -> studentNameMap.put(u.getId(), u.getRealName()));
+            }
+
+            result.getRecords().forEach(sub -> {
+                sub.setTaskTitle(taskTitleMap.get(sub.getTaskId()));
+                sub.setStudentName(studentNameMap.get(sub.getStudentId()));
+            });
+        }
+
         return Result.ok(new PageResult<>(result.getRecords(), result.getCurrent(), result.getSize(), result.getTotal()));
     }
 
