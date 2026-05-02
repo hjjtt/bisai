@@ -28,7 +28,6 @@
             <el-table-column label="操作" width="150" fixed="right">
               <template #default="{ row }">
                 <el-button type="primary" link @click="showClassDialog(row)">编辑</el-button>
-                <el-button type="info" link @click="viewStudents(row)">查看学生</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -102,14 +101,14 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { getClassList, createClass, updateClass, getCourseList, createCourse, updateCourse } from '@/api/course'
 import { getUserList } from '@/api/user'
-import type { ClassInfo, Course } from '@/types'
+import type { ClassInfo, Course, UserInfo } from '@/types'
 
 const activeTab = ref('class')
 const classLoading = ref(false)
 const courseLoading = ref(false)
 const classes = ref<ClassInfo[]>([])
 const courses = ref<Course[]>([])
-const teachers = ref<any[]>([])
+const teachers = ref<UserInfo[]>([])
 
 // 班级表单
 const classDialogVisible = ref(false)
@@ -145,16 +144,13 @@ function showCourseDialog(item?: Course) {
   courseDialogVisible.value = true
 }
 
-function viewStudents(row: ClassInfo) {
-  ElMessage.info('查看班级学生列表')
-}
-
 async function loadClasses() {
   classLoading.value = true
   try {
     const res = await getClassList({ size: 100 })
     classes.value = res.data.items
-  } catch {
+  } catch (e) {
+    console.error('加载班级列表失败:', e)
     ElMessage.error('加载班级列表失败')
   } finally {
     classLoading.value = false
@@ -166,7 +162,8 @@ async function loadCourses() {
   try {
     const res = await getCourseList({ size: 100 })
     courses.value = res.data.items
-  } catch {
+  } catch (e) {
+    console.error('加载课程列表失败:', e)
     ElMessage.error('加载课程列表失败')
   } finally {
     courseLoading.value = false
@@ -177,7 +174,9 @@ async function loadTeachers() {
   try {
     const res = await getUserList({ role: 'TEACHER', size: 100 })
     teachers.value = res.data.items
-  } catch { /* ignore */ }
+  } catch (e) {
+    console.error('加载教师列表失败:', e)
+  }
 }
 
 async function saveClass() {
@@ -189,7 +188,8 @@ async function saveClass() {
     ElMessage.success('保存成功')
     classDialogVisible.value = false
     loadClasses()
-  } catch {
+  } catch (e) {
+    console.error('保存班级失败:', e)
     ElMessage.error('保存失败')
   }
 }
@@ -203,7 +203,8 @@ async function saveCourse() {
     ElMessage.success('保存成功')
     courseDialogVisible.value = false
     loadCourses()
-  } catch {
+  } catch (e) {
+    console.error('保存课程失败:', e)
     ElMessage.error('保存失败')
   }
 }

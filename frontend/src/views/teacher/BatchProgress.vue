@@ -40,17 +40,19 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getTaskList, getBatchProgress } from '@/api/task'
-import type { TrainingTask } from '@/types'
+import type { TrainingTask, BatchProgress } from '@/types'
 
 const tasks = ref<TrainingTask[]>([])
 const selectedTaskId = ref<number>()
-const progress = ref<{ total: number; success: number; failed: number; running: number } | null>(null)
+const progress = ref<BatchProgress | null>(null)
 
 async function loadTasks() {
   try {
     const res = await getTaskList({ size: 100 })
     tasks.value = res.data.items
-  } catch { /* ignore */ }
+  } catch (e) {
+    console.error('加载任务列表失败:', e)
+  }
 }
 
 async function loadProgress() {
@@ -58,7 +60,8 @@ async function loadProgress() {
   try {
     const res = await getBatchProgress(selectedTaskId.value)
     progress.value = res.data
-  } catch {
+  } catch (e) {
+    console.error('加载进度失败:', e)
     ElMessage.error('加载进度失败')
   }
 }

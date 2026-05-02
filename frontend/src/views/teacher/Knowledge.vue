@@ -13,9 +13,7 @@
         <el-table-column prop="courseName" label="适用课程" width="150" />
         <el-table-column label="解析状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="row.parseStatus === 'SUCCESS' ? 'success' : row.parseStatus === 'FAILED' ? 'danger' : 'warning'" size="small">
-              {{ row.parseStatus }}
-            </el-tag>
+            <el-tag :type="getKnowledgeStatusType(row.parseStatus)" size="small">{{ row.parseStatus }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="向量化状态" width="120">
@@ -25,7 +23,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="启用状态" width="100">
+        <el-table-column label="启用状态" width="100">
           <template #default="{ row }">
             <el-switch v-model="row.enabled" @change="handleToggle(row)" />
           </template>
@@ -61,21 +59,29 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
-import { getKnowledgeList, deleteKnowledge, uploadKnowledge } from '@/api/knowledge'
+import { getKnowledgeList, deleteKnowledge, uploadKnowledge, toggleKnowledgeStatus, type KnowledgeDocument } from '@/api/knowledge'
+import { getKnowledgeStatusType } from '@/utils/status'
 
 const loading = ref(false)
 const uploading = ref(false)
 const showUploadDialog = ref(false)
-const documents = ref<any[]>([])
+const documents = ref<KnowledgeDocument[]>([])
 const selectedFiles = ref<File[]>([])
 const polling = ref<number | null>(null)
 
-function handleFileChange(_: any, fileList: any[]) {
+function handleFileChange(_file: unknown, fileList: { raw: File }[]) {
   selectedFiles.value = fileList.map(item => item.raw).filter(Boolean)
 }
 
-async function handleToggle(row: any) {
-  ElMessage.success(row.enabled ? '已启用' : '已停用')
+async function handleToggle(row: KnowledgeDocument) {
+  try {
+    await toggleKnowledgeStatus(row.id, row.enabled)
+    ElMessage.success(row.enabled ? '已启用' : '已停用')
+  } catch (e) {
+    row.enabled = !row.enabled
+    console.error('状态更新失败:', e)
+    ElMessage.error('状态更新失败')
+  }
 }
 
 async function handleDelete(id: number) {
@@ -83,7 +89,8 @@ async function handleDelete(id: number) {
     await deleteKnowledge(id)
     ElMessage.success('已删除')
     loadDocuments()
-  } catch {
+  } catch (e) {
+    console.error('删除失败:', e)
     ElMessage.error('删除失败')
   }
 }
@@ -103,7 +110,8 @@ async function handleUpload() {
     ElMessage.success('上传成功，正在解析和向量化')
     await loadDocuments()
     startPolling()
-  } catch {
+  } catch (e) {
+    console.error('上传失败:', e)
     ElMessage.error('上传失败')
   } finally {
     uploading.value = false
@@ -114,8 +122,9 @@ async function loadDocuments() {
   loading.value = true
   try {
     const res = await getKnowledgeList({ page: 1, size: 100 })
-    documents.value = (res.data as any).items || []
-  } catch {
+    documents.value = res.data.items || []
+  } catch (e) {
+    console.error('加载知识库列表失败:', e)
     ElMessage.error('加载知识库列表失败')
   } finally {
     loading.value = false

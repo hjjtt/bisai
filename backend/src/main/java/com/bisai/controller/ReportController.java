@@ -2,6 +2,7 @@ package com.bisai.controller;
 
 import com.bisai.common.Result;
 import com.bisai.service.ReportService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -30,6 +31,7 @@ public class ReportController {
      * 导出学生个人报告
      */
     @PostMapping("/student/{submissionId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Map<String, Object>> exportStudentReport(
             @PathVariable Long submissionId,
             @RequestBody Map<String, String> body) {
@@ -41,6 +43,7 @@ public class ReportController {
      * 导出班级报告
      */
     @PostMapping("/class/{taskId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Map<String, Object>> exportClassReport(
             @PathVariable Long taskId,
             @RequestBody Map<String, String> body) {
@@ -52,8 +55,19 @@ public class ReportController {
      * 下载报告文件
      */
     @GetMapping("/download/report/{fileName}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public ResponseEntity<Resource> downloadReport(@PathVariable String fileName) {
-        Path filePath = Path.of(uploadPath, "reports", fileName);
+        // 防止路径遍历攻击
+        if (fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Path baseDir = Path.of(uploadPath, "reports").toAbsolutePath().normalize();
+        Path filePath = baseDir.resolve(fileName).normalize();
+        if (!filePath.startsWith(baseDir)) {
+            return ResponseEntity.badRequest().build();
+        }
+
         if (!filePath.toFile().exists()) {
             return ResponseEntity.notFound().build();
         }

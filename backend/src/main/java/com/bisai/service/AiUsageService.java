@@ -29,11 +29,7 @@ public class AiUsageService {
             throw new RuntimeException("AI 今日调用次数已达到上限");
         }
 
-        int usedTokens = aiCallLogMapper.selectList(today).stream()
-                .map(AiCallLog::getTotalTokens)
-                .filter(v -> v != null)
-                .mapToInt(Integer::intValue)
-                .sum();
+        long usedTokens = aiCallLogMapper.sumTotalTokens(start, end);
         if (usedTokens + estimatedInputTokens > aiConfig.getDailyTokenLimit()) {
             throw new RuntimeException("AI 今日 Token 用量已达到上限");
         }

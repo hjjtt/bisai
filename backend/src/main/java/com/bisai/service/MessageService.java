@@ -42,12 +42,16 @@ public class MessageService {
         return Result.ok(count);
     }
 
-    public Result<Void> markRead(Long id) {
+    public Result<Void> markRead(Long id, Long userId) {
         Message msg = messageMapper.selectById(id);
-        if (msg != null) {
-            msg.setIsRead(true);
-            messageMapper.updateById(msg);
+        if (msg == null) {
+            return Result.error(40401, "消息不存在");
         }
+        if (!msg.getUserId().equals(userId)) {
+            return Result.error(40301, "无权操作此消息");
+        }
+        msg.setIsRead(true);
+        messageMapper.updateById(msg);
         return Result.ok();
     }
 

@@ -32,8 +32,9 @@ public class MessageController {
     }
 
     @PutMapping("/{id}/read")
-    public Result<Void> markRead(@PathVariable Long id) {
-        return messageService.markRead(id);
+    public Result<Void> markRead(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        return messageService.markRead(id, userId);
     }
 
     @PutMapping("/read-all")

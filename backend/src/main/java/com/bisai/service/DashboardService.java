@@ -187,20 +187,31 @@ public class DashboardService {
         List<Map<String, Object>> pendingReviews = buildSubmissionList(pendingSubs);
         stats.setPendingReviews(pendingReviews);
 
-        // 高风险列表
+        // 高风险列表 - 批量查询避免N+1
         List<Map<String, Object>> highRiskList = new ArrayList<>();
-        for (CheckResult cr : highRiskResults) {
-            Submission sub = submissionMapper.selectById(cr.getSubmissionId());
-            if (sub == null) continue;
-            User student = userMapper.selectById(sub.getStudentId());
-            TrainingTask task = taskMapper.selectById(sub.getTaskId());
+        if (!highRiskSubmissionIds.isEmpty()) {
+            List<Submission> highRiskSubs = submissionMapper.selectBatchIds(highRiskSubmissionIds);
+            Set<Long> studentIds = highRiskSubs.stream().map(Submission::getStudentId).filter(Objects::nonNull).collect(Collectors.toSet());
+            Set<Long> hrTaskIds = highRiskSubs.stream().map(Submission::getTaskId).filter(Objects::nonNull).collect(Collectors.toSet());
 
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", sub.getId());
-            item.put("studentName", student != null ? student.getRealName() : "");
-            item.put("title", task != null ? task.getTitle() : "");
-            item.put("riskReason", cr.getDescription());
-            highRiskList.add(item);
+            Map<Long, User> studentMap = studentIds.isEmpty() ? Map.of() :
+                    userMapper.selectBatchIds(studentIds).stream().collect(Collectors.toMap(User::getId, u -> u));
+            Map<Long, TrainingTask> taskMap = hrTaskIds.isEmpty() ? Map.of() :
+                    taskMapper.selectBatchIds(hrTaskIds).stream().collect(Collectors.toMap(TrainingTask::getId, t -> t));
+            Map<Long, CheckResult> crMap = highRiskResults.stream()
+                    .collect(Collectors.toMap(CheckResult::getSubmissionId, cr -> cr, (a, b) -> a));
+
+            for (Submission sub : highRiskSubs) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("id", sub.getId());
+                User student = studentMap.get(sub.getStudentId());
+                item.put("studentName", student != null ? student.getRealName() : "");
+                TrainingTask task = taskMap.get(sub.getTaskId());
+                item.put("title", task != null ? task.getTitle() : "");
+                CheckResult cr = crMap.get(sub.getId());
+                item.put("riskReason", cr != null ? cr.getDescription() : "");
+                highRiskList.add(item);
+            }
         }
         stats.setHighRiskSubmissions(highRiskList);
 
@@ -241,25 +252,30 @@ public class DashboardService {
         }).collect(Collectors.toList());
         stats.setRecentLogs(recentLogs);
 
-        // 系统状态（模拟）
-        List<Map<String, Object>> systemStatus = new ArrayList<>();
-        systemStatus.add(Map.of("name", "核心模型服务", "type", "success", "text", "运行中"));
-        systemStatus.add(Map.of("name", "OCR 识别引擎", "type", "success", "text", "运行中"));
-        systemStatus.add(Map.of("name", "数据存储服务", "type", "success", "text", "运行中"));
-        systemStatus.add(Map.of("name", "文件存储服务", "type", "success", "text", "运行中"));
-        stats.setSystemStatus(systemStatus);
+        // 系统状态（由前端根据实际服务状态展示）
+        stats.setSystemStatus(List.of());
 
         return stats;
     }
 
     private List<Map<String, Object>> buildSubmissionList(List<Submission> subs) {
+        if (subs.isEmpty()) return List.of();
+
+        Set<Long> studentIds = subs.stream().map(Submission::getStudentId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> taskIds = subs.stream().map(Submission::getTaskId).filter(Objects::nonNull).collect(Collectors.toSet());
+
+        Map<Long, User> studentMap = studentIds.isEmpty() ? Map.of() :
+                userMapper.selectBatchIds(studentIds).stream().collect(Collectors.toMap(User::getId, u -> u));
+        Map<Long, TrainingTask> taskMap = taskIds.isEmpty() ? Map.of() :
+                taskMapper.selectBatchIds(taskIds).stream().collect(Collectors.toMap(TrainingTask::getId, t -> t));
+
         List<Map<String, Object>> list = new ArrayList<>();
         for (Submission sub : subs) {
-            User student = userMapper.selectById(sub.getStudentId());
-            TrainingTask task = taskMapper.selectById(sub.getTaskId());
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", sub.getId());
+            User student = studentMap.get(sub.getStudentId());
             item.put("studentName", student != null ? student.getRealName() : "");
+            TrainingTask task = taskMap.get(sub.getTaskId());
             item.put("title", task != null ? task.getTitle() : "");
             item.put("submitTime", sub.getSubmitTime());
             list.add(item);

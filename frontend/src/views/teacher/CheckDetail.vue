@@ -7,7 +7,7 @@
       <el-col :span="8">
         <el-card shadow="never" class="risk-card">
           <div class="risk-stat">
-            <span class="risk-number" style="color: #67c23a">{{ highRiskCount }}</span>
+            <span class="risk-number" style="color: #67c23a">{{ lowRiskCount }}</span>
             <span class="risk-label">低风险</span>
           </div>
         </el-card>
@@ -23,7 +23,7 @@
       <el-col :span="8">
         <el-card shadow="never" class="risk-card">
           <div class="risk-stat">
-            <span class="risk-number" style="color: #f56c6c">{{ lowRiskCount }}</span>
+            <span class="risk-number" style="color: #f56c6c">{{ highRiskCount }}</span>
             <span class="risk-label">高风险</span>
           </div>
         </el-card>
@@ -68,6 +68,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getCheckResults, startCheck } from '@/api/task'
+import { getResultType, getResultLabel, getRiskType, getRiskLabel } from '@/utils/status'
 import type { CheckResult } from '@/types'
 
 const route = useRoute()
@@ -77,26 +78,9 @@ const checkResults = ref<CheckResult[]>([])
 
 const submissionId = computed(() => Number(route.params.id) || 0)
 
-const highRiskCount = computed(() => checkResults.value.filter(r => r.riskLevel === 'LOW').length)
+const highRiskCount = computed(() => checkResults.value.filter(r => r.riskLevel === 'HIGH').length)
 const mediumRiskCount = computed(() => checkResults.value.filter(r => r.riskLevel === 'MEDIUM').length)
-const lowRiskCount = computed(() => checkResults.value.filter(r => r.riskLevel === 'HIGH').length)
-
-function getResultType(result: string) {
-  const map: Record<string, string> = { PASS: 'success', WARNING: 'warning', FAIL: 'danger' }
-  return map[result] || 'info'
-}
-function getResultLabel(result: string) {
-  const map: Record<string, string> = { PASS: '通过', WARNING: '警告', FAIL: '不通过' }
-  return map[result] || result
-}
-function getRiskType(level: string) {
-  const map: Record<string, string> = { LOW: 'success', MEDIUM: 'warning', HIGH: 'danger' }
-  return map[level] || 'info'
-}
-function getRiskLabel(level: string) {
-  const map: Record<string, string> = { LOW: '低', MEDIUM: '中', HIGH: '高' }
-  return map[level] || level
-}
+const lowRiskCount = computed(() => checkResults.value.filter(r => r.riskLevel === 'LOW').length)
 
 async function loadData() {
   if (!submissionId.value) return
@@ -104,7 +88,8 @@ async function loadData() {
   try {
     const res = await getCheckResults(submissionId.value)
     checkResults.value = res.data
-  } catch {
+  } catch (e) {
+    console.error('加载核查结果失败:', e)
     ElMessage.error('加载核查结果失败')
   } finally {
     loading.value = false
@@ -117,7 +102,8 @@ async function handleRecheck() {
     await startCheck(submissionId.value)
     ElMessage.success('AI 重新核查完成')
     loadData()
-  } catch {
+  } catch (e) {
+    console.error('AI 核查失败:', e)
     ElMessage.error('AI 核查失败')
   } finally {
     rechecking.value = false

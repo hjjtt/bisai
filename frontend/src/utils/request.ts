@@ -26,7 +26,7 @@ service.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
     const { code, message } = response.data
     if (code === 0) {
-      return response.data as any
+      return response.data as unknown as AxiosResponse
     }
 
     // 认证错误
@@ -59,25 +59,25 @@ service.interceptors.response.use(
 export default service
 
 // 封装请求方法
-export function get<T>(url: string, params?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-  return service.get(url, { params, ...config })
+export function get<T>(url: string, params?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  return service.get(url, { params, ...config }) as unknown as Promise<ApiResponse<T>>
 }
 
-export function post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-  return service.post(url, data, config)
+export function post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  return service.post(url, data, config) as unknown as Promise<ApiResponse<T>>
 }
 
-export function put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-  return service.put(url, data, config)
+export function put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  return service.put(url, data, config) as unknown as Promise<ApiResponse<T>>
 }
 
 export function del<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-  return service.delete(url, config)
+  return service.delete(url, config) as unknown as Promise<ApiResponse<T>>
 }
 
 export function upload<T>(url: string, formData: FormData, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
   return service.post(url, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     ...config,
-  })
+  }) as unknown as Promise<ApiResponse<T>>
 }

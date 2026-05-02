@@ -12,11 +12,15 @@
       <el-table :data="tasks" stripe v-loading="loading">
         <el-table-column prop="title" label="任务名称" min-width="180" />
         <el-table-column prop="courseName" label="所属课程" width="150" />
-        <el-table-column prop="startTime" label="开始时间" width="170" />
-        <el-table-column prop="endTime" label="截止时间" width="170" />
+        <el-table-column label="开始时间" width="170">
+          <template #default="{ row }">{{ formatDate(row.startTime) }}</template>
+        </el-table-column>
+        <el-table-column label="截止时间" width="170">
+          <template #default="{ row }">{{ formatDate(row.endTime) }}</template>
+        </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
-            <el-tag>{{ getTaskStatus(row.status) }}</el-tag>
+            <el-tag>{{ getTaskStatusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
@@ -45,18 +49,15 @@
 import { ref, reactive, onMounted } from 'vue'
 import { getTaskList } from '@/api/task'
 import { getCourseList } from '@/api/course'
-import type { TrainingTask } from '@/types'
+import { getTaskStatusLabel } from '@/utils/status'
+import { formatDate } from '@/utils/date'
+import type { TrainingTask, Course } from '@/types'
 
 const loading = ref(false)
 const tasks = ref<TrainingTask[]>([])
-const courses = ref<any[]>([])
+const courses = ref<Course[]>([])
 const filter = reactive({ courseId: undefined as number | undefined })
 const pagination = reactive({ page: 1, size: 20, total: 0 })
-
-function getTaskStatus(status: string) {
-  const map: Record<string, string> = { DRAFT: '草稿', PUBLISHED: '进行中', CLOSED: '已关闭', ARCHIVED: '已归档' }
-  return map[status] || status
-}
 
 async function loadTasks() {
   loading.value = true
@@ -64,6 +65,8 @@ async function loadTasks() {
     const res = await getTaskList({ page: pagination.page, size: pagination.size, status: 'PUBLISHED', ...filter })
     tasks.value = res.data.items
     pagination.total = res.data.total
+  } catch (e) {
+    console.error('加载任务列表失败:', e)
   } finally {
     loading.value = false
   }
@@ -73,7 +76,9 @@ async function loadCourses() {
   try {
     const res = await getCourseList({ size: 100 })
     courses.value = res.data.items
-  } catch { /* ignore */ }
+  } catch (e) {
+    console.error('加载课程列表失败:', e)
+  }
 }
 
 onMounted(() => {

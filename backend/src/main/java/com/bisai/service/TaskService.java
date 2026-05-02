@@ -18,7 +18,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
 
 @Slf4j
 @Service
@@ -29,9 +28,6 @@ public class TaskService {
     private final SubmissionMapper submissionMapper;
     private final AsyncTaskService asyncTaskService;
 
-    // 批量任务并发控制
-    private static final int MAX_CONCURRENT_BATCHES = 3;
-    private static final Semaphore batchSemaphore = new Semaphore(MAX_CONCURRENT_BATCHES);
     private static final Map<Long, BatchJob> activeJobs = new ConcurrentHashMap<>();
 
     public Result<PageResult<TrainingTask>> listTasks(PageQuery query, Long courseId, String status) {
@@ -97,13 +93,12 @@ public class TaskService {
      * 批量解析 - 使用异步任务队列，控制并发
      */
     public Result<Map<String, Object>> batchParse(Long taskId) {
-        if (!batchSemaphore.tryAcquire()) {
-            return Result.error(42901, "批量任务并发数已达上限(" + MAX_CONCURRENT_BATCHES + ")，请稍后重试");
+        if (activeJobs.containsKey(taskId)) {
+            return Result.error(40901, "该任务正在批量处理中，请稍后重试");
         }
 
         TrainingTask task = taskMapper.selectById(taskId);
         if (task == null) {
-            batchSemaphore.release();
             return Result.error(40401, "任务不存在");
         }
 
@@ -111,13 +106,14 @@ public class TaskService {
                 new LambdaQueryWrapper<Submission>().eq(Submission::getTaskId, taskId)
         );
 
+        // 先注册活跃任务，防止竞态
+        activeJobs.put(taskId, new BatchJob(taskId, "PARSE", submissions.size()));
+
         int created = 0;
         for (Submission sub : submissions) {
             asyncTaskService.createTask("PARSE", sub.getId());
             created++;
         }
-
-        activeJobs.put(taskId, new BatchJob(taskId, "PARSE", submissions.size()));
 
         Map<String, Object> result = new HashMap<>();
         result.put("total", submissions.size());
@@ -129,13 +125,12 @@ public class TaskService {
      * 批量评分 - 使用异步任务队列，控制并发
      */
     public Result<Map<String, Object>> batchScore(Long taskId) {
-        if (!batchSemaphore.tryAcquire()) {
-            return Result.error(42901, "批量任务并发数已达上限(" + MAX_CONCURRENT_BATCHES + ")，请稍后重试");
+        if (activeJobs.containsKey(taskId)) {
+            return Result.error(40901, "该任务正在批量处理中，请稍后重试");
         }
 
         TrainingTask task = taskMapper.selectById(taskId);
         if (task == null) {
-            batchSemaphore.release();
             return Result.error(40401, "任务不存在");
         }
 
@@ -143,27 +138,19 @@ public class TaskService {
                 new LambdaQueryWrapper<Submission>().eq(Submission::getTaskId, taskId)
         );
 
+        // 先注册活跃任务，防止竞态
+        activeJobs.put(taskId, new BatchJob(taskId, "SCORE", submissions.size()));
+
         int created = 0;
         for (Submission sub : submissions) {
             asyncTaskService.createTask("SCORE", sub.getId());
             created++;
         }
 
-        activeJobs.put(taskId, new BatchJob(taskId, "SCORE", submissions.size()));
-
         Map<String, Object> result = new HashMap<>();
         result.put("total", submissions.size());
         result.put("created", created);
         return Result.ok(result);
-    }
-
-    /**
-     * 批量任务完成后释放信号量（由 AsyncTaskService 回调）
-     */
-    public void onBatchJobCompleted(Long taskId) {
-        activeJobs.remove(taskId);
-        batchSemaphore.release();
-        log.info("批量任务完成，释放信号量: taskId={}", taskId);
     }
 
     /**
@@ -199,13 +186,12 @@ public class TaskService {
     }
 
     /**
-     * 监听批量任务完成事件，释放信号量
+     * 监听批量任务完成事件
      */
     @EventListener
     public void onBatchJobCompleted(AsyncTaskService.BatchJobCompletedEvent event) {
         activeJobs.remove(event.taskId);
-        batchSemaphore.release();
-        log.info("批量任务完成，释放信号量: taskId={}", event.taskId);
+        log.info("批量任务完成: taskId={}", event.taskId);
     }
 
     private static class BatchJob {

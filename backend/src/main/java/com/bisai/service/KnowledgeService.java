@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -29,6 +30,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 
@@ -81,13 +84,22 @@ public class KnowledgeService {
 
         Page<KnowledgeDocument> result = documentMapper.selectPage(page, wrapper);
 
+        // 批量查询知识库名称，避免N+1
+        Set<Long> kbIds = result.getRecords().stream()
+                .map(KnowledgeDocument::getKnowledgeBaseId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<Long, KnowledgeBase> kbMap = new java.util.HashMap<>();
+        if (!kbIds.isEmpty()) {
+            knowledgeBaseMapper.selectBatchIds(kbIds).forEach(kb -> kbMap.put(kb.getId(), kb));
+        }
+
         result.getRecords().forEach(doc -> {
             doc.setVectorized("SUCCESS".equals(doc.getVectorStatus()));
             doc.setUpdateTime(doc.getUpdatedAt());
-            // 设置前端需要的 name 字段（映射自 originalName）
             doc.setName(doc.getOriginalName());
-            // 设置关联课程名称
-            doc.setCourseName(resolveCourseName(doc));
+            KnowledgeBase kb = kbMap.get(doc.getKnowledgeBaseId());
+            doc.setCourseName(kb != null && kb.getCourseId() != null ? "课程 #" + kb.getCourseId() : "知识库 #" + doc.getKnowledgeBaseId());
         });
 
         return Result.ok(new PageResult<>(result.getRecords(), result.getCurrent(), result.getSize(), result.getTotal()));
@@ -96,6 +108,7 @@ public class KnowledgeService {
     /**
      * 上传知识库文档（MVP 阶段模拟实现）
      */
+    @Transactional(rollbackFor = Exception.class)
     public Result<KnowledgeDocument> uploadDocument(MultipartFile file, Long courseId) {
         try {
             String originalName = file.getOriginalFilename();
@@ -148,6 +161,17 @@ public class KnowledgeService {
 
     public Result<Void> deleteDocument(Long id) {
         documentMapper.deleteById(id);
+        return Result.ok();
+    }
+
+    public Result<Void> toggleDocumentStatus(Long id, Boolean enabled) {
+        KnowledgeDocument doc = documentMapper.selectById(id);
+        if (doc == null) {
+            return Result.error("文档不存在");
+        }
+        doc.setEnabled(enabled != null && enabled);
+        doc.setUpdatedAt(LocalDateTime.now());
+        documentMapper.updateById(doc);
         return Result.ok();
     }
 
@@ -248,11 +272,46 @@ public class KnowledgeService {
     private List<String> splitContent(String content, int chunkSize) {
         if (content == null || content.isBlank()) return List.of("");
         java.util.ArrayList<String> chunks = new java.util.ArrayList<>();
-        for (int start = 0; start < content.length(); start += chunkSize) {
-            int end = Math.min(content.length(), start + chunkSize);
-            chunks.add(content.substring(start, end));
+        int start = 0;
+        while (start < content.length()) {
+            int end = Math.min(start + chunkSize, content.length());
+            if (end < content.length()) {
+                // 在 chunkSize 范围内找最近的段落/句子边界
+                int boundary = findSplitBoundary(content, start, end, chunkSize);
+                if (boundary > start) {
+                    end = boundary;
+                }
+            }
+            chunks.add(content.substring(start, end).trim());
+            start = end;
         }
         return chunks;
+    }
+
+    private int findSplitBoundary(String content, int start, int preferredEnd, int chunkSize) {
+        // 优先在段落边界（\n\n）分割
+        for (int i = preferredEnd; i > start + chunkSize / 2; i--) {
+            if (i < content.length() && content.charAt(i) == '\n'
+                    && i + 1 < content.length() && content.charAt(i + 1) == '\n') {
+                return i;
+            }
+        }
+        // 其次在换行符分割
+        for (int i = preferredEnd; i > start + chunkSize / 2; i--) {
+            if (i < content.length() && content.charAt(i) == '\n') {
+                return i;
+            }
+        }
+        // 最后在句号/感叹号/问号分割
+        for (int i = preferredEnd; i > start + chunkSize / 2; i--) {
+            if (i < content.length()) {
+                char c = content.charAt(i);
+                if (c == '。' || c == '.' || c == '！' || c == '？' || c == '!' || c == '?') {
+                    return i + 1;
+                }
+            }
+        }
+        return preferredEnd;
     }
 
     private String trim(String content, int maxLength) {

@@ -38,15 +38,17 @@
       <el-divider v-if="submissions.length > 0">历史提交版本</el-divider>
       <el-table v-if="submissions.length > 0" :data="submissions" stripe size="small">
         <el-table-column prop="version" label="版本" width="80" />
-        <el-table-column prop="submitTime" label="提交时间" width="180" />
+        <el-table-column label="提交时间" width="180">
+          <template #default="{ row }">{{ formatDate(row.submitTime) }}</template>
+        </el-table-column>
         <el-table-column label="解析状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="getParseStatusType(row.parseStatus)" size="small">{{ row.parseStatus }}</el-tag>
+            <el-tag :type="getParseStatusType(row.parseStatus)" size="small">{{ getParseStatusLabel(row.parseStatus) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="评分状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="getScoreStatusType(row.scoreStatus)" size="small">{{ row.scoreStatus }}</el-tag>
+            <el-tag :type="getScoreStatusType(row.scoreStatus)" size="small">{{ getScoreStatusLabel(row.scoreStatus) }}</el-tag>
           </template>
         </el-table-column>
       </el-table>
@@ -63,6 +65,8 @@ import type { UploadFile, UploadInstance, UploadRawFile } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { getTask, getSubmissions, uploadFiles } from '@/api/task'
+import { getParseStatusType, getParseStatusLabel, getScoreStatusType, getScoreStatusLabel } from '@/utils/status'
+import { formatDate } from '@/utils/date'
 import type { TrainingTask, Submission } from '@/types'
 
 const route = useRoute()
@@ -77,19 +81,6 @@ const submissions = ref<Submission[]>([])
 
 const taskId = computed(() => Number(route.params.taskId) || 0)
 const acceptTypes = '.doc,.docx,.pdf,.jpg,.jpeg,.png,.xls,.xlsx,.zip'
-
-function getParseStatusType(status: string) {
-  const map: Record<string, string> = { PENDING: 'info', PARSING: 'warning', SUCCESS: 'success', FAILED: 'danger' }
-  return map[status] || 'info'
-}
-
-function getScoreStatusType(status: string) {
-  const map: Record<string, string> = {
-    NOT_SCORED: 'info', SCORING: 'warning', AI_SCORED: '', TEACHER_CONFIRMED: 'success',
-    PUBLISHED: 'success', SCORE_FAILED: 'danger', RETURNED: 'warning',
-  }
-  return map[status] || 'info'
-}
 
 const beforeUpload = (file: UploadRawFile) => {
   const maxSize = 200 * 1024 * 1024
@@ -136,7 +127,8 @@ async function submitUpload() {
     selectedFiles.value = []
     fileList.value = []
     router.push(`/student/tasks/${taskId.value}`)
-  } catch {
+  } catch (e) {
+    console.error('上传失败:', e)
     ElMessage.error('上传失败，请重试')
   } finally {
     uploading.value = false
@@ -149,7 +141,8 @@ async function loadTask() {
   try {
     const res = await getTask(taskId.value)
     task.value = res.data
-  } catch {
+  } catch (e) {
+    console.error('加载任务信息失败:', e)
     ElMessage.error('加载任务信息失败')
   }
 }
@@ -159,8 +152,8 @@ async function loadSubmissions() {
   try {
     const res = await getSubmissions({ taskId: taskId.value, size: 5, sort: 'version', order: 'desc' })
     submissions.value = res.data.items
-  } catch {
-    // 忽略
+  } catch (e) {
+    console.error('加载提交历史失败:', e)
   }
 }
 

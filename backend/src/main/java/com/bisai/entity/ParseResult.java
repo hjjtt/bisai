@@ -1,6 +1,6 @@
 package com.bisai.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.*;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -22,5 +22,8 @@ public class ParseResult {
     private String completeness;
     private String quality;
     private String suggestions;
+    @TableLogic
+    private Integer deleted;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

@@ -61,7 +61,8 @@ async function loadData() {
     ])
     submission.value = subRes.data
     scores.value = scoreRes.data
-  } catch {
+  } catch (e) {
+    console.error('加载评价结果失败:', e)
     ElMessage.error('加载评价结果失败')
   } finally {
     loading.value = false
@@ -72,7 +73,8 @@ async function downloadReport(format: 'PDF' | 'WORD') {
   try {
     const res = await exportStudentReport(submissionId.value, format)
     window.open(`/api/files/${res.data.fileId}/download`)
-  } catch {
+  } catch (e) {
+    console.error('报告导出失败:', e)
     ElMessage.error('报告导出失败')
   }
 }

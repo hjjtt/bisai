@@ -47,6 +47,7 @@ public class EvaluationTemplateService {
         return Result.ok(template);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public Result<EvaluationTemplate> createTemplate(EvaluationTemplate template) {
         template.setStatus("ENABLED");
         templateMapper.insert(template);
@@ -56,6 +57,7 @@ public class EvaluationTemplateService {
         return Result.ok(template);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public Result<EvaluationTemplate> updateTemplate(Long id, EvaluationTemplate template) {
         EvaluationTemplate existing = templateMapper.selectById(id);
         if (existing == null) {

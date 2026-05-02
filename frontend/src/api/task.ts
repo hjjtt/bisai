@@ -97,3 +97,18 @@ export function batchScore(taskId: number) {
 export function getBatchProgress(taskId: number) {
   return get<{ total: number; success: number; failed: number; running: number }>(`/tasks/${taskId}/batch-progress`)
 }
+
+// 客观评分
+export function getObjectiveScore(submissionId: number) {
+  return get<{ scores: Record<string, number>; total: number }>(`/submissions/${submissionId}/objective-score`)
+}
+
+// 成绩修正
+export function correctScore(submissionId: number, data: { indicatorId?: number; newScore: number; reason: string }) {
+  return put(`/submissions/${submissionId}/correct`, data)
+}
+
+// 下载报告
+export function downloadReport(fileName: string) {
+  return `/api/reports/download/report/${fileName}`
+}

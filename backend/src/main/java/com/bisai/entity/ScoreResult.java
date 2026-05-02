@@ -18,6 +18,8 @@ public class ScoreResult {
     private BigDecimal finalScore;
     private String reason;
     private String evidence;
+    @TableLogic
+    private Integer deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

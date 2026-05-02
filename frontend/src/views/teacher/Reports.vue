@@ -62,7 +62,9 @@ async function loadTasks() {
   try {
     const res = await getTaskList({ size: 100 })
     tasks.value = res.data.items
-  } catch { /* ignore */ }
+  } catch (e) {
+    console.error('加载任务列表失败:', e)
+  }
 }
 
 async function loadSubmissions() {
@@ -70,7 +72,9 @@ async function loadSubmissions() {
   try {
     const res = await getSubmissions({ taskId: studentReport.taskId, size: 100 })
     submissionList.value = res.data.items
-  } catch { /* ignore */ }
+  } catch (e) {
+    console.error('加载提交列表失败:', e)
+  }
 }
 
 async function doExportStudentReport(format: 'PDF' | 'WORD') {
@@ -79,7 +83,8 @@ async function doExportStudentReport(format: 'PDF' | 'WORD') {
   try {
     const res = await exportStudentReportApi(studentReport.submissionId, format)
     window.open(`/api/files/${res.data.fileId}/download`)
-  } catch {
+  } catch (e) {
+    console.error('导出报告失败:', e)
     ElMessage.error('导出失败')
   } finally {
     exporting.value = false
@@ -92,7 +97,8 @@ async function doExportClassReport(format: 'PDF' | 'EXCEL') {
   try {
     const res = await exportClassReportApi(classReport.taskId, format)
     window.open(`/api/files/${res.data.fileId}/download`)
-  } catch {
+  } catch (e) {
+    console.error('导出报表失败:', e)
     ElMessage.error('导出失败')
   } finally {
     exporting.value = false

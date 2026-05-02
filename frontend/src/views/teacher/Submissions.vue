@@ -18,7 +18,9 @@
         <el-table-column prop="studentName" label="学生" width="100" />
         <el-table-column prop="title" label="任务名称" min-width="180" />
         <el-table-column prop="version" label="版本" width="70" />
-        <el-table-column prop="submitTime" label="提交时间" width="170" />
+        <el-table-column label="提交时间" width="170">
+          <template #default="{ row }">{{ formatDate(row.submitTime) }}</template>
+        </el-table-column>
         <el-table-column label="解析状态" width="110">
           <template #default="{ row }">
             <el-tag :type="getParseStatusType(row.parseStatus)" size="small">{{ getParseStatusLabel(row.parseStatus) }}</el-tag>
@@ -63,12 +65,12 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getSubmissions, getTaskList, batchParse, batchScore, returnSubmission, startParse, startCheck } from '@/api/task'
+import { getParseStatusType, getParseStatusLabel, getCheckStatusType, getCheckStatusLabel, getScoreStatusType, getScoreStatusLabel } from '@/utils/status'
+import { formatDate } from '@/utils/date'
 import type { Submission, TrainingTask } from '@/types'
 
-const router = useRouter()
 const loading = ref(false)
 const batchLoading = ref(false)
 const aiLoading = reactive<Record<number, boolean>>({})
@@ -78,44 +80,14 @@ const tasks = ref<TrainingTask[]>([])
 const filter = reactive({ taskId: undefined as number | undefined })
 const pagination = reactive({ page: 1, size: 20, total: 0 })
 
-function getParseStatusType(status: string) {
-  const map: Record<string, string> = { PENDING: 'info', PARSING: 'warning', SUCCESS: 'success', FAILED: 'danger' }
-  return map[status] || 'info'
-}
-function getParseStatusLabel(status: string) {
-  const map: Record<string, string> = { PENDING: '待解析', PARSING: '解析中', SUCCESS: '已完成', FAILED: '失败' }
-  return map[status] || status
-}
-function getCheckStatusType(status?: string) {
-  const map: Record<string, string> = { NOT_CHECKED: 'info', CHECKING: 'warning', SUCCESS: 'success', CHECK_FAILED: 'danger' }
-  return map[status || 'NOT_CHECKED'] || 'info'
-}
-function getCheckStatusLabel(status?: string) {
-  const map: Record<string, string> = { NOT_CHECKED: '未核查', CHECKING: '核查中', SUCCESS: '已完成', CHECK_FAILED: '失败' }
-  return map[status || 'NOT_CHECKED'] || status || '未核查'
-}
-function getScoreStatusType(status: string) {
-  const map: Record<string, string> = {
-    NOT_SCORED: 'info', SCORING: 'warning', AI_SCORED: '', TEACHER_CONFIRMED: 'success',
-    PUBLISHED: 'success', SCORE_FAILED: 'danger', RETURNED: 'warning',
-  }
-  return map[status] || 'info'
-}
-function getScoreStatusLabel(status: string) {
-  const map: Record<string, string> = {
-    NOT_SCORED: '未评分', SCORING: '评分中', AI_SCORED: 'AI已评分', TEACHER_CONFIRMED: '教师已确认',
-    PUBLISHED: '已发布', SCORE_FAILED: '评分失败', RETURNED: '已退回',
-  }
-  return map[status] || status
-}
-
 async function loadData() {
   loading.value = true
   try {
     const res = await getSubmissions({ page: pagination.page, size: pagination.size, ...filter })
     submissions.value = res.data.items
     pagination.total = res.data.total
-  } catch {
+  } catch (e) {
+    console.error('加载提交列表失败:', e)
     ElMessage.error('加载提交列表失败')
   } finally {
     loading.value = false
@@ -149,8 +121,8 @@ async function loadTasks() {
   try {
     const res = await getTaskList({ size: 100 })
     tasks.value = res.data.items
-  } catch {
-    // 忽略
+  } catch (e) {
+    console.error('加载任务列表失败:', e)
   }
 }
 
@@ -161,7 +133,8 @@ async function handleParse(id: number) {
     ElMessage.success('AI 解析任务已启动')
     await loadData()
     startPolling()
-  } catch {
+  } catch (e) {
+    console.error('AI 解析失败:', e)
     ElMessage.error('AI 解析失败')
   } finally {
     if (!hasRunningAiTask()) aiLoading[id] = false
@@ -175,7 +148,8 @@ async function handleCheck(id: number) {
     ElMessage.success('AI 核查任务已启动')
     await loadData()
     startPolling()
-  } catch {
+  } catch (e) {
+    console.error('AI 核查失败:', e)
     ElMessage.error('AI 核查失败')
   } finally {
     if (!hasRunningAiTask()) aiLoading[id] = false
@@ -190,7 +164,8 @@ async function handleBatchParse() {
     ElMessage.success('批量解析任务已启动')
     await loadData()
     startPolling()
-  } catch {
+  } catch (e) {
+    console.error('批量解析失败:', e)
     ElMessage.error('批量解析失败')
   } finally {
     if (!hasRunningAiTask()) batchLoading.value = false
@@ -205,7 +180,8 @@ async function handleBatchScore() {
     ElMessage.success('批量评分任务已启动')
     await loadData()
     startPolling()
-  } catch {
+  } catch (e) {
+    console.error('批量评分失败:', e)
     ElMessage.error('批量评分失败')
   } finally {
     if (!hasRunningAiTask()) batchLoading.value = false
@@ -224,7 +200,7 @@ async function handleReturn(id: number) {
     ElMessage.success('已退回')
     loadData()
   } catch {
-    // 用户取消
+    // 用户取消操作
   }
 }
 

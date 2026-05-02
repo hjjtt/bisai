@@ -4,6 +4,7 @@ import com.bisai.common.Result;
 import com.bisai.dto.DashboardStats;
 import com.bisai.service.DashboardService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,6 +28,7 @@ public class DashboardController {
     }
 
     @GetMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<DashboardStats.AdminStats> adminStats() {
         return Result.ok(dashboardService.getAdminStats());
     }

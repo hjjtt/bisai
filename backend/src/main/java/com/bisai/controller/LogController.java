@@ -12,6 +12,7 @@ import com.bisai.mapper.OperationLogMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +21,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/logs")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class LogController {
 
     private final OperationLogMapper operationLogMapper;

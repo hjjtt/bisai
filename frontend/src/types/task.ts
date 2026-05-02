@@ -21,6 +21,7 @@ export interface TrainingTask {
 export interface Submission {
   id: number
   taskId: number
+  taskTitle?: string
   studentId: number
   studentName?: string
   submitTime: string
@@ -29,6 +30,13 @@ export interface Submission {
   checkStatus?: CheckStatus
   scoreStatus: ScoreStatus
   totalScore?: number
+  autoTotalScore?: number
+  teacherComment?: string
+  parseSummary?: string
+  parseTopics?: string
+  parseCompleteness?: string
+  parseQuality?: string
+  parseSuggestions?: string
 }
 
 // 文件
