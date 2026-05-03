@@ -21,7 +21,6 @@ public class DashboardService {
     private final TrainingTaskMapper taskMapper;
     private final SubmissionMapper submissionMapper;
     private final MessageMapper messageMapper;
-    private final OperationLogMapper operationLogMapper;
     private final CheckResultMapper checkResultMapper;
 
     public DashboardStats.StudentStats getStudentStats(Long userId) {
@@ -236,21 +235,8 @@ public class DashboardService {
         );
         stats.setTodayError(todayError);
 
-        // 最近操作日志
-        List<OperationLog> logs = operationLogMapper.selectList(
-                new LambdaQueryWrapper<OperationLog>()
-                        .orderByDesc(OperationLog::getCreatedAt)
-                        .last("LIMIT 5")
-        );
-        List<Map<String, Object>> recentLogs = logs.stream().map(log -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("time", log.getCreatedAt());
-            m.put("user", log.getUsername());
-            m.put("type", log.getAction());
-            m.put("content", log.getDescription());
-            return m;
-        }).collect(Collectors.toList());
-        stats.setRecentLogs(recentLogs);
+        // 最近操作日志（已移除操作日志功能）
+        stats.setRecentLogs(List.of());
 
         // 系统状态（由前端根据实际服务状态展示）
         stats.setSystemStatus(List.of());

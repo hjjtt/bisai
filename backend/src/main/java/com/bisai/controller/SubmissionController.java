@@ -104,9 +104,10 @@ public class SubmissionController {
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Void> saveTeacherScores(@PathVariable Long id,
                                            @RequestBody Map<String, Object> body) {
-        @SuppressWarnings("unchecked")
-        List<com.bisai.entity.ScoreResult> scores =
-                com.bisai.util.JsonUtil.convertList(body.get("scores"), com.bisai.entity.ScoreResult.class);
+        Object scoresObj = body.get("scores");
+        List<com.bisai.entity.ScoreResult> scores = scoresObj != null
+                ? com.bisai.util.JsonUtil.convertList(scoresObj, com.bisai.entity.ScoreResult.class)
+                : List.of();
         String comment = (String) body.get("comment");
         return scoreService.saveTeacherScores(id, scores, comment);
     }

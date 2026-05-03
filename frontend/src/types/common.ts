@@ -60,7 +60,6 @@ export interface BaseStats {
   apiUsage?: number
   serverLoad?: number
   systemStatus?: SystemStatusItem[]
-  recentLogs?: LogEntry[]
   dates?: string[]
   submissions?: number[]
   parsed?: number[]
@@ -71,12 +70,4 @@ export interface SystemStatusItem {
   name: string
   type: 'success' | 'warning' | 'danger' | 'info'
   text: string
-}
-
-export interface LogEntry {
-  time: string
-  user: string
-  type: string
-  content: string
-  status?: string
 }

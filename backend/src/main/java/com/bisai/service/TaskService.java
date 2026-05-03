@@ -111,6 +111,8 @@ public class TaskService {
 
         int created = 0;
         for (Submission sub : submissions) {
+            sub.setParseStatus("PARSING");
+            submissionMapper.updateById(sub);
             asyncTaskService.createTask("PARSE", sub.getId());
             created++;
         }
@@ -143,6 +145,8 @@ public class TaskService {
 
         int created = 0;
         for (Submission sub : submissions) {
+            sub.setScoreStatus("SCORING");
+            submissionMapper.updateById(sub);
             asyncTaskService.createTask("SCORE", sub.getId());
             created++;
         }

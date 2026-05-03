@@ -36,14 +36,14 @@ public class AiService {
     private final KnowledgeRetrievalService knowledgeRetrievalService;
     private final MessageService messageService;
     private final ObjectMapper objectMapper;
+    private final AsyncTaskMapper asyncTaskMapper;
 
     // ==================== 智能解析 ====================
 
     /**
      * 智能解析提交文件内容
      */
-    @Async("aiTaskExecutor")
-    public void doParse(Long submissionId) {
+    public void doParse(Long submissionId, Long asyncTaskId) {
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) return;
 
@@ -60,15 +60,19 @@ public class AiService {
             if (files.isEmpty()) {
                 submission.setParseStatus("SUCCESS");
                 submissionMapper.updateById(submission);
+                updateTaskProgress(asyncTaskId, 100, "解析完成");
                 return;
             }
 
             // 读取文件内容（文本类文件直接读取，非文本文件记录文件信息）
             StringBuilder fileContent = new StringBuilder();
-            for (FileEntity file : files) {
+            for (int i = 0; i < files.size(); i++) {
+                FileEntity file = files.get(i);
                 fileContent.append("【文件: ").append(file.getOriginalName())
                         .append(" | 类型: ").append(file.getFileType())
                         .append(" | 大小: ").append(file.getFileSize()).append("字节】\n");
+
+                updateTaskProgress(asyncTaskId, 10 + (i * 30 / files.size()), "正在读取文件: " + file.getOriginalName());
 
                 DocumentTextExtractor.ExtractedText extracted = documentTextExtractor.extract(file);
                 String content = extracted.content();
@@ -79,9 +83,9 @@ public class AiService {
                     }
                 }
                 if (content != null && !content.isEmpty()) {
-                    // 截取前 8000 字符避免 token 过多
-                    if (content.length() > 8000) {
-                        content = content.substring(0, 8000) + "\n...(内容过长已截断)";
+                    // 截取前 2000 字符，解析任务只需提取关键信息
+                    if (content.length() > 2000) {
+                        content = content.substring(0, 2000) + "\n...(内容过长已截断)";
                     }
                     fileContent.append(content).append("\n\n");
                     saveParseResult(submissionId, null, file.getId(), extracted.parserType(), content, null);
@@ -89,6 +93,8 @@ public class AiService {
                     fileContent.append("(二进制文件，无法直接读取文本内容)\n\n");
                 }
             }
+
+            updateTaskProgress(asyncTaskId, 50, "正在调用 AI 解析...");
 
             // 调用 AI 解析
             String systemPrompt = "你是一个文档解析助手。你需要分析学生提交的实训成果文件内容，提取关键信息。" +
@@ -109,14 +115,20 @@ public class AiService {
             submission.setParseSuggestions(parsed.path("suggestions").toString());
             log.info("解析结果(submissionId={}): {}", submissionId, aiResult.length() > 200 ? aiResult.substring(0, 200) + "..." : aiResult);
 
+            updateTaskProgress(asyncTaskId, 90, "正在保存解析结果...");
+
             submission.setParseStatus("SUCCESS");
             submissionMapper.updateById(submission);
             saveParseResult(submissionId, null, null, "AI", fileContent.toString(), parsed);
 
+            updateTaskProgress(asyncTaskId, 100, "解析完成");
+
         } catch (Exception e) {
-            log.error("智能解析失败, submissionId={}: {}", submissionId, e.getMessage());
+            log.error("智能解析失败, submissionId={}: {}", submissionId, e.getMessage(), e);
             submission.setParseStatus("FAILED");
             submissionMapper.updateById(submission);
+            updateTaskProgress(asyncTaskId, -1, "解析失败: " + e.getMessage());
+            throw new RuntimeException("智能解析失败: " + e.getMessage(), e);
         }
     }
 
@@ -125,8 +137,7 @@ public class AiService {
     /**
      * 智能核查提交内容
      */
-    @Async("aiTaskExecutor")
-    public void doCheck(Long submissionId) {
+    public void doCheck(Long submissionId, Long asyncTaskId) {
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) return;
         submission.setCheckStatus("CHECKING");
@@ -137,6 +148,8 @@ public class AiService {
             TrainingTask task = taskMapper.selectById(submission.getTaskId());
             String taskRequirements = task != null ? task.getRequirements() : "";
             String taskTitle = task != null ? task.getTitle() : "";
+
+            updateTaskProgress(asyncTaskId, 10, "正在读取提交文件...");
 
             // 获取文件内容
             List<FileEntity> files = fileMapper.selectList(
@@ -160,6 +173,8 @@ public class AiService {
                 }
             }
 
+            updateTaskProgress(asyncTaskId, 30, "正在调用 AI 核查...");
+
             // 构建核查 prompt
             String systemPrompt = "你是实训成果核查专家。你需要从以下维度核查学生提交的实训成果：\n" +
                     "1. **内容完整性** - 是否涵盖任务要求的所有要点\n" +
@@ -178,6 +193,8 @@ public class AiService {
             String userMessage = "## 任务要求\n标题：" + taskTitle + "\n要求：" + taskRequirements + "\n\n## 学生提交内容\n" + fileContent;
 
             JsonNode result = aiClient.chatAsJson(systemPrompt, userMessage);
+
+            updateTaskProgress(asyncTaskId, 80, "正在保存核查结果...");
 
             // 清除旧的核查结果
             checkResultMapper.delete(
@@ -205,13 +222,16 @@ public class AiService {
 
             submission.setCheckStatus("SUCCESS");
             submissionMapper.updateById(submission);
+            updateTaskProgress(asyncTaskId, 100, "核查完成");
             log.info("智能核查完成, submissionId={}, 检查项数={}", submissionId, items.size());
 
         } catch (Exception e) {
-            log.error("智能核查失败, submissionId={}: {}", submissionId, e.getMessage());
+            log.error("智能核查失败, submissionId={}: {}", submissionId, e.getMessage(), e);
             submission.setCheckStatus("CHECK_FAILED");
             submissionMapper.updateById(submission);
+            updateTaskProgress(asyncTaskId, -1, "核查失败: " + e.getMessage());
             saveCheckFailure(submissionId, e.getMessage());
+            throw new RuntimeException("智能核查失败: " + e.getMessage(), e);
         }
     }
 
@@ -220,8 +240,7 @@ public class AiService {
     /**
      * 智能评分 - 基于评价指标自动打分
      */
-    @Async("aiTaskExecutor")
-    public void doScore(Long submissionId) {
+    public void doScore(Long submissionId, Long asyncTaskId) {
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) return;
         submission.setScoreStatus("SCORING");
@@ -234,8 +253,11 @@ public class AiService {
                 log.warn("任务不存在或未关联评分模板, taskId={}", submission.getTaskId());
                 submission.setScoreStatus("AI_SCORED");
                 submissionMapper.updateById(submission);
+                updateTaskProgress(asyncTaskId, 100, "评分完成");
                 return;
             }
+
+            updateTaskProgress(asyncTaskId, 10, "正在加载评分指标...");
 
             // 获取评分指标（一次性查询所有指标，避免 N+1）
             List<Indicator> allIndicators = indicatorMapper.selectList(
@@ -259,8 +281,11 @@ public class AiService {
                 log.warn("评分模板没有指标, templateId={}", task.getTemplateId());
                 submission.setScoreStatus("AI_SCORED");
                 submissionMapper.updateById(submission);
+                updateTaskProgress(asyncTaskId, 100, "评分完成");
                 return;
             }
+
+            updateTaskProgress(asyncTaskId, 20, "正在读取提交文件...");
 
             // 获取文件内容
             List<FileEntity> files = fileMapper.selectList(
@@ -283,6 +308,8 @@ public class AiService {
                     fileContent.append(content).append("\n\n");
                 }
             }
+
+            updateTaskProgress(asyncTaskId, 30, "正在检索知识库...");
 
             // 获取任务要求
             String requirements = task.getRequirements() != null ? task.getRequirements() : "";
@@ -307,6 +334,8 @@ public class AiService {
                 }
             }
 
+            updateTaskProgress(asyncTaskId, 40, "正在调用 AI 评分...");
+
             // 构建 AI 评分 prompt
             String systemPrompt = "你是实训成果评分专家。你需要根据给定的评分指标，对学生提交的实训成果进行客观评分。\n" +
                     "评分要求：\n" +
@@ -328,6 +357,8 @@ public class AiService {
                     "\n## 学生提交内容\n" + fileContent;
 
             JsonNode result = aiClient.chatAsJson(systemPrompt, userMessage);
+
+            updateTaskProgress(asyncTaskId, 80, "正在保存评分结果...");
 
             // 清除旧的 AI 评分结果
             scoreResultMapper.delete(
@@ -400,15 +431,38 @@ public class AiService {
 
             log.info("智能评分完成, submissionId={}, 评分项数={}, 总分={}", submissionId, scores.size(), totalScore);
 
+            updateTaskProgress(asyncTaskId, 100, "评分完成");
+
         } catch (Exception e) {
             log.error("智能评分失败, submissionId={}: {}", submissionId, e.getMessage());
             submission.setScoreStatus("SCORE_FAILED");
             submissionMapper.updateById(submission);
+            updateTaskProgress(asyncTaskId, -1, "评分失败: " + e.getMessage());
             throw new RuntimeException("智能评分失败: " + e.getMessage());
         }
     }
 
     // ==================== 辅助方法 ====================
+
+    /**
+     * 更新异步任务进度
+     */
+    private void updateTaskProgress(Long asyncTaskId, int progress, String step) {
+        if (asyncTaskId == null) return;
+        try {
+            AsyncTask task = asyncTaskMapper.selectById(asyncTaskId);
+            if (task != null) {
+                task.setProgress(progress < 0 ? 0 : progress);
+                task.setCurrentStep(step);
+                if (progress < 0) {
+                    task.setErrorMessage(step);
+                }
+                asyncTaskMapper.updateById(task);
+            }
+        } catch (Exception e) {
+            log.warn("更新任务进度失败: {}", e.getMessage());
+        }
+    }
 
     private String analyzeImage(FileEntity file) {
         try {

@@ -13,6 +13,8 @@ public class AsyncTask {
     private String taskType;
     private Long bizId;
     private String status;
+    private Integer progress; // 进度百分比 0-100
+    private String currentStep; // 当前执行步骤描述
     private Integer retryCount;
     private Integer maxRetry;
     private LocalDateTime nextRunAt;

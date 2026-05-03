@@ -97,6 +97,12 @@ export const teacherRoutes: RouteRecordRaw[] = [
         meta: { title: '核查详情', hidden: true },
       },
       {
+        path: 'check',
+        name: 'TeacherCheckList',
+        component: () => import('@/views/teacher/CheckList.vue'),
+        meta: { title: '成果核查', icon: 'CircleCheck' },
+      },
+      {
         path: 'submissions/:id/score',
         name: 'TeacherScoreReview',
         component: () => import('@/views/teacher/ScoreReview.vue'),

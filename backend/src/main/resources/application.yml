@@ -16,24 +16,19 @@ spring:
     time-zone: Asia/Shanghai
   devtools:
     restart:
-      enabled: true
+      enabled: false
     livereload:
-      enabled: true
+      enabled: false
   ai:
-    model:
-      chat: openai
-      embedding: openai
     openai:
       base-url: https://api-inference.modelscope.cn
       api-key: ${ai.api-key:ms-cb4b0861-40d9-4697-86ac-b8764e1cdbd1}
       chat:
-        completions-path: /v1/chat/completions
         options:
           model: Qwen/Qwen3.5-35B-A3B
-          max-tokens: 4096
+          max-tokens: 2048
           temperature: 0.3
       embedding:
-        embeddings-path: /v1/embeddings
         options:
           model: damo/nlp_corom_sentence-embedding_chinese-base
 
@@ -74,7 +69,7 @@ ai:
   model: Qwen/Qwen3.5-35B-A3B
   embedding-model: damo/nlp_corom_sentence-embedding_chinese-base
   vision-model: Qwen/Qwen3.5-35B-A3B
-  max-tokens: 4096
+  max-tokens: 2048
   temperature: 0.3
   daily-token-limit: 200000
   daily-call-limit: 1000

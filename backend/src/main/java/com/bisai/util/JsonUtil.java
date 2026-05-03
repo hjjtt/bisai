@@ -1,8 +1,8 @@
 package com.bisai.util;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 public class JsonUtil {
 
@@ -10,6 +10,7 @@ public class JsonUtil {
 
     static {
         MAPPER.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        MAPPER.registerModule(new JavaTimeModule());
     }
 
     public static <T> T convert(Object obj, Class<T> clazz) {

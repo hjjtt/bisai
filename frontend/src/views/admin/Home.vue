@@ -80,37 +80,6 @@
       </el-col>
     </el-row>
 
-    <!-- 最近日志 -->
-    <el-row :gutter="20" class="mt-20">
-      <el-col :span="24">
-        <el-card shadow="never">
-          <template #header>
-            <div class="card-header">
-              <span class="title">最近操作日志</span>
-              <el-button type="primary" link @click="$router.push('/admin/logs')">查看全部</el-button>
-            </div>
-          </template>
-          <el-table :data="logs" style="width: 100%" size="small" v-loading="statsLoading">
-            <el-table-column prop="time" label="操作时间" width="180" />
-            <el-table-column prop="user" label="操作员" width="150" />
-            <el-table-column prop="type" label="操作类型" width="150">
-              <template #default="scope">
-                <el-tag size="small">{{ scope.row.type }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="content" label="详情" />
-            <el-table-column label="状态" width="120">
-              <template #default="{ row }">
-                <el-tag :type="row.status === '失败' ? 'danger' : 'success'" size="small" effect="dark">
-                  {{ row.status || '成功' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-if="!statsLoading && logs.length === 0" description="暂无操作日志" :image-size="60" />
-        </el-card>
-      </el-col>
-    </el-row>
   </div>
 </template>
 
@@ -119,7 +88,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import { Loading } from '@element-plus/icons-vue'
 import { getAdminStats } from '@/api/dashboard'
-import type { SystemStatusItem, LogEntry, BaseStats } from '@/types'
+import type { SystemStatusItem, BaseStats } from '@/types'
 
 const timeRange = ref('7d')
 const chartRef = ref<HTMLElement>()
@@ -134,7 +103,6 @@ const statCards = ref([
 ])
 
 const systemStatus = ref<SystemStatusItem[]>([])
-const logs = ref<LogEntry[]>([])
 const apiUsage = ref(0)
 const serverLoad = ref(0)
 
@@ -152,7 +120,6 @@ async function loadStats() {
     statCards.value[3].value = d.todayError || 0
     statCards.value[3].trend = d.errorTrend || 0
     systemStatus.value = d.systemStatus || []
-    logs.value = d.recentLogs || []
     apiUsage.value = d.apiUsage || 0
     serverLoad.value = d.serverLoad || 0
     initChart(d)

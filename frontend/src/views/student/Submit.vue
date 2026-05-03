@@ -29,9 +29,21 @@
       <!-- 上传进度 -->
       <el-progress v-if="uploading" :percentage="uploadProgress" :stroke-width="20" :text-inside="true" style="margin-top: 16px" />
 
+      <!-- AI 处理进度 -->
+      <el-card v-if="aiTaskProgress" style="margin-top: 16px" shadow="never">
+        <template #header>
+          <div style="display: flex; justify-content: space-between; align-items: center">
+            <span>AI 处理进度</span>
+            <el-tag :type="aiTaskStatusType">{{ aiTaskStatusLabel }}</el-tag>
+          </div>
+        </template>
+        <el-progress :percentage="aiTaskProgress" :status="aiTaskProgress === 100 ? 'success' : undefined" :stroke-width="16" />
+        <p style="margin-top: 8px; color: #666; font-size: 14px">{{ aiTaskCurrentStep }}</p>
+      </el-card>
+
       <div style="margin-top: 20px; text-align: right">
         <el-button @click="$router.back()">取消</el-button>
-        <el-button type="primary" :loading="uploading" :disabled="fileList.length === 0" @click="submitUpload">确认提交</el-button>
+        <el-button type="primary" :loading="uploading" :disabled="selectedFiles.length === 0" @click="submitUpload">确认提交</el-button>
       </div>
 
       <!-- 历史版本 -->
@@ -59,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { UploadFile, UploadInstance, UploadRawFile } from 'element-plus'
 import { ElMessage } from 'element-plus'
@@ -68,6 +80,7 @@ import { getTask, getSubmissions, uploadFiles } from '@/api/task'
 import { getParseStatusType, getParseStatusLabel, getScoreStatusType, getScoreStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
 import type { TrainingTask, Submission } from '@/types'
+import { get, post } from '@/utils/request'
 
 const route = useRoute()
 const router = useRouter()
@@ -79,8 +92,24 @@ const fileList = ref<UploadFile[]>([])
 const selectedFiles = ref<File[]>([])
 const submissions = ref<Submission[]>([])
 
+// AI 任务进度
+const aiTaskProgress = ref<number>(0)
+const aiTaskCurrentStep = ref<string>('')
+const aiTaskStatus = ref<string>('')
+let progressTimer: ReturnType<typeof setInterval> | null = null
+
 const taskId = computed(() => Number(route.params.taskId) || 0)
 const acceptTypes = '.doc,.docx,.pdf,.jpg,.jpeg,.png,.xls,.xlsx,.zip'
+
+const aiTaskStatusType = computed(() => {
+  const map: Record<string, string> = { PENDING: 'info', RUNNING: 'warning', SUCCESS: 'success', FAILED: 'danger' }
+  return map[aiTaskStatus.value] || 'info'
+})
+
+const aiTaskStatusLabel = computed(() => {
+  const map: Record<string, string> = { PENDING: '等待中', RUNNING: '处理中', SUCCESS: '已完成', FAILED: '失败' }
+  return map[aiTaskStatus.value] || aiTaskStatus.value
+})
 
 const beforeUpload = (file: UploadRawFile) => {
   const maxSize = 200 * 1024 * 1024
@@ -123,10 +152,12 @@ async function submitUpload() {
 
     await uploadFiles(taskId.value, formData)
     uploadProgress.value = 100
-    ElMessage.success('上传成功')
+    ElMessage.success('上传成功，AI 正在处理...')
     selectedFiles.value = []
     fileList.value = []
-    router.push(`/student/tasks/${taskId.value}`)
+
+    // 开始轮询 AI 任务进度
+    startProgressPolling()
   } catch (e) {
     console.error('上传失败:', e)
     ElMessage.error('上传失败，请重试')
@@ -135,6 +166,59 @@ async function submitUpload() {
     uploadProgress.value = 0
   }
 }
+
+// 轮询 AI 任务进度
+function startProgressPolling() {
+  if (progressTimer) clearInterval(progressTimer)
+
+  progressTimer = setInterval(async () => {
+    try {
+      // 获取最新的提交记录
+      const res = await getSubmissions({ taskId: taskId.value, size: 1, sort: 'version', order: 'desc' })
+      if (res.data.items.length === 0) return
+
+      const latestSubmission = res.data.items[0]
+      if (!latestSubmission) return
+
+      // 查询该提交的异步任务
+      const tasksRes = await get<{ id: number; status: string; progress: number; currentStep: string }[]>(
+        `/async-tasks/biz/${latestSubmission.id}`
+      )
+
+      if (tasksRes.data.length === 0) return
+
+      // 获取最新的任务（PARSE 任务）
+      const parseTask = tasksRes.data.find(t => true) // 取第一个
+      if (!parseTask) return
+
+      aiTaskProgress.value = parseTask.progress || 0
+      aiTaskCurrentStep.value = parseTask.currentStep || ''
+      aiTaskStatus.value = parseTask.status || ''
+
+      // 如果任务完成或失败，停止轮询
+      if (parseTask.status === 'SUCCESS' || parseTask.status === 'FAILED') {
+        clearInterval(progressTimer!)
+        progressTimer = null
+        if (parseTask.status === 'SUCCESS') {
+          ElMessage.success('AI 处理完成！')
+        } else {
+          ElMessage.error('AI 处理失败: ' + parseTask.currentStep)
+        }
+        // 刷新提交列表
+        loadSubmissions()
+      }
+    } catch (e) {
+      console.error('获取进度失败:', e)
+    }
+  }, 2000) // 每 2 秒查询一次
+}
+
+onUnmounted(() => {
+  if (progressTimer) {
+    clearInterval(progressTimer)
+    progressTimer = null
+  }
+})
 
 async function loadTask() {
   if (!taskId.value) return
