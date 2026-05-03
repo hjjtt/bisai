@@ -40,8 +40,8 @@
         <el-table-column label="操作" width="340" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="$router.push(`/teacher/submissions/${row.id}/preview`)">预览</el-button>
-            <el-button type="info" link @click="handleParse(row.id)" :loading="aiLoading[row.id]">解析</el-button>
-            <el-button type="success" link @click="handleCheck(row.id)" :loading="aiLoading[row.id]">核查</el-button>
+            <el-button type="info" link @click="$router.push(`/teacher/submissions/${row.id}/parse`)">解析</el-button>
+            <el-button type="success" link @click="$router.push(`/teacher/submissions/${row.id}/check`)">核查</el-button>
             <el-button type="warning" link @click="$router.push(`/teacher/submissions/${row.id}/score`)">评分</el-button>
             <el-button type="danger" link @click="handleReturn(row.id)">退回</el-button>
           </template>

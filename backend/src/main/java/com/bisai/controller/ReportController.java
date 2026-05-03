@@ -76,7 +76,7 @@ public class ReportController {
         String encodedName = URLEncoder.encode(fileName, StandardCharsets.UTF_8);
 
         return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentType(java.util.Objects.requireNonNull(MediaType.APPLICATION_OCTET_STREAM))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedName + "\"")
                 .body(resource);
     }

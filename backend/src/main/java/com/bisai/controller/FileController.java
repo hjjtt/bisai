@@ -1,6 +1,5 @@
 package com.bisai.controller;
 
-import com.bisai.common.Result;
 import com.bisai.entity.FileEntity;
 import com.bisai.entity.Submission;
 import com.bisai.entity.TrainingTask;
@@ -11,7 +10,6 @@ import com.bisai.mapper.SubmissionMapper;
 import com.bisai.mapper.TrainingTaskMapper;
 import com.bisai.mapper.CourseMapper;
 import com.bisai.mapper.UserMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.FileSystemResource;
@@ -62,7 +60,7 @@ public class FileController {
         }
 
         FileSystemResource resource = new FileSystemResource(path);
-        String contentType = getContentType(fileEntity.getFileType());
+        String contentTypeStr = getContentType(fileEntity.getFileType());
         String disposition = "inline";
 
         // Word/Excel 转换为 PDF 预览
@@ -70,14 +68,16 @@ public class FileController {
             Path pdfPath = convertToPdf(path, fileEntity);
             if (pdfPath != null && pdfPath.toFile().exists()) {
                 resource = new FileSystemResource(pdfPath);
-                contentType = "application/pdf";
+                contentTypeStr = "application/pdf";
             }
         }
 
+        MediaType mediaType = MediaType.parseMediaType(java.util.Objects.requireNonNull(contentTypeStr));
+
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
+                .contentType(java.util.Objects.requireNonNull(mediaType))
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"" +
-                        URLEncoder.encode(fileEntity.getOriginalName(), StandardCharsets.UTF_8) + "\"")
+                        URLEncoder.encode(java.util.Objects.requireNonNullElse(fileEntity.getOriginalName(), "file"), StandardCharsets.UTF_8) + "\"")
                 .body(resource);
     }
 
@@ -107,9 +107,9 @@ public class FileController {
         FileSystemResource resource = new FileSystemResource(path);
 
         return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentType(java.util.Objects.requireNonNull(MediaType.APPLICATION_OCTET_STREAM))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" +
-                        URLEncoder.encode(fileEntity.getOriginalName(), StandardCharsets.UTF_8) + "\"")
+                        URLEncoder.encode(java.util.Objects.requireNonNullElse(fileEntity.getOriginalName(), "file"), StandardCharsets.UTF_8) + "\"")
                 .body(resource);
     }
 
@@ -149,6 +149,7 @@ public class FileController {
     }
 
     private String getContentType(String fileType) {
+        if (fileType == null) return "application/octet-stream";
         String type = fileType.toUpperCase();
         if ("PDF".equals(type)) return "application/pdf";
         if ("JPG".equals(type) || "JPEG".equals(type)) return "image/jpeg";
@@ -160,6 +161,7 @@ public class FileController {
     }
 
     private boolean isOfficeFile(String fileType) {
+        if (fileType == null) return false;
         String type = fileType.toUpperCase();
         return "DOC".equals(type) || "DOCX".equals(type) || "XLS".equals(type) || "XLSX".equals(type);
     }
@@ -169,7 +171,7 @@ public class FileController {
      */
     private Path convertToPdf(Path sourcePath, FileEntity fileEntity) {
         try {
-            String type = fileEntity.getFileType().toUpperCase();
+            String type = fileEntity.getFileType() != null ? fileEntity.getFileType().toUpperCase() : "";
             Path tempDir = Path.of(System.getProperty("java.io.tmpdir"), "bisai-preview");
             java.nio.file.Files.createDirectories(tempDir);
             Path pdfPath = tempDir.resolve(fileEntity.getId() + ".pdf");
@@ -223,94 +225,95 @@ public class FileController {
     private void convertDocxToPdf(Path sourcePath, Path pdfPath) throws Exception {
         try (java.io.InputStream is = java.nio.file.Files.newInputStream(sourcePath);
              org.apache.poi.xwpf.usermodel.XWPFDocument doc = new org.apache.poi.xwpf.usermodel.XWPFDocument(is);
+             org.apache.pdfbox.pdmodel.PDDocument pdf = new org.apache.pdfbox.pdmodel.PDDocument();
              java.io.OutputStream os = java.nio.file.Files.newOutputStream(pdfPath)) {
-            org.apache.pdfbox.pdmodel.PDDocument pdf = new org.apache.pdfbox.pdmodel.PDDocument();
+            
             org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage(org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
             pdf.addPage(page);
 
             org.apache.pdfbox.pdmodel.font.PDFont font = loadChineseFont(pdf);
-            org.apache.pdfbox.pdmodel.PDPageContentStream contentStream = new org.apache.pdfbox.pdmodel.PDPageContentStream(pdf, page);
-            contentStream.beginText();
-            contentStream.setFont(font, 10);
-            contentStream.newLineAtOffset(50, 750);
+            try (org.apache.pdfbox.pdmodel.PDPageContentStream contentStream = new org.apache.pdfbox.pdmodel.PDPageContentStream(pdf, page)) {
+                contentStream.beginText();
+                contentStream.setFont(font, 10);
+                contentStream.newLineAtOffset(50, 750);
 
-            String text = new org.apache.poi.xwpf.extractor.XWPFWordExtractor(doc).getText();
-            String[] lines = text.split("\n");
-            for (String line : lines) {
-                if (line.length() > 80) line = line.substring(0, 80);
-                contentStream.showText(line);
-                contentStream.newLineAtOffset(0, -12);
+                try (org.apache.poi.xwpf.extractor.XWPFWordExtractor extractor = new org.apache.poi.xwpf.extractor.XWPFWordExtractor(doc)) {
+                    String text = extractor.getText();
+                    String[] lines = text.split("\n");
+                    for (String line : lines) {
+                        if (line.length() > 80) line = line.substring(0, 80);
+                        contentStream.showText(line);
+                        contentStream.newLineAtOffset(0, -12);
+                    }
+                }
+                contentStream.endText();
             }
-
-            contentStream.endText();
-            contentStream.close();
             pdf.save(os);
-            pdf.close();
         }
     }
 
     private void convertDocToPdf(Path sourcePath, Path pdfPath) throws Exception {
         try (java.io.InputStream is = java.nio.file.Files.newInputStream(sourcePath);
              org.apache.poi.hwpf.HWPFDocument doc = new org.apache.poi.hwpf.HWPFDocument(is);
+             org.apache.pdfbox.pdmodel.PDDocument pdf = new org.apache.pdfbox.pdmodel.PDDocument();
              java.io.OutputStream os = java.nio.file.Files.newOutputStream(pdfPath)) {
-            org.apache.pdfbox.pdmodel.PDDocument pdf = new org.apache.pdfbox.pdmodel.PDDocument();
+            
             org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage(org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
             pdf.addPage(page);
 
             org.apache.pdfbox.pdmodel.font.PDFont font = loadChineseFont(pdf);
-            org.apache.pdfbox.pdmodel.PDPageContentStream contentStream = new org.apache.pdfbox.pdmodel.PDPageContentStream(pdf, page);
-            contentStream.beginText();
-            contentStream.setFont(font, 10);
-            contentStream.newLineAtOffset(50, 750);
+            try (org.apache.pdfbox.pdmodel.PDPageContentStream contentStream = new org.apache.pdfbox.pdmodel.PDPageContentStream(pdf, page)) {
+                contentStream.beginText();
+                contentStream.setFont(font, 10);
+                contentStream.newLineAtOffset(50, 750);
 
-            String text = new org.apache.poi.hwpf.extractor.WordExtractor(doc).getText();
-            String[] lines = text.split("\n");
-            for (String line : lines) {
-                if (line.length() > 80) line = line.substring(0, 80);
-                contentStream.showText(line);
-                contentStream.newLineAtOffset(0, -12);
+                try (org.apache.poi.hwpf.extractor.WordExtractor extractor = new org.apache.poi.hwpf.extractor.WordExtractor(doc)) {
+                    String text = extractor.getText();
+                    String[] lines = text.split("\n");
+                    for (String line : lines) {
+                        if (line.length() > 80) line = line.substring(0, 80);
+                        contentStream.showText(line);
+                        contentStream.newLineAtOffset(0, -12);
+                    }
+                }
+                contentStream.endText();
             }
-
-            contentStream.endText();
-            contentStream.close();
             pdf.save(os);
-            pdf.close();
         }
     }
 
     private void convertExcelToPdf(Path sourcePath, Path pdfPath) throws Exception {
         try (java.io.InputStream is = java.nio.file.Files.newInputStream(sourcePath);
              org.apache.poi.ss.usermodel.Workbook workbook = org.apache.poi.ss.usermodel.WorkbookFactory.create(is);
+             org.apache.pdfbox.pdmodel.PDDocument pdf = new org.apache.pdfbox.pdmodel.PDDocument();
              java.io.OutputStream os = java.nio.file.Files.newOutputStream(pdfPath)) {
-            org.apache.pdfbox.pdmodel.PDDocument pdf = new org.apache.pdfbox.pdmodel.PDDocument();
+            
             org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage(org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
             pdf.addPage(page);
 
             org.apache.pdfbox.pdmodel.font.PDFont font = loadChineseFont(pdf);
-            org.apache.pdfbox.pdmodel.PDPageContentStream contentStream = new org.apache.pdfbox.pdmodel.PDPageContentStream(pdf, page);
-            contentStream.beginText();
-            contentStream.setFont(font, 8);
-            contentStream.newLineAtOffset(30, 770);
+            try (org.apache.pdfbox.pdmodel.PDPageContentStream contentStream = new org.apache.pdfbox.pdmodel.PDPageContentStream(pdf, page)) {
+                contentStream.beginText();
+                contentStream.setFont(font, 8);
+                contentStream.newLineAtOffset(30, 770);
 
-            org.apache.poi.ss.usermodel.DataFormatter formatter = new org.apache.poi.ss.usermodel.DataFormatter();
-            for (org.apache.poi.ss.usermodel.Sheet sheet : workbook) {
-                contentStream.showText("【" + sheet.getSheetName() + "】");
-                contentStream.newLineAtOffset(0, -12);
-                for (org.apache.poi.ss.usermodel.Row row : sheet) {
-                    StringBuilder line = new StringBuilder();
-                    for (org.apache.poi.ss.usermodel.Cell cell : row) {
-                        line.append(formatter.formatCellValue(cell)).append("\t");
+                org.apache.poi.ss.usermodel.DataFormatter formatter = new org.apache.poi.ss.usermodel.DataFormatter();
+                for (org.apache.poi.ss.usermodel.Sheet sheet : workbook) {
+                    contentStream.showText("【" + sheet.getSheetName() + "】");
+                    contentStream.newLineAtOffset(0, -12);
+                    for (org.apache.poi.ss.usermodel.Row row : sheet) {
+                        StringBuilder line = new StringBuilder();
+                        for (org.apache.poi.ss.usermodel.Cell cell : row) {
+                            line.append(formatter.formatCellValue(cell)).append("\t");
+                        }
+                        contentStream.showText(line.toString());
+                        contentStream.newLineAtOffset(0, -10);
                     }
-                    contentStream.showText(line.toString());
                     contentStream.newLineAtOffset(0, -10);
                 }
-                contentStream.newLineAtOffset(0, -10);
+                contentStream.endText();
             }
-
-            contentStream.endText();
-            contentStream.close();
             pdf.save(os);
-            pdf.close();
         }
     }
 }
