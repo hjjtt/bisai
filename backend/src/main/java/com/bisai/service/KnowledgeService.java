@@ -117,10 +117,11 @@ public class KnowledgeService {
             String ext = originalName != null && originalName.contains(".")
                     ? originalName.substring(originalName.lastIndexOf(".")) : "";
             String storedName = UUID.randomUUID().toString() + ext;
-            Path dir = Paths.get(uploadPath, "knowledge");
+            Path baseDir = Paths.get(uploadPath).toAbsolutePath().normalize();
+            Path dir = baseDir.resolve("knowledge");
             Files.createDirectories(dir);
             Path filePath = dir.resolve(storedName);
-            file.transferTo(filePath.toFile());
+            Files.copy(file.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
             KnowledgeBase kb = resolveKnowledgeBase(courseId);
 

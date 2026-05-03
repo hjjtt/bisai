@@ -67,6 +67,11 @@ public class ModelScopeClient {
                             .temperature(temperature)
                             .build()
             ));
+            if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+                log.warn("AI 返回空响应, model={}, response={}", aiConfig.getModel(), response);
+                aiUsageService.record(aiConfig.getModel(), "CHAT", estimatedInputTokens, 0, false, "AI 返回空响应");
+                throw new RuntimeException("AI 服务返回空响应，请重试");
+            }
             String content = response.getResult().getOutput().getText();
             int inputTokens = estimatedInputTokens;
             int outputTokens = estimateTokens(content);
@@ -123,6 +128,11 @@ public class ModelScopeClient {
                             .temperature(aiConfig.getTemperature())
                             .build()
             ));
+            if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+                log.warn("多模态 AI 返回空响应, model={}", aiConfig.getVisionModel());
+                aiUsageService.record(aiConfig.getVisionModel(), "VISION", estimatedInputTokens, 0, false, "AI 返回空响应");
+                return null;
+            }
             String result = response.getResult().getOutput().getText();
             Usage usage = response.getMetadata() != null ? response.getMetadata().getUsage() : null;
             int inputTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens() : estimatedInputTokens;

@@ -71,28 +71,43 @@ public class AsyncTaskService {
             return;
         }
 
-        task.setStatus("RUNNING");
-        asyncTaskMapper.updateById(task);
+        fresh.setStatus("RUNNING");
+        fresh.setProgress(5);
+        fresh.setCurrentStep("任务开始执行...");
+        asyncTaskMapper.updateById(fresh);
 
         try {
-            switch (task.getTaskType()) {
-                case "PARSE" -> aiService.doParse(task.getBizId());
-                case "CHECK" -> aiService.doCheck(task.getBizId());
-                case "SCORE" -> aiService.doScore(task.getBizId());
-                default -> log.warn("未知任务类型: {}", task.getTaskType());
+            switch (fresh.getTaskType()) {
+                case "PARSE" -> aiService.doParse(fresh.getBizId(), fresh.getId());
+                case "CHECK" -> aiService.doCheck(fresh.getBizId(), fresh.getId());
+                case "SCORE" -> aiService.doScore(fresh.getBizId(), fresh.getId());
+                default -> log.warn("未知任务类型: {}", fresh.getTaskType());
             }
 
             // 执行成功
-            task.setStatus("SUCCESS");
-            asyncTaskMapper.updateById(task);
-            log.info("异步任务执行成功: id={}, type={}", task.getId(), task.getTaskType());
+            fresh.setStatus("SUCCESS");
+            fresh.setProgress(100);
+            fresh.setCurrentStep("执行完成");
+            asyncTaskMapper.updateById(fresh);
+            log.info("异步任务执行成功: id={}, type={}", fresh.getId(), fresh.getTaskType());
+
+            // 同步更新 submission 表的状态
+            Submission submission = submissionMapper.selectById(fresh.getBizId());
+            if (submission != null) {
+                switch (fresh.getTaskType()) {
+                    case "PARSE" -> submission.setParseStatus("SUCCESS");
+                    case "CHECK" -> submission.setCheckStatus("SUCCESS");
+                    case "SCORE" -> submission.setScoreStatus("AI_SCORED");
+                }
+                submissionMapper.updateById(submission);
+            }
 
             // 检查批量任务是否完成
-            checkBatchJobCompletion(task.getBizId());
+            checkBatchJobCompletion(fresh.getBizId());
 
         } catch (Exception e) {
-            log.error("异步任务执行失败: id={}, type={}, error={}", task.getId(), task.getTaskType(), e.getMessage());
-            handleTaskFailure(task, e.getMessage());
+            log.error("异步任务执行失败: id={}, type={}, error={}", fresh.getId(), fresh.getTaskType(), e.getMessage());
+            handleTaskFailure(fresh, e.getMessage());
         }
     }
 

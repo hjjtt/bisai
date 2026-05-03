@@ -1,4 +1,4 @@
-import { get, put, post } from '@/utils/request'
+import { get, put, post, del } from '@/utils/request'
 
 // 系统配置
 export function getSystemConfig() {
@@ -14,11 +14,11 @@ export function testModelConnection(data: { apiUrl: string; apiKey: string }) {
   return post<{ success: boolean; message: string }>('/system/test-model', data)
 }
 
-// 日志 - 改为调用 /api/logs
-export function getOperationLogs(params?: any) {
-  return get('/logs/operation', params)
-}
-
+// 模型调用日志
 export function getModelCallLogs(params?: any) {
   return get('/logs/model-call', params)
+}
+
+export function clearModelCallLogs() {
+  return del('/logs/model-call')
 }

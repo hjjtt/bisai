@@ -205,10 +205,14 @@ public class SubmissionService {
 
             String storedName = UUID.randomUUID().toString() + ext;
 
-            Path dir = Paths.get(uploadPath, "submissions", String.valueOf(taskId), String.valueOf(studentId), String.valueOf(version));
+            Path baseDir = Paths.get(uploadPath).toAbsolutePath().normalize();
+            Path dir = baseDir.resolve("submissions")
+                    .resolve(String.valueOf(taskId))
+                    .resolve(String.valueOf(studentId))
+                    .resolve(String.valueOf(version));
             Files.createDirectories(dir);
             Path filePath = dir.resolve(storedName);
-            file.transferTo(filePath.toFile());
+            Files.copy(file.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
             FileEntity fileEntity = new FileEntity();
             fileEntity.setSubmissionId(submission.getId());
