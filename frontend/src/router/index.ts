@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
-import { getToken, getUserRole } from '@/utils/auth'
+import { getToken, getUserRole, clearAuth } from '@/utils/auth'
 import { studentRoutes, teacherRoutes, adminRoutes } from './guards'
 
 NProgress.configure({ showSpinner: false })
@@ -49,7 +49,12 @@ router.beforeEach((to, _from, next) => {
   if (whiteList.includes(to.path)) {
     if (token) {
       const role = getUserRole()
-      next(getHomePath(role))
+      if (!role) {
+        clearAuth()
+        next()
+      } else {
+        next(getHomePath(role))
+      }
     } else {
       next()
     }
@@ -57,16 +62,21 @@ router.beforeEach((to, _from, next) => {
     if (!token) {
       next(`/login?redirect=${to.path}`)
     } else {
-      const requiredRoles = to.meta.roles as string[] | undefined
-      if (requiredRoles) {
-        const role = getUserRole()
-        if (!role || !requiredRoles.includes(role)) {
-          next(getHomePath(role))
+      const role = getUserRole()
+      if (!role) {
+        clearAuth()
+        next(`/login?redirect=${to.path}`)
+      } else {
+        const requiredRoles = to.meta.roles as string[] | undefined
+        if (requiredRoles) {
+          if (!requiredRoles.includes(role)) {
+            next(getHomePath(role))
+          } else {
+            next()
+          }
         } else {
           next()
         }
-      } else {
-        next()
       }
     }
   }

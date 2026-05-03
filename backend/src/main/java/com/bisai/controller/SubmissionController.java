@@ -138,8 +138,11 @@ public class SubmissionController {
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Void> correctScore(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        Long indicatorId = body.get("indicatorId") != null ? Long.valueOf(body.get("indicatorId").toString()) : null;
-        java.math.BigDecimal newScore = new java.math.BigDecimal(body.get("newScore").toString());
+        Object indicatorIdObj = body.get("indicatorId");
+        Long indicatorId = indicatorIdObj != null ? Long.valueOf(indicatorIdObj.toString()) : null;
+        Object newScoreObj = body.get("newScore");
+        if (newScoreObj == null) return Result.error(40001, "newScore 不能为空");
+        java.math.BigDecimal newScore = new java.math.BigDecimal(newScoreObj.toString());
         String reason = (String) body.get("reason");
         return scoreService.correctScore(id, indicatorId, newScore, reason, userId);
     }

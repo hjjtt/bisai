@@ -34,7 +34,7 @@
         <template #header>
           <div style="display: flex; justify-content: space-between; align-items: center">
             <span>AI 处理进度</span>
-            <el-tag :type="aiTaskStatusType">{{ aiTaskStatusLabel }}</el-tag>
+            <el-tag :type="getAsyncTaskStatusType(aiTaskStatus)">{{ getAsyncTaskStatusLabel(aiTaskStatus) }}</el-tag>
           </div>
         </template>
         <el-progress :percentage="aiTaskProgress" :status="aiTaskProgress === 100 ? 'success' : undefined" :stroke-width="16" />
@@ -76,11 +76,10 @@ import { useRoute, useRouter } from 'vue-router'
 import type { UploadFile, UploadInstance, UploadRawFile } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
-import { getTask, getSubmissions, uploadFiles } from '@/api/task'
-import { getParseStatusType, getParseStatusLabel, getScoreStatusType, getScoreStatusLabel } from '@/utils/status'
+import { getTask, getSubmissions, uploadFiles, getAsyncTasksByBizId } from '@/api/task'
+import { getParseStatusType, getParseStatusLabel, getScoreStatusType, getScoreStatusLabel, getAsyncTaskStatusType, getAsyncTaskStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
 import type { TrainingTask, Submission } from '@/types'
-import { get, post } from '@/utils/request'
 
 const route = useRoute()
 const router = useRouter()
@@ -100,16 +99,6 @@ let progressTimer: ReturnType<typeof setInterval> | null = null
 
 const taskId = computed(() => Number(route.params.taskId) || 0)
 const acceptTypes = '.doc,.docx,.pdf,.jpg,.jpeg,.png,.xls,.xlsx,.zip'
-
-const aiTaskStatusType = computed(() => {
-  const map: Record<string, string> = { PENDING: 'info', RUNNING: 'warning', SUCCESS: 'success', FAILED: 'danger' }
-  return map[aiTaskStatus.value] || 'info'
-})
-
-const aiTaskStatusLabel = computed(() => {
-  const map: Record<string, string> = { PENDING: '等待中', RUNNING: '处理中', SUCCESS: '已完成', FAILED: '失败' }
-  return map[aiTaskStatus.value] || aiTaskStatus.value
-})
 
 const beforeUpload = (file: UploadRawFile) => {
   const maxSize = 200 * 1024 * 1024
@@ -181,9 +170,7 @@ function startProgressPolling() {
       if (!latestSubmission) return
 
       // 查询该提交的异步任务
-      const tasksRes = await get<{ id: number; status: string; progress: number; currentStep: string }[]>(
-        `/async-tasks/biz/${latestSubmission.id}`
-      )
+      const tasksRes = await getAsyncTasksByBizId(latestSubmission.id)
 
       if (tasksRes.data.length === 0) return
 

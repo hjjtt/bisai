@@ -177,7 +177,7 @@ public class ScoreService {
         return Result.ok(results);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> saveTeacherScores(Long submissionId, List<ScoreResult> scores, String comment) {
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {
@@ -408,7 +408,7 @@ public class ScoreService {
     /**
      * 成绩修正流程
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> correctScore(Long submissionId, Long indicatorId, BigDecimal newScore, String reason, Long correctedBy) {
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {

@@ -50,7 +50,7 @@
               @show="loadMessages"
             >
               <template #reference>
-                <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="notice-badge">
+                <el-badge :value="appStore.unreadMessageCount" :hidden="appStore.unreadMessageCount === 0" class="notice-badge">
                   <el-icon :size="20" style="cursor: pointer"><Bell /></el-icon>
                 </el-badge>
               </template>
@@ -103,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Fold, Expand, Bell, Monitor } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
@@ -171,7 +171,6 @@ const handleCommand = (command: string) => {
 
 // 通知功能
 const messages = ref<Message[]>([])
-const unreadCount = ref(0)
 
 async function loadMessages() {
   try {
@@ -185,7 +184,7 @@ async function loadMessages() {
 async function loadUnreadCount() {
   try {
     const res = await getUnreadCount()
-    unreadCount.value = res.data
+    appStore.unreadMessageCount = res.data
   } catch {
     // 忽略
   }
@@ -196,7 +195,7 @@ async function handleReadMessage(msg: Message) {
     try {
       await markMessageRead(msg.id)
       msg.isRead = true
-      unreadCount.value = Math.max(0, unreadCount.value - 1)
+      appStore.unreadMessageCount = Math.max(0, appStore.unreadMessageCount - 1)
     } catch {
       // 忽略
     }
@@ -207,16 +206,22 @@ async function handleMarkAllRead() {
   try {
     await markAllMessagesRead()
     messages.value.forEach(m => m.isRead = true)
-    unreadCount.value = 0
+    appStore.unreadMessageCount = 0
   } catch {
     // 忽略
   }
 }
 
+let timer: ReturnType<typeof setInterval> | null = null
+
 onMounted(() => {
   loadUnreadCount()
   // 每 30 秒刷新一次未读数量
-  setInterval(loadUnreadCount, 30000)
+  timer = setInterval(loadUnreadCount, 30000)
+})
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
 })
 </script>
 

@@ -78,7 +78,7 @@ public class EvaluationTemplateService {
         return Result.ok(templateMapper.selectById(id));
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> deleteTemplate(Long id) {
         EvaluationTemplate existing = templateMapper.selectById(id);
         if (existing == null) {

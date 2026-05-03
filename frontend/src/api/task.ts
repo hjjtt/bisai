@@ -1,5 +1,6 @@
 import { get, post, put, upload } from '@/utils/request'
-import type { TrainingTask, Submission, ScoreResult, CheckResult, FileInfo, PageResponse, PageRequest } from '@/types'
+import service from '@/utils/request'
+import type { TrainingTask, Submission, ScoreResult, CheckResult, FileInfo, PageResponse, PageRequest, AsyncTask } from '@/types'
 
 // 实训任务
 export function getTaskList(params?: PageRequest & { courseId?: number; status?: string }) {
@@ -42,6 +43,10 @@ export function getSubmission(id: number) {
 // 文件预览
 export function getFilePreviewUrl(fileId: number) {
   return `/api/files/${fileId}/preview`
+}
+
+export function getFilePreview(fileId: number) {
+  return service.get(`/files/${fileId}/preview`, { responseType: 'blob' })
 }
 
 export function getFileList(submissionId: number) {
@@ -106,6 +111,11 @@ export function getObjectiveScore(submissionId: number) {
 // 成绩修正
 export function correctScore(submissionId: number, data: { indicatorId?: number; newScore: number; reason: string }) {
   return put(`/submissions/${submissionId}/correct`, data)
+}
+
+// 异步任务
+export function getAsyncTasksByBizId(bizId: number) {
+  return get<AsyncTask[]>(`/async-tasks/biz/${bizId}`)
 }
 
 // 下载报告

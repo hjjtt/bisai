@@ -96,14 +96,12 @@ async function loadTasks() {
   try {
     const res = await getTaskList({ size: 100 })
     tasks.value = res.data.items
-    console.log('加载任务列表成功:', tasks.value.length, '个任务')
-    console.log('任务数据详情:', JSON.stringify(tasks.value))
     if (tasks.value.length === 0) {
       ElMessage.warning('暂无任务数据，请先创建实训任务')
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('加载任务列表失败:', e)
-    ElMessage.error('加载任务列表失败: ' + (e.message || '未知错误'))
+    ElMessage.error('加载任务列表失败: ' + (e instanceof Error ? e.message : '未知错误'))
   }
 }
 
@@ -114,16 +112,14 @@ async function loadSubmissions() {
   }
   loadingSubmissions.value = true
   try {
-    console.log('加载任务', studentReport.taskId, '下的提交列表')
     const res = await getSubmissions({ taskId: studentReport.taskId, page: 1, size: 100 })
     submissionList.value = res.data.items
-    console.log('加载提交列表成功:', submissionList.value.length, '个提交')
     if (submissionList.value.length === 0) {
       ElMessage.info('该任务下暂无学生提交记录')
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('加载提交列表失败:', e)
-    ElMessage.error('加载学生列表失败: ' + (e.message || '未知错误'))
+    ElMessage.error('加载学生列表失败: ' + (e instanceof Error ? e.message : '未知错误'))
     submissionList.value = []
   } finally {
     loadingSubmissions.value = false

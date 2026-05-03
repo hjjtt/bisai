@@ -96,6 +96,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Upload, UploadFilled, CircleCheck, Loading } from '@element-plus/icons-vue'
+import type { UploadFile } from 'element-plus'
 import { getKnowledgeList, deleteKnowledge, uploadKnowledge, type KnowledgeDocument } from '@/api/knowledge'
 import { getCourseList } from '@/api/course'
 import { getKnowledgeStatusType } from '@/utils/status'
@@ -149,7 +150,7 @@ const handleDelete = async (row: KnowledgeDocument) => {
   }
 }
 
-const handleFileChange = (_: any, fileList: { raw: File }[]) => {
+const handleFileChange = (_: UploadFile[], fileList: UploadFile[]) => {
   selectedFile.value = fileList.length > 0 ? fileList[0].raw : null
 }
 

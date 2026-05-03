@@ -22,8 +22,12 @@ public class CalibrationController {
     @PostMapping
     public Result<Void> saveCalibration(@RequestBody Map<String, Object> body, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        Long taskId = Long.valueOf(body.get("taskId").toString());
-        Long submissionId = Long.valueOf(body.get("submissionId").toString());
+        Object taskIdObj = body.get("taskId");
+        Object submissionIdObj = body.get("submissionId");
+        if (taskIdObj == null) return Result.error(40001, "taskId 不能为空");
+        if (submissionIdObj == null) return Result.error(40001, "submissionId 不能为空");
+        Long taskId = Long.valueOf(taskIdObj.toString());
+        Long submissionId = Long.valueOf(submissionIdObj.toString());
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
         return calibrationService.saveCalibration(taskId, submissionId, items, userId);
