@@ -13,14 +13,14 @@
         >
           <div class="preview-area">
             <!-- PDF 预览 -->
-            <iframe v-if="isPdf(file)" :src="getPreviewUrl(file.id)" class="preview-iframe" />
+            <iframe v-if="isPdf(file) && blobUrls[file.id]" :src="blobUrls[file.id]" class="preview-iframe" />
             <!-- 图片预览 -->
-            <el-image v-else-if="isImage(file)" :src="getPreviewUrl(file.id)" fit="contain" class="preview-image" />
+            <el-image v-else-if="isImage(file) && blobUrls[file.id]" :src="blobUrls[file.id]" fit="contain" class="preview-image" />
             <!-- 其他文件 -->
             <div v-else class="no-preview">
               <el-icon :size="64"><Document /></el-icon>
               <p>该文件类型暂不支持在线预览</p>
-              <el-button type="primary" @click="downloadFile(file.id)">下载文件</el-button>
+              <el-button type="primary" @click="handleDownload(file.id)">下载文件</el-button>
             </div>
           </div>
         </el-tab-pane>
@@ -30,23 +30,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Document } from '@element-plus/icons-vue'
 import { getFileList } from '@/api/task'
+import { downloadFile as downloadFileApi } from '@/api/system'
+import service from '@/utils/request'
 import type { FileInfo } from '@/types'
 
 const route = useRoute()
 const loading = ref(false)
 const files = ref<FileInfo[]>([])
 const activeTab = ref('')
+const blobUrls = reactive<Record<number, string>>({})
 
 const submissionId = computed(() => Number(route.params.id) || 0)
-
-function getPreviewUrl(fileId: number) {
-  return `/api/files/${fileId}/preview`
-}
 
 function isPdf(file: FileInfo) {
   return file.fileType === 'PDF' || file.originalName.endsWith('.pdf')
@@ -56,8 +55,22 @@ function isImage(file: FileInfo) {
   return ['JPG', 'JPEG', 'PNG'].includes(file.fileType)
 }
 
-function downloadFile(fileId: number) {
-  window.open(`/api/files/${fileId}/download`)
+async function loadBlob(fileId: number) {
+  try {
+    const res = await service.get(`/files/${fileId}/preview`, { responseType: 'blob' })
+    const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
+    blobUrls[fileId] = URL.createObjectURL(blob)
+  } catch {
+    ElMessage.error('文件预览加载失败')
+  }
+}
+
+async function handleDownload(fileId: number) {
+  try {
+    await downloadFileApi(fileId)
+  } catch {
+    ElMessage.error('下载失败')
+  }
 }
 
 async function loadFiles() {
@@ -68,6 +81,9 @@ async function loadFiles() {
     files.value = res.data
     if (files.value.length > 0) {
       activeTab.value = String(files.value[0].id)
+      for (const file of files.value) {
+        await loadBlob(file.id)
+      }
     }
   } catch {
     ElMessage.error('加载文件列表失败')

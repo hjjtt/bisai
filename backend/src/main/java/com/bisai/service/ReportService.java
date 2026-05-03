@@ -1,7 +1,6 @@
 package com.bisai.service;
 
 import com.alibaba.excel.EasyExcel;
-import com.alibaba.excel.annotation.ExcelProperty;
 import com.bisai.common.Result;
 import com.bisai.entity.*;
 import com.bisai.mapper.*;
@@ -16,13 +15,12 @@ import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -86,8 +84,10 @@ public class ReportService {
             String fileName;
             if ("PDF".equalsIgnoreCase(format)) {
                 fileName = generatePdfReport(submission, task, course, student, scores, checks, files, indicatorNameMap);
+            } else if ("WORD".equalsIgnoreCase(format)) {
+                fileName = generateWordReport(submission, task, course, student, scores, checks, files, indicatorNameMap);
             } else {
-                return Result.error(40001, "暂不支持" + format + "格式，请使用PDF格式");
+                return Result.error(40001, "暂不支持" + format + "格式，请使用PDF或WORD格式");
             }
 
             // 保存文件记录到 file 表
@@ -96,7 +96,7 @@ public class ReportService {
             fileEntity.setSubmissionId(submissionId);
             fileEntity.setOriginalName(fileName);
             fileEntity.setFilePath(reportPath.toString());
-            fileEntity.setFileType("PDF");
+            fileEntity.setFileType("WORD".equalsIgnoreCase(format) ? "DOCX" : "PDF");
             fileEntity.setFileSize(java.nio.file.Files.size(reportPath));
             fileEntity.setFileHash(cn.hutool.crypto.digest.DigestUtil.md5Hex(reportPath.toFile()));
             fileMapper.insert(fileEntity);
@@ -136,8 +136,10 @@ public class ReportService {
             String fileName;
             if ("EXCEL".equalsIgnoreCase(format)) {
                 fileName = generateExcelReport(task, submissions);
+            } else if ("PDF".equalsIgnoreCase(format)) {
+                fileName = generateClassPdfReport(task, submissions);
             } else {
-                return Result.error(40001, "暂不支持" + format + "格式，请使用Excel格式");
+                return Result.error(40001, "暂不支持" + format + "格式，请使用Excel或PDF格式");
             }
 
             // 保存文件记录到 file 表
@@ -146,7 +148,7 @@ public class ReportService {
             fileEntity.setSubmissionId(submissions.get(0).getId());
             fileEntity.setOriginalName(fileName);
             fileEntity.setFilePath(reportPath.toString());
-            fileEntity.setFileType("XLSX");
+            fileEntity.setFileType("PDF".equalsIgnoreCase(format) ? "PDF" : "XLSX");
             fileEntity.setFileSize(java.nio.file.Files.size(reportPath));
             fileEntity.setFileHash(cn.hutool.crypto.digest.DigestUtil.md5Hex(reportPath.toFile()));
             fileMapper.insert(fileEntity);
@@ -297,6 +299,187 @@ public class ReportService {
     }
 
     /**
+     * 生成Word格式的学生个人报告
+     */
+    private String generateWordReport(Submission submission, TrainingTask task, Course course,
+                                      User student, List<ScoreResult> scores, List<CheckResult> checks,
+                                      List<FileEntity> files, Map<Long, String> indicatorNameMap) throws Exception {
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        String studentLabel = student != null && student.getRealName() != null ? student.getRealName() : String.valueOf(submission.getStudentId());
+        String fileName = "学生报告_" + studentLabel + "_" + timestamp + ".docx";
+        fileName = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
+        Path reportDir = Path.of(uploadPath, "reports");
+        java.nio.file.Files.createDirectories(reportDir);
+        Path filePath = reportDir.resolve(fileName);
+
+        try (XWPFDocument document = new XWPFDocument()) {
+            // 标题
+            XWPFParagraph titleParagraph = document.createParagraph();
+            titleParagraph.setAlignment(ParagraphAlignment.CENTER);
+            XWPFRun titleRun = titleParagraph.createRun();
+            titleRun.setText("实训成果评价报告");
+            titleRun.setBold(true);
+            titleRun.setFontSize(18);
+
+            // 空行
+            document.createParagraph();
+
+            // 基本信息表格
+            XWPFTable infoTable = document.createTable(6, 2);
+            infoTable.setWidth("100%");
+
+            addTableRow(infoTable, 0, "学生姓名", student != null ? student.getRealName() : "-");
+            addTableRow(infoTable, 1, "学号", student != null ? student.getUsername() : "-");
+            addTableRow(infoTable, 2, "课程", course != null ? course.getName() : "-");
+            addTableRow(infoTable, 3, "任务", task != null ? task.getTitle() : "-");
+            addTableRow(infoTable, 4, "提交时间", submission.getSubmitTime() != null ?
+                    submission.getSubmitTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) : "-");
+            addTableRow(infoTable, 5, "提交版本", "V" + submission.getVersion());
+
+            // 空行
+            document.createParagraph();
+
+            // 评分详情标题
+            XWPFParagraph scoreTitleParagraph = document.createParagraph();
+            XWPFRun scoreTitleRun = scoreTitleParagraph.createRun();
+            scoreTitleRun.setText("评分详情");
+            scoreTitleRun.setBold(true);
+            scoreTitleRun.setFontSize(14);
+
+            // 空行
+            document.createParagraph();
+
+            // 评分详情表格
+            if (!scores.isEmpty()) {
+                XWPFTable scoreTable = document.createTable(scores.size() + 1, 5);
+                scoreTable.setWidth("100%");
+
+                // 表头
+                addTableHeaderCell(scoreTable, 0, 0, "评价指标");
+                addTableHeaderCell(scoreTable, 0, 1, "系统评分");
+                addTableHeaderCell(scoreTable, 0, 2, "教师评分");
+                addTableHeaderCell(scoreTable, 0, 3, "最终得分");
+                addTableHeaderCell(scoreTable, 0, 4, "评分理由");
+
+                // 数据行
+                for (int i = 0; i < scores.size(); i++) {
+                    ScoreResult sr = scores.get(i);
+                    String indName = indicatorNameMap.getOrDefault(sr.getIndicatorId(),
+                            sr.getIndicatorName() != null ? sr.getIndicatorName() : "-");
+                    addTableCell(scoreTable, i + 1, 0, indName);
+                    addTableCell(scoreTable, i + 1, 1, sr.getAutoScore() != null ? sr.getAutoScore().toString() : "-");
+                    addTableCell(scoreTable, i + 1, 2, sr.getTeacherScore() != null ? sr.getTeacherScore().toString() : "-");
+                    addTableCell(scoreTable, i + 1, 3, sr.getFinalScore() != null ? sr.getFinalScore().toString() : "-");
+                    addTableCell(scoreTable, i + 1, 4, sr.getReason() != null ? sr.getReason() : "-");
+                }
+            }
+
+            // 空行
+            document.createParagraph();
+
+            // 总分
+            XWPFParagraph totalScoreParagraph = document.createParagraph();
+            totalScoreParagraph.setAlignment(ParagraphAlignment.CENTER);
+            XWPFRun totalScoreRun = totalScoreParagraph.createRun();
+            totalScoreRun.setText("总分：" + (submission.getTotalScore() != null ? submission.getTotalScore() : "未评分") + " 分");
+            totalScoreRun.setBold(true);
+            totalScoreRun.setFontSize(14);
+
+            // 空行
+            document.createParagraph();
+
+            // 核查结果
+            if (!checks.isEmpty()) {
+                XWPFParagraph checkTitleParagraph = document.createParagraph();
+                XWPFRun checkTitleRun = checkTitleParagraph.createRun();
+                checkTitleRun.setText("核查结果");
+                checkTitleRun.setBold(true);
+                checkTitleRun.setFontSize(14);
+
+                // 空行
+                document.createParagraph();
+
+                XWPFTable checkTable = document.createTable(checks.size() + 1, 4);
+                checkTable.setWidth("100%");
+
+                // 表头
+                addTableHeaderCell(checkTable, 0, 0, "核查项");
+                addTableHeaderCell(checkTable, 0, 1, "结果");
+                addTableHeaderCell(checkTable, 0, 2, "风险等级");
+                addTableHeaderCell(checkTable, 0, 3, "说明");
+
+                // 数据行
+                for (int i = 0; i < checks.size(); i++) {
+                    CheckResult cr = checks.get(i);
+                    addTableCell(checkTable, i + 1, 0, cr.getCheckItem());
+                    addTableCell(checkTable, i + 1, 1, cr.getResult());
+                    addTableCell(checkTable, i + 1, 2, cr.getRiskLevel());
+                    addTableCell(checkTable, i + 1, 3, cr.getDescription() != null ? cr.getDescription() : "-");
+                }
+            }
+
+            // 教师评语
+            if (submission.getTeacherComment() != null && !submission.getTeacherComment().isEmpty()) {
+                document.createParagraph();
+                XWPFParagraph commentTitleParagraph = document.createParagraph();
+                XWPFRun commentTitleRun = commentTitleParagraph.createRun();
+                commentTitleRun.setText("教师评语");
+                commentTitleRun.setBold(true);
+                commentTitleRun.setFontSize(14);
+
+                document.createParagraph();
+                XWPFParagraph commentParagraph = document.createParagraph();
+                XWPFRun commentRun = commentParagraph.createRun();
+                commentRun.setText(submission.getTeacherComment());
+            }
+
+            // 生成时间
+            document.createParagraph();
+            XWPFParagraph footerParagraph = document.createParagraph();
+            footerParagraph.setAlignment(ParagraphAlignment.RIGHT);
+            XWPFRun footerRun = footerParagraph.createRun();
+            footerRun.setText("报告生成时间：" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            footerRun.setFontSize(9);
+
+            // 保存文件
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(filePath.toFile())) {
+                document.write(fos);
+            }
+        }
+
+        return fileName;
+    }
+
+    /**
+     * 添加Word表格行
+     */
+    private void addTableRow(XWPFTable table, int rowIndex, String label, String value) {
+        XWPFTableRow row = table.getRow(rowIndex);
+        row.getCell(0).setText(label);
+        row.getCell(1).setText(value);
+    }
+
+    /**
+     * 添加Word表格表头单元格
+     */
+    private void addTableHeaderCell(XWPFTable table, int rowIndex, int colIndex, String text) {
+        XWPFTableCell cell = table.getRow(rowIndex).getCell(colIndex);
+        cell.setText(text);
+        // 设置表头样式
+        XWPFParagraph paragraph = cell.getParagraphs().get(0);
+        XWPFRun run = paragraph.createRun();
+        run.setBold(true);
+    }
+
+    /**
+     * 添加Word表格普通单元格
+     */
+    private void addTableCell(XWPFTable table, int rowIndex, int colIndex, String text) {
+        XWPFTableCell cell = table.getRow(rowIndex).getCell(colIndex);
+        cell.setText(text);
+    }
+
+    /**
      * 生成Excel格式的班级统计报表
      */
     private String generateExcelReport(TrainingTask task, List<Submission> submissions) throws Exception {
@@ -320,7 +503,7 @@ public class ReportService {
         Set<Long> studentIds = submissions.stream().map(Submission::getStudentId).collect(Collectors.toSet());
         Set<Long> subIds = submissions.stream().map(Submission::getId).collect(Collectors.toSet());
 
-        Map<Long, User> studentMap = userMapper.selectBatchIds(studentIds).stream()
+        Map<Long, User> studentMap = userMapper.selectList(new LambdaQueryWrapper<User>().in(User::getId, studentIds)).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
         List<ScoreResult> allScores = scoreResultMapper.selectList(
@@ -331,48 +514,192 @@ public class ReportService {
                         Collectors.toMap(ScoreResult::getIndicatorId,
                                 sr -> sr.getFinalScore() != null ? sr.getFinalScore().doubleValue() : 0)));
 
-        List<ClassReportRow> rows = new ArrayList<>();
+        // 构建动态表头
+        List<List<String>> head = new ArrayList<>();
+        head.add(Collections.singletonList("学生姓名"));
+        head.add(Collections.singletonList("学号"));
+        for (Indicator ind : indicators) {
+            head.add(Collections.singletonList(ind.getName()));
+        }
+        head.add(Collections.singletonList("总分"));
+
+        // 构建数据行
+        List<List<Object>> data = new ArrayList<>();
         for (Submission sub : submissions) {
-            ClassReportRow row = new ClassReportRow();
+            List<Object> row = new ArrayList<>();
             User student = studentMap.get(sub.getStudentId());
-            row.setStudentName(student != null ? student.getRealName() : "-");
-            row.setStudentUsername(student != null ? student.getUsername() : "-");
-            row.setTotalScore(sub.getTotalScore() != null ? sub.getTotalScore().doubleValue() : 0);
+            row.add(student != null ? student.getRealName() : "-");
+            row.add(student != null ? student.getUsername() : "-");
 
             Map<Long, Double> scoreMap = scoreBySubmission.getOrDefault(sub.getId(), Map.of());
-            List<Double> indicatorScores = new ArrayList<>();
             for (Indicator ind : indicators) {
-                indicatorScores.add(scoreMap.getOrDefault(ind.getId(), 0.0));
+                row.add(scoreMap.getOrDefault(ind.getId(), 0.0));
             }
-            row.setIndicatorScores(indicatorScores);
-
-            rows.add(row);
+            row.add(sub.getTotalScore() != null ? sub.getTotalScore().doubleValue() : 0);
+            data.add(row);
         }
 
-        // 写入Excel
-        EasyExcel.write(filePath.toFile(), ClassReportRow.class)
+        // 写入Excel（使用动态表头）
+        EasyExcel.write(filePath.toFile())
+                .head(head)
                 .sheet("班级统计")
-                .doWrite(rows);
+                .doWrite(data);
 
         return fileName;
     }
 
     /**
-     * Excel数据行类
+     * 生成PDF格式的班级统计报表
      */
-    @Data
-    public static class ClassReportRow {
-        @ExcelProperty("学生姓名")
-        private String studentName;
+    private String generateClassPdfReport(TrainingTask task, List<Submission> submissions) throws Exception {
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        String taskLabel = task.getTitle() != null ? task.getTitle() : "task-" + task.getId();
+        String fileName = "班级报表_" + taskLabel + "_" + timestamp + ".pdf";
+        fileName = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
+        Path reportDir = Path.of(uploadPath, "reports");
+        java.nio.file.Files.createDirectories(reportDir);
+        Path filePath = reportDir.resolve(fileName);
 
-        @ExcelProperty("学号")
-        private String studentUsername;
+        // 收集所有评分指标
+        List<Indicator> indicators = indicatorMapper.selectList(
+                new LambdaQueryWrapper<Indicator>()
+                        .eq(Indicator::getTemplateId, task.getTemplateId())
+                        .isNull(Indicator::getParentId)
+                        .orderByAsc(Indicator::getSortOrder)
+        );
 
-        @ExcelProperty("总分")
-        private Double totalScore;
+        // 构建数据 - 批量查询避免N+1
+        Set<Long> studentIds = submissions.stream().map(Submission::getStudentId).collect(Collectors.toSet());
+        Set<Long> subIds = submissions.stream().map(Submission::getId).collect(Collectors.toSet());
 
-        // 动态指标列（通过includeColumnFiledNames控制）
-        private List<Double> indicatorScores;
+        Map<Long, User> studentMap = userMapper.selectList(new LambdaQueryWrapper<User>().in(User::getId, studentIds)).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        List<ScoreResult> allScores = scoreResultMapper.selectList(
+                new LambdaQueryWrapper<ScoreResult>().in(ScoreResult::getSubmissionId, subIds)
+        );
+        Map<Long, Map<Long, Double>> scoreBySubmission = allScores.stream()
+                .collect(Collectors.groupingBy(ScoreResult::getSubmissionId,
+                        Collectors.toMap(ScoreResult::getIndicatorId,
+                                sr -> sr.getFinalScore() != null ? sr.getFinalScore().doubleValue() : 0)));
+
+        // 获取课程信息
+        Course course = courseMapper.selectById(task.getCourseId());
+
+        // 生成PDF
+        try (PdfWriter writer = new PdfWriter(filePath.toString());
+             PdfDocument pdf = new PdfDocument(writer);
+             Document document = new Document(pdf)) {
+
+            PdfFont font = PdfFontFactory.createFont("STSong-Light", "UniGB-UCS2-H", PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+            document.setFont(font);
+            document.setFontSize(10);
+
+            // 标题
+            Paragraph title = new Paragraph("班级统计报表")
+                    .setFont(font)
+                    .setFontSize(18)
+                    .setBold()
+                    .setTextAlignment(TextAlignment.CENTER);
+            document.add(title);
+            document.add(new Paragraph("\n"));
+
+            // 基本信息
+            Table infoTable = new Table(UnitValue.createPercentArray(new float[]{1, 2, 1, 2})).useAllAvailableWidth();
+            infoTable.addCell(createHeaderCell("课程名称", font));
+            infoTable.addCell(createCell(course != null ? course.getName() : "-", font));
+            infoTable.addCell(createHeaderCell("实训任务", font));
+            infoTable.addCell(createCell(task.getTitle(), font));
+            infoTable.addCell(createHeaderCell("学生人数", font));
+            infoTable.addCell(createCell(String.valueOf(submissions.size()), font));
+            infoTable.addCell(createHeaderCell("生成时间", font));
+            infoTable.addCell(createCell(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")), font));
+            document.add(infoTable);
+            document.add(new Paragraph("\n"));
+
+            // 统计摘要
+            List<Submission> scoredSubmissions = submissions.stream()
+                    .filter(s -> s.getTotalScore() != null)
+                    .collect(Collectors.toList());
+
+            if (!scoredSubmissions.isEmpty()) {
+                double avg = scoredSubmissions.stream().mapToDouble(s -> s.getTotalScore().doubleValue()).average().orElse(0);
+                double max = scoredSubmissions.stream().mapToDouble(s -> s.getTotalScore().doubleValue()).max().orElse(0);
+                double min = scoredSubmissions.stream().mapToDouble(s -> s.getTotalScore().doubleValue()).min().orElse(0);
+                long passCount = scoredSubmissions.stream()
+                        .filter(s -> s.getTotalScore().compareTo(BigDecimal.valueOf(60)) >= 0)
+                        .count();
+
+                Paragraph summaryTitle = new Paragraph("成绩统计")
+                        .setFont(font)
+                        .setFontSize(14)
+                        .setBold();
+                document.add(summaryTitle);
+                document.add(new Paragraph("\n"));
+
+                Table summaryTable = new Table(UnitValue.createPercentArray(new float[]{1, 1, 1, 1})).useAllAvailableWidth();
+                summaryTable.addCell(createHeaderCell("平均分", font));
+                summaryTable.addCell(createCell(String.format("%.2f", avg), font));
+                summaryTable.addCell(createHeaderCell("最高分", font));
+                summaryTable.addCell(createCell(String.format("%.2f", max), font));
+                summaryTable.addCell(createHeaderCell("最低分", font));
+                summaryTable.addCell(createCell(String.format("%.2f", min), font));
+                summaryTable.addCell(createHeaderCell("及格率", font));
+                summaryTable.addCell(createCell(String.format("%.1f%%", passCount * 100.0 / scoredSubmissions.size()), font));
+                document.add(summaryTable);
+                document.add(new Paragraph("\n"));
+            }
+
+            // 学生成绩明细表
+            Paragraph detailTitle = new Paragraph("学生成绩明细")
+                    .setFont(font)
+                    .setFontSize(14)
+                    .setBold();
+            document.add(detailTitle);
+            document.add(new Paragraph("\n"));
+
+            // 动态列：学号、姓名、各指标、总分
+            int colCount = 3 + indicators.size();
+            float[] colWidths = new float[colCount];
+            colWidths[0] = 1.5f; // 学号
+            colWidths[1] = 1.5f; // 姓名
+            for (int i = 0; i < indicators.size(); i++) {
+                colWidths[2 + i] = 1.5f; // 各指标
+            }
+            colWidths[colCount - 1] = 1.5f; // 总分
+
+            Table detailTable = new Table(UnitValue.createPercentArray(colWidths)).useAllAvailableWidth();
+            detailTable.addHeaderCell(createHeaderCell("学号", font));
+            detailTable.addHeaderCell(createHeaderCell("姓名", font));
+            for (Indicator ind : indicators) {
+                detailTable.addHeaderCell(createHeaderCell(ind.getName(), font));
+            }
+            detailTable.addHeaderCell(createHeaderCell("总分", font));
+
+            for (Submission sub : submissions) {
+                User student = studentMap.get(sub.getStudentId());
+                detailTable.addCell(createCell(student != null ? student.getUsername() : "-", font));
+                detailTable.addCell(createCell(student != null ? student.getRealName() : "-", font));
+
+                Map<Long, Double> scoreMap = scoreBySubmission.getOrDefault(sub.getId(), Map.of());
+                for (Indicator ind : indicators) {
+                    Double score = scoreMap.getOrDefault(ind.getId(), 0.0);
+                    detailTable.addCell(createCell(String.format("%.1f", score), font));
+                }
+                detailTable.addCell(createCell(sub.getTotalScore() != null ? String.format("%.1f", sub.getTotalScore()) : "-", font));
+            }
+            document.add(detailTable);
+
+            // 页脚
+            document.add(new Paragraph("\n"));
+            Paragraph footer = new Paragraph("报表生成时间：" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
+                    .setFont(font)
+                    .setFontSize(9)
+                    .setTextAlignment(TextAlignment.RIGHT);
+            document.add(footer);
+        }
+
+        return fileName;
     }
 
     /**

@@ -7,6 +7,7 @@ import com.bisai.entity.Course;
 import com.bisai.entity.Submission;
 import com.bisai.entity.FileEntity;
 import com.bisai.entity.TrainingTask;
+import com.bisai.entity.User;
 import com.bisai.mapper.CourseMapper;
 import com.bisai.mapper.FileMapper;
 import com.bisai.mapper.SubmissionMapper;
@@ -101,12 +102,13 @@ public class SubmissionService {
 
             java.util.Map<Long, String> taskTitleMap = new java.util.HashMap<>();
             if (!taskIds.isEmpty()) {
-                taskMapper.selectBatchIds(taskIds).forEach(t -> taskTitleMap.put(t.getId(), t.getTitle()));
+                taskMapper.selectList(new LambdaQueryWrapper<TrainingTask>().in(TrainingTask::getId, taskIds)).forEach(t -> taskTitleMap.put(t.getId(), t.getTitle()));
             }
 
             java.util.Map<Long, String> studentNameMap = new java.util.HashMap<>();
             if (!studentIds.isEmpty()) {
-                userMapper.selectBatchIds(studentIds).forEach(u -> studentNameMap.put(u.getId(), u.getRealName()));
+                userMapper.selectList(new LambdaQueryWrapper<User>().in(User::getId, studentIds))
+                        .forEach(u -> studentNameMap.put(u.getId(), u.getRealName()));
             }
 
             result.getRecords().forEach(sub -> {
@@ -123,6 +125,17 @@ public class SubmissionService {
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
         }
+
+        // 填充学生姓名和任务标题
+        User student = userMapper.selectById(submission.getStudentId());
+        if (student != null) {
+            submission.setStudentName(student.getRealName());
+        }
+        TrainingTask task = taskMapper.selectById(submission.getTaskId());
+        if (task != null) {
+            submission.setTaskTitle(task.getTitle());
+        }
+
         // 数据权限校验
         if ("STUDENT".equals(role) && !submission.getStudentId().equals(userId)) {
             return Result.error(40301, "无权查看此提交");
@@ -251,7 +264,11 @@ public class SubmissionService {
 
     public Result<List<FileEntity>> getFileList(Long submissionId) {
         List<FileEntity> files = fileMapper.selectList(
-                new LambdaQueryWrapper<FileEntity>().eq(FileEntity::getSubmissionId, submissionId)
+                new LambdaQueryWrapper<FileEntity>()
+                        .eq(FileEntity::getSubmissionId, submissionId)
+                        .notLike(FileEntity::getOriginalName, "学生报告_%")
+                        .notLike(FileEntity::getOriginalName, "班级报表_%")
+                        .orderByAsc(FileEntity::getCreatedAt)
         );
         return Result.ok(files);
     }

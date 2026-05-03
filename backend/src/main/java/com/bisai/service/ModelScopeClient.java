@@ -56,7 +56,7 @@ public class ModelScopeClient {
             if (systemPrompt != null && !systemPrompt.isEmpty()) {
                 messages.add(new SystemMessage(systemPrompt));
             }
-            messages.add(new UserMessage(userMessage));
+            messages.add(new UserMessage(java.util.Objects.requireNonNull(userMessage, "userMessage cannot be null")));
 
             log.info("调用 ModelScope API, model={}, 消息长度={}", aiConfig.getModel(), userMessage.length());
             ChatResponse response = chatModel.call(new Prompt(
@@ -99,7 +99,7 @@ public class ModelScopeClient {
         int estimatedInputTokens = estimateTokens(input);
         aiUsageService.checkQuota(estimatedInputTokens);
         try {
-            float[] values = embeddingModel.embed(input);
+            float[] values = embeddingModel.embed(java.util.Objects.requireNonNull(input, "input cannot be null"));
             List<Double> embedding = Arrays.stream(toDoubleArray(values)).boxed().toList();
             aiUsageService.record(aiConfig.getEmbeddingModel(), "EMBEDDING", estimatedInputTokens, 0, true, null);
             return embedding;
@@ -113,6 +113,10 @@ public class ModelScopeClient {
         int estimatedInputTokens = estimateTokens(prompt) + 1000;
         aiUsageService.checkQuota(estimatedInputTokens);
         try {
+            java.util.Objects.requireNonNull(imagePath, "imagePath cannot be null");
+            java.util.Objects.requireNonNull(mimeType, "mimeType cannot be null");
+            java.util.Objects.requireNonNull(prompt, "prompt cannot be null");
+
             UserMessage userMessage = UserMessage.builder()
                     .text(prompt)
                     .media(Media.builder()
@@ -120,6 +124,7 @@ public class ModelScopeClient {
                             .data(new FileSystemResource(imagePath))
                             .build())
                     .build();
+            java.util.Objects.requireNonNull(userMessage, "userMessage builder failed");
             ChatResponse response = chatModel.call(new Prompt(
                     userMessage,
                     OpenAiChatOptions.builder()

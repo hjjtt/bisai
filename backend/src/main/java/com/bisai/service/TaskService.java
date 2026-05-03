@@ -199,14 +199,7 @@ public class TaskService {
     }
 
     private static class BatchJob {
-        Long taskId;
-        String type;
-        int total;
-
         BatchJob(Long taskId, String type, int total) {
-            this.taskId = taskId;
-            this.type = type;
-            this.total = total;
         }
     }
 }

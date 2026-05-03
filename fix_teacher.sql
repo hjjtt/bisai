@@ -1,0 +1,1 @@
+UPDATE user SET password = '$2a$10$KwSxLKxk8N/cW5qHiFQRueyRNxdmJcBc0XwMKf0ZhRjCs9h4hjuL6' WHERE id = 2;

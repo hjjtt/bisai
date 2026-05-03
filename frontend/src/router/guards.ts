@@ -91,6 +91,12 @@ export const teacherRoutes: RouteRecordRaw[] = [
         meta: { title: '文件预览', hidden: true },
       },
       {
+        path: 'submissions/:id/parse',
+        name: 'TeacherParseDetail',
+        component: () => import('@/views/teacher/ParseDetail.vue'),
+        meta: { title: '解析详情', hidden: true },
+      },
+      {
         path: 'submissions/:id/check',
         name: 'TeacherCheckDetail',
         component: () => import('@/views/teacher/CheckDetail.vue'),
@@ -106,7 +112,7 @@ export const teacherRoutes: RouteRecordRaw[] = [
         path: 'submissions/:id/score',
         name: 'TeacherScoreReview',
         component: () => import('@/views/teacher/ScoreReview.vue'),
-        meta: { title: '评分复核', icon: 'EditPen' },
+        meta: { title: '评分复核', icon: 'EditPen', hidden: true },
       },
       {
         path: 'reports',

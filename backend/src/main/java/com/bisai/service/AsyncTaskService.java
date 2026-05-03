@@ -2,10 +2,8 @@ package com.bisai.service;
 
 import com.bisai.entity.AsyncTask;
 import com.bisai.entity.Submission;
-import com.bisai.entity.TrainingTask;
 import com.bisai.mapper.AsyncTaskMapper;
 import com.bisai.mapper.SubmissionMapper;
-import com.bisai.mapper.TrainingTaskMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +22,6 @@ public class AsyncTaskService {
     private final AsyncTaskMapper asyncTaskMapper;
     private final SubmissionMapper submissionMapper;
     private final AiService aiService;
-    private final TrainingTaskMapper taskMapper;
     private final ApplicationEventPublisher eventPublisher;
 
     /**
@@ -48,7 +45,10 @@ public class AsyncTaskService {
      */
     @Scheduled(fixedDelay = 5000)
     public void processPendingTasks() {
-        // 获取待执行的任务
+        // 1. 清理僵尸任务（处于 RUNNING 状态超过 10 分钟的任务）
+        cleanupStuckTasks();
+
+        // 2. 获取待执行的任务
         List<AsyncTask> tasks = asyncTaskMapper.selectList(
                 new LambdaQueryWrapper<AsyncTask>()
                         .in(AsyncTask::getStatus, "PENDING", "RETRYING")
@@ -58,6 +58,23 @@ public class AsyncTaskService {
 
         for (AsyncTask task : tasks) {
             executeTask(task);
+        }
+    }
+
+    /**
+     * 清理并重置长时间卡在 RUNNING 状态的任务
+     */
+    private void cleanupStuckTasks() {
+        LocalDateTime threshold = LocalDateTime.now().minusMinutes(10);
+        List<AsyncTask> stuckTasks = asyncTaskMapper.selectList(
+                new LambdaQueryWrapper<AsyncTask>()
+                        .eq(AsyncTask::getStatus, "RUNNING")
+                        .lt(AsyncTask::getUpdatedAt, threshold)
+        );
+
+        for (AsyncTask task : stuckTasks) {
+            log.warn("检测到僵尸任务，执行重置: id={}, type={}, bizId={}", task.getId(), task.getTaskType(), task.getBizId());
+            handleTaskFailure(task, "任务执行超时或意外中断（僵尸任务清理）");
         }
     }
 
@@ -118,30 +135,34 @@ public class AsyncTaskService {
         task.setErrorMessage(errorMessage);
         task.setRetryCount(task.getRetryCount() + 1);
 
-        if (task.getRetryCount() < task.getMaxRetry()) {
+        boolean isFinalFailure = task.getRetryCount() >= task.getMaxRetry();
+        if (!isFinalFailure) {
             // 等待重试，递增等待时间
             int delaySeconds = task.getRetryCount() * 30;
             task.setStatus("RETRYING");
             task.setNextRunAt(LocalDateTime.now().plusSeconds(delaySeconds));
-            asyncTaskMapper.updateById(task);
             log.info("任务将重试: id={}, retryCount={}, nextRunAt={}", task.getId(), task.getRetryCount(), task.getNextRunAt());
         } else {
             // 重试次数用尽
             task.setStatus("FAILED");
-            asyncTaskMapper.updateById(task);
+            log.error("任务重试失败，次数已达上限: id={}, type={}", task.getId(), task.getTaskType());
+        }
+        asyncTaskMapper.updateById(task);
 
-            // 更新提交状态
-            Submission submission = submissionMapper.selectById(task.getBizId());
-            if (submission != null) {
-                switch (task.getTaskType()) {
-                    case "PARSE" -> submission.setParseStatus("FAILED");
-                    case "CHECK" -> submission.setCheckStatus("CHECK_FAILED");
-                    case "SCORE" -> submission.setScoreStatus("SCORE_FAILED");
-                }
-                submissionMapper.updateById(submission);
+        // 只要任务不再运行，就更新提交状态，释放锁定
+        updateSubmissionStatusOnFailure(task);
+    }
+
+    private void updateSubmissionStatusOnFailure(AsyncTask task) {
+        Submission submission = submissionMapper.selectById(task.getBizId());
+        if (submission != null) {
+            String statusSuffix = "RETRYING".equals(task.getStatus()) ? " (待重试)" : "";
+            switch (task.getTaskType()) {
+                case "PARSE" -> submission.setParseStatus("FAILED" + statusSuffix);
+                case "CHECK" -> submission.setCheckStatus("CHECK_FAILED" + statusSuffix);
+                case "SCORE" -> submission.setScoreStatus("SCORE_FAILED" + statusSuffix);
             }
-
-            log.error("任务重试失败: id={}, type={}", task.getId(), task.getTaskType());
+            submissionMapper.updateById(submission);
         }
     }
 

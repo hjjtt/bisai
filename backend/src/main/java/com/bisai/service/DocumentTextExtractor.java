@@ -27,7 +27,6 @@ public class DocumentTextExtractor {
     // ZIP 安全限制
     private static final long MAX_ZIP_SIZE = 500 * 1024 * 1024L; // 500MB
     private static final int MAX_ENTRY_COUNT = 1000;
-    private static final int MAX_NEST_LEVEL = 3;
     private static final Set<String> SUPPORTED_EXTENSIONS = Set.of(
             "txt", "md", "csv", "java", "py", "html", "css", "js", "json", "xml", "sql",
             "pdf", "doc", "docx", "xls", "xlsx", "jpg", "jpeg", "png", "webp", "bmp"

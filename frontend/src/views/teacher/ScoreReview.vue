@@ -1,6 +1,30 @@
 <template>
   <div class="score-review">
     <el-page-header @back="$router.back()" title="返回" content="评分复核" />
+
+    <!-- 提交信息摘要 -->
+    <el-card v-if="submission" style="margin-top: 16px" body-style="padding: 15px">
+      <el-descriptions title="提交信息" :column="3" border size="small">
+        <el-descriptions-item label="学生姓名">{{ submission.studentName || '学生 #' + submission.studentId }}</el-descriptions-item>
+        <el-descriptions-item label="任务名称">{{ submission.taskTitle || '任务 #' + submission.taskId }}</el-descriptions-item>
+        <el-descriptions-item label="提交版本">V{{ submission.version }}</el-descriptions-item>
+        <el-descriptions-item label="提交时间">{{ formatDate(submission.submitTime) }}</el-descriptions-item>
+        <el-descriptions-item label="解析状态">
+          <el-tag :type="getParseStatusType(submission.parseStatus)" size="small">
+            {{ getParseStatusLabel(submission.parseStatus) }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="总分">
+          <span style="font-weight: bold; color: #f56c6c">{{ submission.totalScore ?? '--' }}</span> 分
+        </el-descriptions-item>
+      </el-descriptions>
+      
+      <div v-if="submission.parseSummary" style="margin-top: 12px">
+        <h4 style="margin: 0 0 8px 0; font-size: 14px">内容摘要 (AI 解析)</h4>
+        <el-text type="info" size="small" style="line-height: 1.6">{{ submission.parseSummary }}</el-text>
+      </div>
+    </el-card>
+
     <el-row :gutter="20" style="margin-top: 16px">
       <!-- 左侧：评分表格 -->
       <el-col :span="16">
@@ -80,7 +104,9 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getScoreResults, saveTeacherScores, publishScore, returnSubmission, startScore, getSubmission } from '@/api/task'
-import type { ScoreResult } from '@/types'
+import { getParseStatusType, getParseStatusLabel } from '@/utils/status'
+import { formatDate } from '@/utils/date'
+import type { ScoreResult, Submission } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -88,9 +114,21 @@ const loading = ref(false)
 const saving = ref(false)
 const aiScoring = ref(false)
 const comment = ref('')
+const submission = ref<Submission | null>(null)
 const scores = ref<(ScoreResult & { maxScore?: number })[]>([])
 const submissionId = computed(() => Number(route.params.id) || 0)
 const polling = ref<number | null>(null)
+
+async function loadSubmission() {
+  if (!submissionId.value) return
+  try {
+    const res = await getSubmission(submissionId.value)
+    submission.value = res.data
+    comment.value = res.data.teacherComment || ''
+  } catch {
+    ElMessage.error('加载提交信息失败')
+  }
+}
 
 async function loadScores() {
   if (!submissionId.value) return
@@ -122,6 +160,7 @@ function startScorePolling() {
   if (polling.value !== null) return
   polling.value = window.setInterval(async () => {
     const res = await getSubmission(submissionId.value)
+    submission.value = res.data // 轮询时顺便更新 submission 信息（如总分、状态）
     if (res.data.scoreStatus !== 'SCORING') {
       stopScorePolling()
       aiScoring.value = false
@@ -144,6 +183,7 @@ async function handleSave() {
   try {
     await saveTeacherScores(submissionId.value, { scores: scores.value, comment: comment.value })
     ElMessage.success('保存成功')
+    await loadSubmission() // 重新加载以获取最新总分
   } catch {
     ElMessage.error('保存失败')
   } finally {
@@ -182,7 +222,10 @@ async function handleReturn() {
   }
 }
 
-onMounted(loadScores)
+onMounted(() => {
+  loadSubmission()
+  loadScores()
+})
 onBeforeUnmount(stopScorePolling)
 </script>
 

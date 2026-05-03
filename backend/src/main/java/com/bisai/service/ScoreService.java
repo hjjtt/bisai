@@ -24,7 +24,6 @@ public class ScoreService {
     private final SubmissionMapper submissionMapper;
     private final ScoreResultMapper scoreResultMapper;
     private final CheckResultMapper checkResultMapper;
-    private final AiService aiService;
     private final TrainingTaskMapper taskMapper;
     private final IndicatorMapper indicatorMapper;
     private final MessageService messageService;
@@ -41,6 +40,12 @@ public class ScoreService {
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
         }
+        
+        // 检查是否已有任务在运行
+        if (isTaskRunning("PARSE", submissionId)) {
+            return Result.error("解析任务正在处理中，请勿重复操作");
+        }
+
         try {
             submission.setParseStatus("PARSING");
             submissionMapper.updateById(submission);
@@ -60,6 +65,12 @@ public class ScoreService {
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
         }
+
+        // 检查是否已有任务在运行
+        if (isTaskRunning("CHECK", submissionId)) {
+            return Result.error("核查任务正在处理中，请勿重复操作");
+        }
+
         try {
             submission.setCheckStatus("CHECKING");
             submissionMapper.updateById(submission);
@@ -79,6 +90,12 @@ public class ScoreService {
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
         }
+
+        // 检查是否已有任务在运行
+        if (isTaskRunning("SCORE", submissionId)) {
+            return Result.error("评分任务正在处理中，请勿重复操作");
+        }
+
         try {
             submission.setScoreStatus("SCORING");
             submissionMapper.updateById(submission);
@@ -90,6 +107,17 @@ public class ScoreService {
         }
     }
 
+    /**
+     * 检查任务是否正在运行
+     */
+    private boolean isTaskRunning(String taskType, Long bizId) {
+        List<AsyncTask> tasks = asyncTaskService.getTasksByBizId(bizId);
+        return tasks.stream().anyMatch(t -> 
+            taskType.equals(t.getTaskType()) && 
+            ( "PENDING".equals(t.getStatus()) || "RUNNING".equals(t.getStatus()) || "RETRYING".equals(t.getStatus()) )
+        );
+    }
+
     public Result<List<CheckResult>> getCheckResults(Long submissionId) {
         List<CheckResult> results = checkResultMapper.selectList(
                 new LambdaQueryWrapper<CheckResult>().eq(CheckResult::getSubmissionId, submissionId)
@@ -98,9 +126,54 @@ public class ScoreService {
     }
 
     public Result<List<ScoreResult>> getScoreResults(Long submissionId) {
+        Submission submission = submissionMapper.selectById(submissionId);
+        if (submission == null) {
+            return Result.error(40401, "提交记录不存在");
+        }
+
+        // 获取已有评分结果
         List<ScoreResult> results = scoreResultMapper.selectList(
                 new LambdaQueryWrapper<ScoreResult>().eq(ScoreResult::getSubmissionId, submissionId)
         );
+
+        // 获取任务关联的评分指标
+        TrainingTask task = taskMapper.selectById(submission.getTaskId());
+        List<Indicator> indicators = List.of();
+        if (task != null && task.getTemplateId() != null) {
+            indicators = indicatorMapper.selectList(
+                    new LambdaQueryWrapper<Indicator>()
+                            .eq(Indicator::getTemplateId, task.getTemplateId())
+                            .isNull(Indicator::getParentId)
+                            .orderByAsc(Indicator::getSortOrder)
+            );
+        }
+
+        // 如果没有评分结果，则根据指标模板返回初始化列表
+        if (results.isEmpty()) {
+            List<ScoreResult> initialResults = indicators.stream().map(ind -> {
+                ScoreResult sr = new ScoreResult();
+                sr.setSubmissionId(submissionId);
+                sr.setIndicatorId(ind.getId());
+                sr.setIndicatorName(ind.getName());
+                sr.setMaxScore(ind.getMaxScore());
+                sr.setCreatedAt(LocalDateTime.now());
+                sr.setUpdatedAt(LocalDateTime.now());
+                return sr;
+            }).collect(java.util.stream.Collectors.toList());
+            return Result.ok(initialResults);
+        }
+
+        // 补齐已有结果的指标名称和最高分
+        Map<Long, Indicator> indMap = indicators.stream()
+                .collect(java.util.stream.Collectors.toMap(Indicator::getId, i -> i, (a, b) -> a));
+        results.forEach(r -> {
+            Indicator ind = indMap.get(r.getIndicatorId());
+            if (ind != null) {
+                r.setIndicatorName(ind.getName());
+                r.setMaxScore(ind.getMaxScore());
+            }
+        });
+
         return Result.ok(results);
     }
 

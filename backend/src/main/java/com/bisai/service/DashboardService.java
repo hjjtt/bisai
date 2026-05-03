@@ -70,7 +70,7 @@ public class DashboardService {
                 .collect(Collectors.toSet());
         Map<Long, String> courseNameMap = new HashMap<>();
         if (!courseIds.isEmpty()) {
-            courseMapper.selectBatchIds(courseIds).forEach(c ->
+            courseMapper.selectList(new LambdaQueryWrapper<Course>().in(Course::getId, courseIds)).forEach(c ->
                     courseNameMap.put(c.getId(), c.getName())
             );
         }
@@ -189,14 +189,14 @@ public class DashboardService {
         // 高风险列表 - 批量查询避免N+1
         List<Map<String, Object>> highRiskList = new ArrayList<>();
         if (!highRiskSubmissionIds.isEmpty()) {
-            List<Submission> highRiskSubs = submissionMapper.selectBatchIds(highRiskSubmissionIds);
+            List<Submission> highRiskSubs = submissionMapper.selectList(new LambdaQueryWrapper<Submission>().in(Submission::getId, highRiskSubmissionIds));
             Set<Long> studentIds = highRiskSubs.stream().map(Submission::getStudentId).filter(Objects::nonNull).collect(Collectors.toSet());
             Set<Long> hrTaskIds = highRiskSubs.stream().map(Submission::getTaskId).filter(Objects::nonNull).collect(Collectors.toSet());
 
             Map<Long, User> studentMap = studentIds.isEmpty() ? Map.of() :
-                    userMapper.selectBatchIds(studentIds).stream().collect(Collectors.toMap(User::getId, u -> u));
+                    userMapper.selectList(new LambdaQueryWrapper<User>().in(User::getId, studentIds)).stream().collect(Collectors.toMap(User::getId, u -> u));
             Map<Long, TrainingTask> taskMap = hrTaskIds.isEmpty() ? Map.of() :
-                    taskMapper.selectBatchIds(hrTaskIds).stream().collect(Collectors.toMap(TrainingTask::getId, t -> t));
+                    taskMapper.selectList(new LambdaQueryWrapper<TrainingTask>().in(TrainingTask::getId, hrTaskIds)).stream().collect(Collectors.toMap(TrainingTask::getId, t -> t));
             Map<Long, CheckResult> crMap = highRiskResults.stream()
                     .collect(Collectors.toMap(CheckResult::getSubmissionId, cr -> cr, (a, b) -> a));
 
@@ -251,9 +251,9 @@ public class DashboardService {
         Set<Long> taskIds = subs.stream().map(Submission::getTaskId).filter(Objects::nonNull).collect(Collectors.toSet());
 
         Map<Long, User> studentMap = studentIds.isEmpty() ? Map.of() :
-                userMapper.selectBatchIds(studentIds).stream().collect(Collectors.toMap(User::getId, u -> u));
+                userMapper.selectList(new LambdaQueryWrapper<User>().in(User::getId, studentIds)).stream().collect(Collectors.toMap(User::getId, u -> u));
         Map<Long, TrainingTask> taskMap = taskIds.isEmpty() ? Map.of() :
-                taskMapper.selectBatchIds(taskIds).stream().collect(Collectors.toMap(TrainingTask::getId, t -> t));
+                taskMapper.selectList(new LambdaQueryWrapper<TrainingTask>().in(TrainingTask::getId, taskIds)).stream().collect(Collectors.toMap(TrainingTask::getId, t -> t));
 
         List<Map<String, Object>> list = new ArrayList<>();
         for (Submission sub : subs) {

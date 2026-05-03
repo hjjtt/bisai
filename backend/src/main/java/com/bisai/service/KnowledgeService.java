@@ -91,7 +91,8 @@ public class KnowledgeService {
                 .collect(java.util.stream.Collectors.toSet());
         Map<Long, KnowledgeBase> kbMap = new java.util.HashMap<>();
         if (!kbIds.isEmpty()) {
-            knowledgeBaseMapper.selectBatchIds(kbIds).forEach(kb -> kbMap.put(kb.getId(), kb));
+            knowledgeBaseMapper.selectList(new LambdaQueryWrapper<KnowledgeBase>().in(KnowledgeBase::getId, kbIds))
+                    .forEach(kb -> kbMap.put(kb.getId(), kb));
         }
 
         result.getRecords().forEach(doc -> {
