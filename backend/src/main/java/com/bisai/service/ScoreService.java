@@ -220,23 +220,28 @@ public class ScoreService {
                 scoreResultMapper.insert(score);
             }
 
-            // 计算AI建议总分（加权）
+            // 计算AI建议总分（优化后的占比权重算法）
             if (score.getAutoScore() != null) {
                 Indicator ind = indicatorMap.get(score.getIndicatorId());
-                if (ind != null && ind.getWeight() != null) {
-                    BigDecimal weight = ind.getWeight().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
-                    autoTotalScore = autoTotalScore.add(score.getAutoScore().multiply(weight));
+                if (ind != null && ind.getWeight() != null && ind.getMaxScore() != null && ind.getMaxScore().compareTo(BigDecimal.ZERO) > 0) {
+                    // 公式：(得分 / 满分) * 权重
+                    BigDecimal contribution = score.getAutoScore()
+                            .divide(ind.getMaxScore(), 4, RoundingMode.HALF_UP)
+                            .multiply(ind.getWeight());
+                    autoTotalScore = autoTotalScore.add(contribution);
                 } else {
                     autoTotalScore = autoTotalScore.add(score.getAutoScore());
                 }
             }
 
-            // 计算教师确认总分（加权）
+            // 计算教师确认总分（优化后的占比权重算法）
             if (score.getTeacherScore() != null) {
                 Indicator ind = indicatorMap.get(score.getIndicatorId());
-                if (ind != null && ind.getWeight() != null) {
-                    BigDecimal weight = ind.getWeight().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
-                    totalScore = totalScore.add(score.getTeacherScore().multiply(weight));
+                if (ind != null && ind.getWeight() != null && ind.getMaxScore() != null && ind.getMaxScore().compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal contribution = score.getTeacherScore()
+                            .divide(ind.getMaxScore(), 4, RoundingMode.HALF_UP)
+                            .multiply(ind.getWeight());
+                    totalScore = totalScore.add(contribution);
                 } else {
                     totalScore = totalScore.add(score.getTeacherScore());
                 }
@@ -511,9 +516,11 @@ public class ScoreService {
         for (ScoreResult sr : scores) {
             if (sr.getFinalScore() != null) {
                 Indicator ind = indicatorMap.get(sr.getIndicatorId());
-                if (ind != null && ind.getWeight() != null) {
-                    BigDecimal weight = ind.getWeight().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
-                    totalScore = totalScore.add(sr.getFinalScore().multiply(weight));
+                if (ind != null && ind.getWeight() != null && ind.getMaxScore() != null && ind.getMaxScore().compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal contribution = sr.getFinalScore()
+                            .divide(ind.getMaxScore(), 4, RoundingMode.HALF_UP)
+                            .multiply(ind.getWeight());
+                    totalScore = totalScore.add(contribution);
                 } else {
                     totalScore = totalScore.add(sr.getFinalScore());
                 }

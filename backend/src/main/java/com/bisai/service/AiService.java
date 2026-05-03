@@ -336,12 +336,13 @@ public class AiService {
             updateTaskProgress(asyncTaskId, 40, "正在调用 AI 评分...");
 
             // 构建 AI 评分 prompt
-            String systemPrompt = "你是实训成果评分专家。你需要根据给定的评分指标，对学生提交的实训成果进行客观评分。\n" +
-                    "评分要求：\n" +
-                    "1. 严格按照每个指标的满分范围打分\n" +
-                    "2. 给出具体的评分理由\n" +
-                    "3. 引用学生提交内容中的具体证据\n" +
-                    "4. 评分要客观公正，不要过分宽松或严格\n\n" +
+            String systemPrompt = "你是实训成果评分专家。你需要对学生提交的内容进行专业且具有**区分度**的评价。\n" +
+                    "评分准则：\n" +
+                    "1. **分类化鼓励原则**：对于表现出清晰逻辑、认真态度但因能力或时间导致成果不完整的学生，应体现鼓励，尽量给予及格线（60%得分率）左右的反馈。\n" +
+                    "2. **精准识别低质量内容**：**严厉打击敷衍行为**。对于内容极度贫乏（如仅有目录无正文）、完全跑题、逻辑混乱、或存在明显抄袭/AI生成痕迹且无个人思考的提交，必须果断给予低分，确保评分具有区分度。\n" +
+                    "3. **细节定真伪**：通过具体证据（如代码中的特定命名、需求中的独特业务逻辑）来判断学生是否真实参与。对于只有模板化文字而无实质内容的提交，应判为写得不好。\n" +
+                    "4. 严格按照每个指标的满分范围打分，并重点参考权重信息。\n" +
+                    "5. 给出具体的评分理由，并引用具体证据。\n\n" +
                     "请以 JSON 格式返回评分结果：\n" +
                     "{\n" +
                     "  \"scores\": [\n" +
@@ -402,11 +403,13 @@ public class AiService {
                     sr.setUpdatedAt(LocalDateTime.now());
                     scoreResultMapper.insert(sr);
 
-                    // 加权计算总分（与 ScoreService.saveTeacherScores 保持一致）
-                    if (sr.getAutoScore() != null) {
+                    // 占比加权计算总分（优化后的算法）
+                    if (sr.getAutoScore() != null && matchedIndicator.getMaxScore() != null && matchedIndicator.getMaxScore().compareTo(BigDecimal.ZERO) > 0) {
                         if (matchedIndicator.getWeight() != null) {
-                            BigDecimal weight = matchedIndicator.getWeight().divide(BigDecimal.valueOf(100), 4, java.math.RoundingMode.HALF_UP);
-                            autoTotalScore = autoTotalScore.add(sr.getAutoScore().multiply(weight));
+                            BigDecimal contribution = sr.getAutoScore()
+                                    .divide(matchedIndicator.getMaxScore(), 4, java.math.RoundingMode.HALF_UP)
+                                    .multiply(matchedIndicator.getWeight());
+                            autoTotalScore = autoTotalScore.add(contribution);
                         } else {
                             autoTotalScore = autoTotalScore.add(sr.getAutoScore());
                         }
