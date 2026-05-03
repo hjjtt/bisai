@@ -18,7 +18,7 @@
     <description>实训成果智能核查与评价系统后端</description>
 
     <properties>
-        <java.version>21</java.version>
+        <java.version>17</java.version>
         <mybatis-plus.version>3.5.9</mybatis-plus.version>
         <jjwt.version>0.12.6</jjwt.version>
         <spring-ai.version>1.0.0</spring-ai.version>
@@ -162,6 +162,13 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <!-- 可视化报表图表库 -->
+        <dependency>
+            <groupId>org.jfree</groupId>
+            <artifactId>jfreechart</artifactId>
+            <version>1.5.5</version>
         </dependency>
 
         <!-- 热部署 (已禁用) -->

@@ -18,8 +18,20 @@ import com.itextpdf.layout.properties.UnitValue;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xwpf.usermodel.*;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartUtils;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.data.category.DefaultCategoryDataset;
+import org.jfree.data.general.DefaultPieDataset;
+import com.itextpdf.layout.element.Image;
+import com.itextpdf.io.image.ImageDataFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import java.io.ByteArrayOutputStream;
+import java.awt.Font;
+import org.jfree.chart.StandardChartTheme;
 
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -44,6 +56,21 @@ public class ReportService {
 
     @Value("${file.upload-path}")
     private String uploadPath;
+
+    static {
+        // 全局配置 JFreeChart 中文字体，解决乱码问题
+        StandardChartTheme chartTheme = new StandardChartTheme("CN");
+        // 设置标题字体
+        chartTheme.setExtraLargeFont(new Font("Microsoft YaHei", Font.BOLD, 20));
+        // 设置轴标签字体
+        chartTheme.setLargeFont(new Font("Microsoft YaHei", Font.PLAIN, 15));
+        // 设置常规字体
+        chartTheme.setRegularFont(new Font("Microsoft YaHei", Font.PLAIN, 12));
+        // 设置小字体
+        chartTheme.setSmallFont(new Font("Microsoft YaHei", Font.PLAIN, 10));
+        // 应用主题
+        ChartFactory.setChartTheme(chartTheme);
+    }
 
     /**
      * 导出学生个人报告
@@ -223,6 +250,24 @@ public class ReportService {
             document.add(new Paragraph("\n"));
 
             if (!scores.isEmpty()) {
+                // 可视化图表 - 个人指标得分图
+                try {
+                    DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+                    for (ScoreResult sr : scores) {
+                        String indName = indicatorNameMap.getOrDefault(sr.getIndicatorId(), "指标");
+                        double finalScore = sr.getFinalScore() != null ? sr.getFinalScore().doubleValue() : 0;
+                        dataset.addValue(finalScore, "得分", indName);
+                    }
+                    JFreeChart chart = ChartFactory.createBarChart("得分对比图", "评价指标", "分数", dataset, PlotOrientation.VERTICAL, false, true, false);
+                    ByteArrayOutputStream chartOut = new ByteArrayOutputStream();
+                    ChartUtils.writeChartAsPNG(chartOut, chart, 500, 300);
+                    Image chartImg = new Image(ImageDataFactory.create(chartOut.toByteArray())).setHorizontalAlignment(com.itextpdf.layout.properties.HorizontalAlignment.CENTER);
+                    document.add(chartImg);
+                    document.add(new Paragraph("\n"));
+                } catch (Exception e) {
+                    log.warn("个人报告图表生成失败: {}", e.getMessage());
+                }
+
                 Table scoreTable = new Table(UnitValue.createPercentArray(new float[]{3, 1.5f, 1.5f, 1.5f, 4})).useAllAvailableWidth();
                 scoreTable.addHeaderCell(createHeaderCell("评价指标", font));
                 scoreTable.addHeaderCell(createHeaderCell("系统评分", font));
@@ -345,6 +390,31 @@ public class ReportService {
             scoreTitleRun.setText("评分详情");
             scoreTitleRun.setBold(true);
             scoreTitleRun.setFontSize(14);
+
+            // 可视化图表 - 个人指标得分图
+            if (!scores.isEmpty()) {
+                try {
+                    DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+                    for (ScoreResult sr : scores) {
+                        String indName = indicatorNameMap.getOrDefault(sr.getIndicatorId(), "指标");
+                        double finalScore = sr.getFinalScore() != null ? sr.getFinalScore().doubleValue() : 0;
+                        dataset.addValue(finalScore, "得分", indName);
+                    }
+                    JFreeChart chart = ChartFactory.createBarChart("得分对比图", "评价指标", "分数", dataset, PlotOrientation.VERTICAL, false, true, false);
+                    ByteArrayOutputStream chartOut = new ByteArrayOutputStream();
+                    ChartUtils.writeChartAsPNG(chartOut, chart, 500, 300);
+                    
+                    XWPFParagraph imgPara = document.createParagraph();
+                    imgPara.setAlignment(ParagraphAlignment.CENTER);
+                    XWPFRun imgRun = imgPara.createRun();
+                    try (java.io.ByteArrayInputStream bis = new java.io.ByteArrayInputStream(chartOut.toByteArray())) {
+                        imgRun.addPicture(bis, XWPFDocument.PICTURE_TYPE_PNG, "chart.png", 
+                                org.apache.poi.util.Units.toEMU(400), org.apache.poi.util.Units.toEMU(240));
+                    }
+                } catch (Exception e) {
+                    log.warn("Word报告图表生成失败: {}", e.getMessage());
+                }
+            }
 
             // 空行
             document.createParagraph();
@@ -648,6 +718,48 @@ public class ReportService {
                 summaryTable.addCell(createCell(String.format("%.1f%%", passCount * 100.0 / scoredSubmissions.size()), font));
                 document.add(summaryTable);
                 document.add(new Paragraph("\n"));
+
+                // 可视化图表 - 班级成绩分布图
+                try {
+                    DefaultPieDataset pieDataset = new DefaultPieDataset();
+                    long excellent = scoredSubmissions.stream().filter(s -> s.getTotalScore().compareTo(BigDecimal.valueOf(90)) >= 0).count();
+                    long good = scoredSubmissions.stream().filter(s -> s.getTotalScore().compareTo(BigDecimal.valueOf(80)) >= 0 && s.getTotalScore().compareTo(BigDecimal.valueOf(90)) < 0).count();
+                    long pass = scoredSubmissions.stream().filter(s -> s.getTotalScore().compareTo(BigDecimal.valueOf(60)) >= 0 && s.getTotalScore().compareTo(BigDecimal.valueOf(80)) < 0).count();
+                    long fail = scoredSubmissions.stream().filter(s -> s.getTotalScore().compareTo(BigDecimal.valueOf(60)) < 0).count();
+                    
+                    if (excellent > 0) pieDataset.setValue("优秀(90+)", excellent);
+                    if (good > 0) pieDataset.setValue("良好(80-89)", good);
+                    if (pass > 0) pieDataset.setValue("及格(60-79)", pass);
+                    if (fail > 0) pieDataset.setValue("不及格(<60)", fail);
+
+                    JFreeChart pieChart = ChartFactory.createPieChart("成绩等级分布", pieDataset, true, true, false);
+                    ByteArrayOutputStream pieOut = new ByteArrayOutputStream();
+                    ChartUtils.writeChartAsPNG(pieOut, pieChart, 400, 300);
+                    Image pieImg = new Image(ImageDataFactory.create(pieOut.toByteArray())).setHorizontalAlignment(com.itextpdf.layout.properties.HorizontalAlignment.CENTER);
+                    document.add(pieImg);
+                } catch (Exception e) {
+                    log.warn("班级分布图生成失败: {}", e.getMessage());
+                }
+
+                // 可视化图表 - 指标达成度柱状图
+                try {
+                    DefaultCategoryDataset barDataset = new DefaultCategoryDataset();
+                    for (Indicator ind : indicators) {
+                        double indAvg = allScores.stream()
+                                .filter(s -> s.getIndicatorId().equals(ind.getId()))
+                                .mapToDouble(s -> s.getFinalScore() != null ? s.getFinalScore().doubleValue() : 0)
+                                .average().orElse(0);
+                        barDataset.addValue(indAvg, "平均分", ind.getName());
+                    }
+                    JFreeChart barChart = ChartFactory.createBarChart("各指标平均达成度", "指标名称", "平均分数", barDataset, PlotOrientation.VERTICAL, false, true, false);
+                    ByteArrayOutputStream barOut = new ByteArrayOutputStream();
+                    ChartUtils.writeChartAsPNG(barOut, barChart, 500, 300);
+                    Image barImg = new Image(ImageDataFactory.create(barOut.toByteArray())).setHorizontalAlignment(com.itextpdf.layout.properties.HorizontalAlignment.CENTER);
+                    document.add(barImg);
+                    document.add(new Paragraph("\n"));
+                } catch (Exception e) {
+                    log.warn("指标达成度图生成失败: {}", e.getMessage());
+                }
             }
 
             // 学生成绩明细表
