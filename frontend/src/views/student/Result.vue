@@ -41,6 +41,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getSubmission, getScoreResults } from '@/api/task'
 import { exportStudentReport } from '@/api/report'
+import { downloadFile } from '@/api/system'
 import type { Submission, ScoreResult } from '@/types'
 
 const route = useRoute()
@@ -72,7 +73,7 @@ async function loadData() {
 async function downloadReport(format: 'PDF' | 'WORD') {
   try {
     const res = await exportStudentReport(submissionId.value, format)
-    window.open(`/api/files/${res.data.fileId}/download`)
+    await downloadFile(res.data.fileId)
   } catch (e) {
     console.error('报告导出失败:', e)
     ElMessage.error('报告导出失败')

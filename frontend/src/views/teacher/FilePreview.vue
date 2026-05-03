@@ -30,13 +30,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Document } from '@element-plus/icons-vue'
-import { getFileList } from '@/api/task'
+import { getFileList, getFilePreview } from '@/api/task'
 import { downloadFile as downloadFileApi } from '@/api/system'
-import service from '@/utils/request'
 import type { FileInfo } from '@/types'
 
 const route = useRoute()
@@ -57,7 +56,7 @@ function isImage(file: FileInfo) {
 
 async function loadBlob(fileId: number) {
   try {
-    const res = await service.get(`/files/${fileId}/preview`, { responseType: 'blob' })
+    const res = await getFilePreview(fileId)
     const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
     blobUrls[fileId] = URL.createObjectURL(blob)
   } catch {
@@ -93,6 +92,10 @@ async function loadFiles() {
 }
 
 onMounted(loadFiles)
+
+onUnmounted(() => {
+  Object.values(blobUrls).forEach(url => URL.revokeObjectURL(url))
+})
 </script>
 
 <style lang="scss" scoped>

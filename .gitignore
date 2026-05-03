@@ -31,3 +31,11 @@ data/files/
 
 # 压缩包
 *.zip
+
+# SQL 文件（除 schema.sql 外）
+*.sql
+!backend/src/main/resources/schema.sql
+
+# 环境变量文件
+.env
+.env.*

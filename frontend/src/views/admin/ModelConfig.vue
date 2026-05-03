@@ -59,6 +59,15 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getSystemConfig, updateSystemConfig, testModelConnection } from '@/api/system'
 
+interface SystemConfigData {
+  textModelApiUrl?: string
+  textModelApiKey?: string
+  model?: string
+  timeout?: string | number
+  temperature?: string | number
+  maxTokens?: string | number
+}
+
 const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
@@ -76,7 +85,7 @@ async function loadConfig() {
   loading.value = true
   try {
     const res = await getSystemConfig()
-    const data = res.data as any
+    const data = res.data as SystemConfigData
     if (data.textModelApiUrl) form.textModelApiUrl = data.textModelApiUrl
     if (data.textModelApiKey) form.textModelApiKey = data.textModelApiKey
     if (data.model) form.model = data.model

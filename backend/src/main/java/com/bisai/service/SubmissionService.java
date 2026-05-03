@@ -256,7 +256,7 @@ public class SubmissionService {
                 }
             }
         } catch (Exception e) {
-            // 消息发送失败不影响主流程
+            log.warn("发送提交通知消息失败: {}", e.getMessage());
         }
 
         return Result.ok();

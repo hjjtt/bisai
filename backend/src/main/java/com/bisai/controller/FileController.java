@@ -23,6 +23,9 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @RestController
@@ -35,6 +38,12 @@ public class FileController {
     private final TrainingTaskMapper taskMapper;
     private final CourseMapper courseMapper;
     private final UserMapper userMapper;
+
+    private static final ScheduledExecutorService CLEANUP_EXECUTOR = Executors.newScheduledThreadPool(2, r -> {
+        Thread t = new Thread(r, "file-cleanup");
+        t.setDaemon(true);
+        return t;
+    });
 
     @GetMapping("/{fileId}/preview")
     public ResponseEntity<Resource> preview(@PathVariable Long fileId, Authentication auth) {
@@ -185,10 +194,10 @@ public class FileController {
             }
 
             // 5分钟后自动清理临时PDF
-            new Thread(() -> {
-                try { Thread.sleep(300000); java.nio.file.Files.deleteIfExists(pdfPath); }
-                catch (Exception ignored) {}
-            }).start();
+            CLEANUP_EXECUTOR.schedule(() -> {
+                try { java.nio.file.Files.deleteIfExists(pdfPath); }
+                catch (Exception e) { log.debug("清理临时预览PDF失败: {}", e.getMessage()); }
+            }, 5, TimeUnit.MINUTES);
 
             return pdfPath;
         } catch (Exception e) {

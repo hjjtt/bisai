@@ -78,6 +78,22 @@ export interface ScoreResult {
   evidence?: string
 }
 
+// 异步任务
+export interface AsyncTask {
+  id: number
+  bizType: string
+  bizId: number
+  taskType: string
+  status: string
+  progress: number
+  currentStep: string
+  result?: string
+  errorMessage?: string
+  retryCount: number
+  createdAt: string
+  updatedAt: string
+}
+
 // 消息
 export interface Message {
   id: number

@@ -368,7 +368,6 @@ public class AiService {
 
             // 保存评分结果（加权计算）
             BigDecimal autoTotalScore = BigDecimal.ZERO;
-            BigDecimal totalScore = BigDecimal.ZERO;
             JsonNode scores = result.path("scores");
             if (scores.isArray()) {
                 for (JsonNode scoreItem : scores) {
@@ -439,7 +438,7 @@ public class AiService {
                 log.warn("发送AI评分完成消息失败: {}", e.getMessage());
             }
 
-            log.info("智能评分完成, submissionId={}, 评分项数={}, 总分={}", submissionId, scores.size(), totalScore);
+            log.info("智能评分完成, submissionId={}, 评分项数={}, 总分={}", submissionId, scores.size(), autoTotalScore);
 
             updateTaskProgress(asyncTaskId, 100, "评分完成");
 

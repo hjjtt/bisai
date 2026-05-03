@@ -58,16 +58,16 @@ public class ReportService {
     private String uploadPath;
 
     static {
-        // 全局配置 JFreeChart 中文字体，解决乱码问题
+        // 全局配置 JFreeChart 字体，使用跨平台兼容的 SansSerif
         StandardChartTheme chartTheme = new StandardChartTheme("CN");
         // 设置标题字体
-        chartTheme.setExtraLargeFont(new Font("Microsoft YaHei", Font.BOLD, 20));
+        chartTheme.setExtraLargeFont(new Font("SansSerif", Font.BOLD, 20));
         // 设置轴标签字体
-        chartTheme.setLargeFont(new Font("Microsoft YaHei", Font.PLAIN, 15));
+        chartTheme.setLargeFont(new Font("SansSerif", Font.PLAIN, 15));
         // 设置常规字体
-        chartTheme.setRegularFont(new Font("Microsoft YaHei", Font.PLAIN, 12));
+        chartTheme.setRegularFont(new Font("SansSerif", Font.PLAIN, 12));
         // 设置小字体
-        chartTheme.setSmallFont(new Font("Microsoft YaHei", Font.PLAIN, 10));
+        chartTheme.setSmallFont(new Font("SansSerif", Font.PLAIN, 10));
         // 应用主题
         ChartFactory.setChartTheme(chartTheme);
     }

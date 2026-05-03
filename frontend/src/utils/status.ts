@@ -88,3 +88,13 @@ export function getRiskLabel(level: string): string {
   const map: Record<string, string> = { LOW: '低', MEDIUM: '中', HIGH: '高' }
   return map[level] || level
 }
+
+export function getAsyncTaskStatusType(status: string): string {
+  const map: Record<string, string> = { PENDING: 'info', RUNNING: 'warning', SUCCESS: 'success', FAILED: 'danger' }
+  return map[status] || 'info'
+}
+
+export function getAsyncTaskStatusLabel(status: string): string {
+  const map: Record<string, string> = { PENDING: '等待中', RUNNING: '处理中', SUCCESS: '已完成', FAILED: '失败' }
+  return map[status] || status
+}

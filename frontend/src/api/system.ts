@@ -16,7 +16,7 @@ export function testModelConnection(data: { apiUrl: string; apiKey: string }) {
 }
 
 // 模型调用日志
-export function getModelCallLogs(params?: any) {
+export function getModelCallLogs(params?: { page?: number; size?: number }) {
   return get('/logs/model-call', params)
 }
 
