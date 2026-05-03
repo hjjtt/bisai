@@ -366,7 +366,8 @@ public class AiService {
                             .eq(ScoreResult::getSubmissionId, submissionId)
             );
 
-            // 保存评分结果
+            // 保存评分结果（加权计算）
+            BigDecimal autoTotalScore = BigDecimal.ZERO;
             BigDecimal totalScore = BigDecimal.ZERO;
             JsonNode scores = result.path("scores");
             if (scores.isArray()) {
@@ -402,14 +403,21 @@ public class AiService {
                     sr.setUpdatedAt(LocalDateTime.now());
                     scoreResultMapper.insert(sr);
 
+                    // 加权计算总分（与 ScoreService.saveTeacherScores 保持一致）
                     if (sr.getAutoScore() != null) {
-                        totalScore = totalScore.add(sr.getAutoScore());
+                        if (matchedIndicator.getWeight() != null) {
+                            BigDecimal weight = matchedIndicator.getWeight().divide(BigDecimal.valueOf(100), 4, java.math.RoundingMode.HALF_UP);
+                            autoTotalScore = autoTotalScore.add(sr.getAutoScore().multiply(weight));
+                        } else {
+                            autoTotalScore = autoTotalScore.add(sr.getAutoScore());
+                        }
                     }
                 }
             }
 
             submission.setScoreStatus("AI_SCORED");
-            submission.setTotalScore(totalScore);
+            submission.setAutoTotalScore(autoTotalScore.setScale(2, java.math.RoundingMode.HALF_UP));
+            submission.setTotalScore(autoTotalScore.setScale(2, java.math.RoundingMode.HALF_UP));
             submissionMapper.updateById(submission);
 
             // 发送消息通知教师AI评分完成

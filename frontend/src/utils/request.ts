@@ -24,6 +24,11 @@ service.interceptors.request.use(
 // 响应拦截器
 service.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
+    // blob 响应直接返回，不走业务状态码校验
+    if (response.config.responseType === 'blob') {
+      return response
+    }
+
     const { code, message } = response.data
     if (code === 0) {
       return response.data as unknown as AxiosResponse

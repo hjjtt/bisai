@@ -90,10 +90,20 @@ public class ReportService {
                 return Result.error(40001, "暂不支持" + format + "格式，请使用PDF格式");
             }
 
+            // 保存文件记录到 file 表
+            Path reportPath = Path.of(uploadPath, "reports", fileName);
+            FileEntity fileEntity = new FileEntity();
+            fileEntity.setSubmissionId(submissionId);
+            fileEntity.setOriginalName(fileName);
+            fileEntity.setFilePath(reportPath.toString());
+            fileEntity.setFileType("PDF");
+            fileEntity.setFileSize(java.nio.file.Files.size(reportPath));
+            fileEntity.setFileHash(cn.hutool.crypto.digest.DigestUtil.md5Hex(reportPath.toFile()));
+            fileMapper.insert(fileEntity);
+
             Map<String, Object> data = new HashMap<>();
-            data.put("fileId", submissionId);
+            data.put("fileId", fileEntity.getId());
             data.put("fileName", fileName);
-            data.put("downloadUrl", "/api/files/download/report/" + fileName);
             return Result.ok(data);
 
         } catch (Exception e) {
@@ -130,10 +140,20 @@ public class ReportService {
                 return Result.error(40001, "暂不支持" + format + "格式，请使用Excel格式");
             }
 
+            // 保存文件记录到 file 表
+            Path reportPath = Path.of(uploadPath, "reports", fileName);
+            FileEntity fileEntity = new FileEntity();
+            fileEntity.setSubmissionId(submissions.get(0).getId());
+            fileEntity.setOriginalName(fileName);
+            fileEntity.setFilePath(reportPath.toString());
+            fileEntity.setFileType("XLSX");
+            fileEntity.setFileSize(java.nio.file.Files.size(reportPath));
+            fileEntity.setFileHash(cn.hutool.crypto.digest.DigestUtil.md5Hex(reportPath.toFile()));
+            fileMapper.insert(fileEntity);
+
             Map<String, Object> data = new HashMap<>();
-            data.put("fileId", taskId);
+            data.put("fileId", fileEntity.getId());
             data.put("fileName", fileName);
-            data.put("downloadUrl", "/api/files/download/report/" + fileName);
             return Result.ok(data);
 
         } catch (Exception e) {
@@ -177,17 +197,17 @@ public class ReportService {
 
             // 基本信息表格
             Table infoTable = new Table(UnitValue.createPercentArray(new float[]{1, 2, 1, 2})).useAllAvailableWidth();
-            infoTable.addHeaderCell(createHeaderCell("学生姓名", font));
+            infoTable.addCell(createHeaderCell("学生姓名", font));
             infoTable.addCell(createCell(student != null ? student.getRealName() : "-", font));
-            infoTable.addHeaderCell(createHeaderCell("学号", font));
+            infoTable.addCell(createHeaderCell("学号", font));
             infoTable.addCell(createCell(student != null ? student.getUsername() : "-", font));
-            infoTable.addHeaderCell(createHeaderCell("课程", font));
+            infoTable.addCell(createHeaderCell("课程", font));
             infoTable.addCell(createCell(course != null ? course.getName() : "-", font));
-            infoTable.addHeaderCell(createHeaderCell("任务", font));
+            infoTable.addCell(createHeaderCell("任务", font));
             infoTable.addCell(createCell(task != null ? task.getTitle() : "-", font));
-            infoTable.addHeaderCell(createHeaderCell("提交时间", font));
+            infoTable.addCell(createHeaderCell("提交时间", font));
             infoTable.addCell(createCell(submission.getSubmitTime() != null ? submission.getSubmitTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) : "-", font));
-            infoTable.addHeaderCell(createHeaderCell("提交版本", font));
+            infoTable.addCell(createHeaderCell("提交版本", font));
             infoTable.addCell(createCell("V" + submission.getVersion(), font));
             document.add(infoTable);
             document.add(new Paragraph("\n"));

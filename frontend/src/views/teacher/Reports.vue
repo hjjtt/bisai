@@ -78,6 +78,7 @@ import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getTaskList, getSubmissions } from '@/api/task'
 import { exportStudentReport as exportStudentReportApi, exportClassReport as exportClassReportApi } from '@/api/report'
+import { downloadFile } from '@/api/system'
 import { getParseStatusType, getParseStatusLabel, getCheckStatusType, getCheckStatusLabel, getScoreStatusType, getScoreStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
 import type { TrainingTask, Submission } from '@/types'
@@ -143,7 +144,7 @@ async function doExportStudentReport(format: 'PDF' | 'WORD') {
   exporting.value = true
   try {
     const res = await exportStudentReportApi(studentReport.submissionId, format)
-    window.open(`/api/files/${res.data.fileId}/download`)
+    await downloadFile(res.data.fileId)
   } catch (e) {
     console.error('导出报告失败:', e)
     ElMessage.error('导出失败')
@@ -157,7 +158,7 @@ async function doExportClassReport(format: 'PDF' | 'EXCEL') {
   exporting.value = true
   try {
     const res = await exportClassReportApi(classReport.taskId, format)
-    window.open(`/api/files/${res.data.fileId}/download`)
+    await downloadFile(res.data.fileId)
   } catch (e) {
     console.error('导出报表失败:', e)
     ElMessage.error('导出失败')
