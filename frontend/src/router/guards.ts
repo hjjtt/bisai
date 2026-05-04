@@ -43,6 +43,12 @@ export const studentRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/student/Result.vue'),
         meta: { title: '评价结果', hidden: true },
       },
+      {
+        path: 'messages',
+        name: 'StudentMessages',
+        component: () => import('@/views/common/Messages.vue'),
+        meta: { title: '消息中心', icon: 'Bell' },
+      },
     ],
   },
 ]
@@ -132,6 +138,24 @@ export const teacherRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/teacher/Knowledge.vue'),
         meta: { title: '知识库管理', icon: 'Collection' },
       },
+      {
+        path: 'calibration',
+        name: 'TeacherCalibration',
+        component: () => import('@/views/teacher/Calibration.vue'),
+        meta: { title: '评分校准', icon: 'Aim' },
+      },
+      {
+        path: 'templates',
+        name: 'TeacherTemplateManage',
+        component: () => import('@/views/teacher/TemplateManage.vue'),
+        meta: { title: '评价模板', icon: 'Stamp' },
+      },
+      {
+        path: 'messages',
+        name: 'TeacherMessages',
+        component: () => import('@/views/common/Messages.vue'),
+        meta: { title: '消息中心', icon: 'Bell' },
+      },
     ],
   },
 ]
@@ -180,10 +204,28 @@ export const adminRoutes: RouteRecordRaw[] = [
         meta: { title: '系统日志', icon: 'Tickets' },
       },
       {
+        path: 'calibration',
+        name: 'AdminCalibration',
+        component: () => import('@/views/teacher/Calibration.vue'),
+        meta: { title: '评分校准', icon: 'Aim' },
+      },
+      {
         path: 'batch',
         name: 'AdminBatchProgress',
         component: () => import('@/views/teacher/BatchProgress.vue'),
         meta: { title: '批量任务', icon: 'Loading' },
+      },
+      {
+        path: 'templates',
+        name: 'AdminTemplateManage',
+        component: () => import('@/views/teacher/TemplateManage.vue'),
+        meta: { title: '评价模板', icon: 'Stamp' },
+      },
+      {
+        path: 'messages',
+        name: 'AdminMessages',
+        component: () => import('@/views/common/Messages.vue'),
+        meta: { title: '消息中心', icon: 'Bell' },
       },
     ],
   },

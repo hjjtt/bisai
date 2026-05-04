@@ -200,27 +200,3 @@ onBeforeUnmount(stopPolling)
   margin-top: 4px;
 }
 </style>
-
-<style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.risk-card {
-  text-align: center;
-}
-.risk-stat {
-  padding: 8px 0;
-}
-.risk-number {
-  font-size: 32px;
-  font-weight: 700;
-}
-.risk-label {
-  display: block;
-  font-size: 13px;
-  color: #909399;
-  margin-top: 4px;
-}
-</style>

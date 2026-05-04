@@ -158,6 +158,40 @@ public class TaskService {
     }
 
     /**
+     * 批量核查 - 使用异步任务队列，控制并发
+     */
+    public Result<Map<String, Object>> batchCheck(Long taskId) {
+        if (activeJobs.containsKey(taskId)) {
+            return Result.error(40901, "该任务正在批量处理中，请稍后重试");
+        }
+
+        TrainingTask task = taskMapper.selectById(taskId);
+        if (task == null) {
+            return Result.error(40401, "任务不存在");
+        }
+
+        List<Submission> submissions = submissionMapper.selectList(
+                new LambdaQueryWrapper<Submission>().eq(Submission::getTaskId, taskId)
+        );
+
+        // 先注册活跃任务，防止竞态
+        activeJobs.put(taskId, new BatchJob(taskId, "CHECK", submissions.size()));
+
+        int created = 0;
+        for (Submission sub : submissions) {
+            sub.setCheckStatus("CHECKING");
+            submissionMapper.updateById(sub);
+            asyncTaskService.createTask("CHECK", sub.getId());
+            created++;
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("total", submissions.size());
+        result.put("created", created);
+        return Result.ok(result);
+    }
+
+    /**
      * 查询批量操作进度
      */
     public Result<Map<String, Object>> getBatchProgress(Long taskId) {

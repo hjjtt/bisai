@@ -43,3 +43,7 @@ export function createTemplate(data: Partial<EvaluationTemplate>) {
 export function updateTemplate(id: number, data: Partial<EvaluationTemplate>) {
   return put<EvaluationTemplate>(`/templates/${id}`, data)
 }
+
+export function deleteTemplate(id: number) {
+  return del<void>(`/templates/${id}`)
+}

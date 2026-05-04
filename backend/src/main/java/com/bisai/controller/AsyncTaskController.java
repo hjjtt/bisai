@@ -32,6 +32,12 @@ public class AsyncTaskController {
         return success ? Result.ok() : Result.error("任务不存在或状态不是失败");
     }
 
+    @PostMapping("/{taskId}/cancel")
+    public Result<Void> cancelTask(@PathVariable Long taskId) {
+        boolean success = asyncTaskService.cancelTask(taskId);
+        return success ? Result.ok() : Result.error("任务不存在或无法取消");
+    }
+
     @PostMapping("/batch-status")
     public Result<Map<String, Long>> getBatchStatus(@RequestBody List<Long> taskIds) {
         Map<String, Long> stats = Map.of(

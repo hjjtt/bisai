@@ -185,6 +185,41 @@ public class AsyncTaskService {
     }
 
     /**
+     * 取消正在执行的任务
+     */
+    public boolean cancelTask(Long taskId) {
+        AsyncTask task = asyncTaskMapper.selectById(taskId);
+        if (task == null) {
+            return false;
+        }
+        if (!"PENDING".equals(task.getStatus()) && !"RUNNING".equals(task.getStatus())
+                && !"RETRYING".equals(task.getStatus())) {
+            return false;
+        }
+
+        task.setStatus("CANCELLED");
+        task.setUpdatedAt(LocalDateTime.now());
+        asyncTaskMapper.updateById(task);
+        log.info("任务已取消: id={}, type={}, bizId={}", task.getId(), task.getTaskType(), task.getBizId());
+
+        // 释放 submission 锁定状态
+        updateSubmissionStatusOnCancel(task);
+        return true;
+    }
+
+    private void updateSubmissionStatusOnCancel(AsyncTask task) {
+        Submission submission = submissionMapper.selectById(task.getBizId());
+        if (submission != null) {
+            switch (task.getTaskType()) {
+                case "PARSE" -> submission.setParseStatus("CANCELLED");
+                case "CHECK" -> submission.setCheckStatus("CANCELLED");
+                case "SCORE" -> submission.setScoreStatus("CANCELLED");
+            }
+            submissionMapper.updateById(submission);
+        }
+    }
+
+    /**
      * 手动重试失败任务
      */
     public boolean retryFailedTask(Long taskId) {

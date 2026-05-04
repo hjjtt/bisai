@@ -50,12 +50,14 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getSubmissions, getTaskList, batchScore, startCheck } from '@/api/task'
+import { getSubmissions, getTaskList, batchCheck, startCheck } from '@/api/task'
 import { getCheckStatusType, getCheckStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
 import type { Submission, TrainingTask } from '@/types'
 
+const router = useRouter()
 const loading = ref(false)
 const batchLoading = ref(false)
 const aiLoading = reactive<Record<number, boolean>>({})
@@ -130,8 +132,7 @@ async function handleBatchCheck() {
   if (!filter.taskId) { ElMessage.warning('请先选择任务'); return }
   batchLoading.value = true
   try {
-    // 复用 batchScore API，因为后端可能没有专门的 batchCheck
-    await batchScore(filter.taskId)
+    await batchCheck(filter.taskId)
     ElMessage.success('批量核查任务已启动')
     await loadData()
     startPolling()
@@ -144,8 +145,7 @@ async function handleBatchCheck() {
 }
 
 function handleRowClick(row: Submission) {
-  // 可选：点击行跳转到核查详情
-  // router.push(`/teacher/submissions/${row.id}/check`)
+  router.push(`/teacher/submissions/${row.id}/check`)
 }
 
 onMounted(() => {
