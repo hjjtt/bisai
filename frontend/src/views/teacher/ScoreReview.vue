@@ -82,6 +82,13 @@
           <el-input v-model="comment" type="textarea" :rows="4" placeholder="请输入评语" style="margin-top: 12px" />
 
           <el-divider />
+          <el-button type="warning" :loading="objectiveLoading" @click="handleViewObjective" style="width: 100%">
+            查看客观评分
+          </el-button>
+          <el-button type="primary" @click="showCorrectDialog = true" style="width: 100%; margin-top: 8px">
+            修正成绩
+          </el-button>
+          <el-divider />
           <div class="score-actions">
             <el-button type="success" :loading="saving" @click="handlePublish" style="width: 100%">
               确认并发布成绩
@@ -96,6 +103,45 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 客观评分弹窗 -->
+    <el-dialog v-model="showObjectiveDialog" title="客观评分详情" width="500px">
+      <el-descriptions v-if="objectiveScore" :column="1" border>
+        <el-descriptions-item v-for="(score, key) in objectiveScore.scores" :key="key" :label="key">
+          {{ score }} 分
+        </el-descriptions-item>
+        <el-descriptions-item label="总分">
+          <span style="font-weight: bold; color: #f56c6c; font-size: 18px">{{ objectiveScore.total }}</span> 分
+        </el-descriptions-item>
+      </el-descriptions>
+      <el-empty v-else description="暂无客观评分数据" />
+    </el-dialog>
+
+    <!-- 成绩修正弹窗 -->
+    <el-dialog v-model="showCorrectDialog" title="修正成绩" width="500px">
+      <el-form :model="correctForm" label-width="100px">
+        <el-form-item label="指标">
+          <el-select v-model="correctForm.indicatorId" placeholder="选择指标（可选）" clearable style="width: 100%">
+            <el-option
+              v-for="s in scores"
+              :key="s.indicatorId"
+              :label="s.indicatorName || '指标 #' + s.indicatorId"
+              :value="s.indicatorId"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="新分数">
+          <el-input-number v-model="correctForm.newScore" :min="0" :max="100" :precision="1" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="修正原因">
+          <el-input v-model="correctForm.reason" type="textarea" :rows="3" placeholder="请输入修正原因" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showCorrectDialog = false">取消</el-button>
+        <el-button type="primary" :loading="correcting" @click="handleCorrect">确认修正</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -103,7 +149,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getScoreResults, saveTeacherScores, publishScore, returnSubmission, startScore, getSubmission } from '@/api/task'
+import { getScoreResults, saveTeacherScores, publishScore, returnSubmission, startScore, getSubmission, getObjectiveScore, correctScore } from '@/api/task'
 import { getParseStatusType, getParseStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
 import type { ScoreResult, Submission } from '@/types'
@@ -118,6 +164,20 @@ const submission = ref<Submission | null>(null)
 const scores = ref<(ScoreResult & { maxScore?: number })[]>([])
 const submissionId = computed(() => Number(route.params.id) || 0)
 const polling = ref<number | null>(null)
+
+// 客观评分
+const showObjectiveDialog = ref(false)
+const objectiveLoading = ref(false)
+const objectiveScore = ref<{ scores: Record<string, number>; total: number } | null>(null)
+
+// 成绩修正
+const showCorrectDialog = ref(false)
+const correcting = ref(false)
+const correctForm = ref<{ indicatorId?: number; newScore: number; reason: string }>({
+  indicatorId: undefined,
+  newScore: 0,
+  reason: '',
+})
 
 async function loadSubmission() {
   if (!submissionId.value) return
@@ -219,6 +279,41 @@ async function handleReturn() {
     router.back()
   } catch {
     // 用户取消
+  }
+}
+
+// 查看客观评分
+async function handleViewObjective() {
+  objectiveLoading.value = true
+  try {
+    const res = await getObjectiveScore(submissionId.value)
+    objectiveScore.value = res.data
+    showObjectiveDialog.value = true
+  } catch {
+    ElMessage.error('加载客观评分失败')
+  } finally {
+    objectiveLoading.value = false
+  }
+}
+
+// 修正成绩
+async function handleCorrect() {
+  if (!correctForm.value.reason.trim()) {
+    ElMessage.warning('请输入修正原因')
+    return
+  }
+  correcting.value = true
+  try {
+    await correctScore(submissionId.value, correctForm.value)
+    ElMessage.success('成绩修正成功')
+    showCorrectDialog.value = false
+    // 重新加载评分和提交信息
+    await loadScores()
+    await loadSubmission()
+  } catch {
+    ElMessage.error('成绩修正失败')
+  } finally {
+    correcting.value = false
   }
 }
 

@@ -98,3 +98,19 @@ export function getAsyncTaskStatusLabel(status: string): string {
   const map: Record<string, string> = { PENDING: '等待中', RUNNING: '处理中', SUCCESS: '已完成', FAILED: '失败' }
   return map[status] || status
 }
+
+export function getMessageTypeType(type: string): string {
+  const map: Record<string, string> = {
+    SUBMIT: 'success', RESUBMIT: 'warning', SCORE_COMPLETE: 'primary',
+    SCORE_PUBLISH: 'success', BATCH_FAIL: 'danger', QUOTA_WARNING: 'warning',
+  }
+  return map[type] || 'info'
+}
+
+export function getMessageTypeLabel(type: string): string {
+  const map: Record<string, string> = {
+    SUBMIT: '提交通知', RESUBMIT: '重提通知', SCORE_COMPLETE: '评分完成',
+    SCORE_PUBLISH: '成绩发布', BATCH_FAIL: '批量失败', QUOTA_WARNING: '配额警告',
+  }
+  return map[type] || type
+}

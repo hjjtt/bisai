@@ -99,6 +99,10 @@ export function batchScore(taskId: number) {
   return post(`/tasks/${taskId}/batch-score`)
 }
 
+export function batchCheck(taskId: number) {
+  return post(`/tasks/${taskId}/batch-check`)
+}
+
 export function getBatchProgress(taskId: number) {
   return get<{ total: number; success: number; failed: number; running: number }>(`/tasks/${taskId}/batch-progress`)
 }
@@ -118,7 +122,35 @@ export function getAsyncTasksByBizId(bizId: number) {
   return get<AsyncTask[]>(`/async-tasks/biz/${bizId}`)
 }
 
-// 下载报告
-export function downloadReport(fileName: string) {
-  return `/api/reports/download/report/${fileName}`
+export function retryAsyncTask(taskId: number) {
+  return post(`/async-tasks/${taskId}/retry`)
 }
+
+export function cancelAsyncTask(taskId: number) {
+  return post(`/async-tasks/${taskId}/cancel`)
+}
+
+// 评分校准
+export interface CalibrationItem {
+  indicatorId: number
+  score: number
+  reason: string
+  advantages: string
+  problems: string
+  deductionBasis: string
+}
+
+export interface CalibrationSaveData {
+  taskId: number
+  submissionId: number
+  items: CalibrationItem[]
+}
+
+export function saveCalibration(data: CalibrationSaveData) {
+  return post('/calibration', data)
+}
+
+export function getCalibrations(taskId: number) {
+  return get<unknown[]>(`/calibration/task/${taskId}`)
+}
+

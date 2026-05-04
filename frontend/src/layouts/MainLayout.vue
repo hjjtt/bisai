@@ -74,7 +74,7 @@
                   </div>
                 </el-scrollbar>
                 <div class="panel-footer">
-                  <el-button type="primary" link @click="$router.push('/admin/logs')">查看全部消息</el-button>
+                  <el-button type="primary" link @click="$router.push(messagesRoute)">查看全部消息</el-button>
                 </div>
               </div>
             </el-popover>
@@ -110,7 +110,7 @@ import { useUserStore } from '@/store/user'
 import { useAppStore } from '@/store/app'
 import { studentRoutes, teacherRoutes, adminRoutes } from '@/router/guards'
 import type { RouteRecordRaw } from 'vue-router'
-import { getMessages, markMessageRead, markAllMessagesRead, getUnreadCount } from '@/api/report'
+import { getMessages, markMessageRead, markAllMessagesRead, getUnreadCount } from '@/api/message'
 import { formatDate } from '@/utils/date'
 import type { Message } from '@/types'
 
@@ -125,6 +125,13 @@ const sidebarCollapsed = computed({
 })
 const userInfo = computed(() => userStore.userInfo)
 const userRole = computed(() => userStore.role)
+
+const messagesRoute = computed(() => {
+  const role = userRole.value
+  if (role === 'ADMIN') return '/admin/messages'
+  if (role === 'TEACHER') return '/teacher/messages'
+  return '/student/messages'
+})
 
 const toggleSidebar = () => {
   appStore.toggleSidebar()

@@ -68,6 +68,13 @@ public class TaskController {
         return taskService.batchScore(id);
     }
 
+    // 批量核查 - 对任务下所有提交触发核查
+    @PostMapping("/{id}/batch-check")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<Map<String, Object>> batchCheck(@PathVariable Long id) {
+        return taskService.batchCheck(id);
+    }
+
     // 批量操作进度查询
     @GetMapping("/{id}/batch-progress")
     public Result<Map<String, Object>> batchProgress(@PathVariable Long id) {

@@ -26,6 +26,8 @@ export interface EvaluationTemplate {
   totalScore: number
   creatorId: number
   status: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 // 评价指标
