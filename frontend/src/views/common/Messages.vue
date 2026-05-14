@@ -14,12 +14,12 @@
       <!-- 筛选区 -->
       <div class="filter-bar">
         <el-select v-model="filter.type" placeholder="按类型筛选" clearable style="width: 160px" @change="loadMessages">
-          <el-option label="提交通知" value="SUBMIT" />
-          <el-option label="重提通知" value="RESUBMIT" />
-          <el-option label="评分完成" value="SCORE_COMPLETE" />
-          <el-option label="成绩发布" value="SCORE_PUBLISH" />
-          <el-option label="批量失败" value="BATCH_FAIL" />
-          <el-option label="配额警告" value="QUOTA_WARNING" />
+          <el-option label="提交通知" value="SUBMISSION" />
+          <el-option label="解析完成" value="AI_PARSE" />
+          <el-option label="核查完成" value="AI_CHECK" />
+          <el-option label="评分完成" value="AI_SCORE" />
+          <el-option label="成绩发布" value="SCORE_PUBLISHED" />
+          <el-option label="成绩修正" value="SCORE_CORRECTED" />
         </el-select>
         <el-select v-model="filter.isRead" placeholder="按已读状态筛选" clearable style="width: 160px" @change="loadMessages">
           <el-option label="未读" :value="false" />
@@ -54,9 +54,10 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="!row.isRead" type="primary" link @click="handleMarkRead(row.id)">标记已读</el-button>
+            <el-button v-if="row.relatedId" type="primary" link @click="handleViewDetail(row)">查看详情</el-button>
+            <el-button v-else-if="!row.isRead" type="primary" link @click="handleMarkRead(row.id)">标记已读</el-button>
             <span v-else class="read-hint">已读</span>
           </template>
         </el-table-column>
@@ -80,6 +81,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getMessages, markMessageRead, markAllMessagesRead, getUnreadCount } from '@/api/message'
 import { getMessageTypeType, getMessageTypeLabel } from '@/utils/status'
@@ -88,6 +90,7 @@ import { useAppStore } from '@/store/app'
 import type { Message } from '@/types'
 
 const appStore = useAppStore()
+const router = useRouter()
 const loading = ref(false)
 const messages = ref<Message[]>([])
 const unreadCount = computed(() => appStore.unreadMessageCount)
@@ -144,6 +147,26 @@ async function handleMarkAllRead() {
     appStore.unreadMessageCount = 0
   } catch (e) {
     console.error('全部标记已读失败:', e)
+  }
+}
+
+function handleViewDetail(row: Message) {
+  if (!row.isRead) handleMarkRead(row.id)
+  const submissionId = row.relatedId
+  if (!submissionId) return
+
+  if (row.type === 'AI_PARSE') {
+    router.push(`/teacher/submissions/${submissionId}/parse`)
+  } else if (row.type === 'AI_CHECK') {
+    router.push(`/teacher/submissions/${submissionId}/check`)
+  } else if (row.type === 'AI_SCORE' || row.type === 'SCORE_COMPLETE') {
+    router.push(`/teacher/submissions/${submissionId}/score`)
+  } else if (row.type === 'SUBMISSION' || row.type === 'RESUBMIT') {
+    router.push(`/teacher/submissions/${submissionId}/preview`)
+  } else if (row.type === 'SCORE_PUBLISHED' || row.type === 'SCORE_CORRECTED') {
+    router.push(`/teacher/submissions/${submissionId}/score`)
+  } else {
+    router.push(`/teacher/submissions`)
   }
 }
 

@@ -53,7 +53,7 @@ public class CaptchaService {
      */
     public boolean isLocked(String username) {
         LoginFailureEntry entry = failureStore.get(username);
-        if (entry == null) return false;
+        if (entry == null || entry.lockUntil == null) return false;
         if (LocalDateTime.now().isAfter(entry.lockUntil)) {
             failureStore.remove(username);
             return false;
@@ -66,7 +66,7 @@ public class CaptchaService {
      */
     public long getLockRemainingMinutes(String username) {
         LoginFailureEntry entry = failureStore.get(username);
-        if (entry == null) return 0;
+        if (entry == null || entry.lockUntil == null) return 0;
         long minutes = java.time.Duration.between(LocalDateTime.now(), entry.lockUntil).toMinutes();
         return Math.max(0, minutes);
     }

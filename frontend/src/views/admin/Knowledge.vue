@@ -151,7 +151,7 @@ const handleDelete = async (row: KnowledgeDocument) => {
 }
 
 const handleFileChange = (_: UploadFile[], fileList: UploadFile[]) => {
-  selectedFile.value = fileList.length > 0 ? fileList[0].raw : null
+  selectedFile.value = fileList.length > 0 ? fileList[0].raw ?? null : null
 }
 
 const handleUpload = async () => {

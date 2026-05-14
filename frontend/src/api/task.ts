@@ -11,11 +11,11 @@ export function getTask(id: number) {
   return get<TrainingTask>(`/tasks/${id}`)
 }
 
-export function createTask(data: Partial<TrainingTask>) {
+export function createTask(data: Record<string, unknown>) {
   return post<TrainingTask>('/tasks', data)
 }
 
-export function updateTask(id: number, data: Partial<TrainingTask>) {
+export function updateTask(id: number, data: Record<string, unknown>) {
   return put<TrainingTask>(`/tasks/${id}`, data)
 }
 

@@ -88,7 +88,7 @@
           <el-table :data="files" size="small" style="width: 100%">
             <el-table-column prop="originalName" label="文件名" min-width="120" show-overflow-tooltip />
             <el-table-column label="操作" width="80">
-              <template #default="{ row }">
+              <template #default>
                 <el-button type="primary" link @click="$router.push(`/teacher/submissions/${submissionId}/preview`)">预览</el-button>
               </template>
             </el-table-column>
@@ -105,14 +105,13 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getSubmission, startParse, getFileList } from '@/api/task'
 import { getParseStatusType, getParseStatusLabel } from '@/utils/status'
-import { formatDate } from '@/utils/date'
-import type { Submission, FileEntity } from '@/types'
+import type { Submission, FileInfo } from '@/types'
 
 const route = useRoute()
 const loading = ref(false)
 const parsing = ref(false)
 const submission = ref<Submission | null>(null)
-const files = ref<FileEntity[]>([])
+const files = ref<FileInfo[]>([])
 const submissionId = computed(() => Number(route.params.id) || 0)
 const polling = ref<number | null>(null)
 

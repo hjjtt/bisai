@@ -167,9 +167,10 @@ async function loadTask() {
     const res = await getTask(taskId.value)
     const data = res.data
     // 处理允许文件类型：后端返回逗号分隔字符串，前端需要数组
-    if (typeof data.allowedFileTypes === 'string') {
-      data.allowedFileTypes = data.allowedFileTypes.split(',').filter(Boolean)
-    } else if (!Array.isArray(data.allowedFileTypes)) {
+    const rawTypes = data.allowedFileTypes as string | FileType[] | undefined
+    if (typeof rawTypes === 'string') {
+      data.allowedFileTypes = rawTypes.split(',').filter(Boolean) as FileType[]
+    } else if (!Array.isArray(rawTypes)) {
       data.allowedFileTypes = []
     }
     // 处理最大文件大小：后端返回字节，前端显示 MB

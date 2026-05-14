@@ -66,7 +66,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getSubmissions, getTaskList, batchParse, batchScore, returnSubmission, startParse, startCheck } from '@/api/task'
+import { getSubmissions, getTaskList, batchParse, batchScore, returnSubmission } from '@/api/task'
 import { getParseStatusType, getParseStatusLabel, getCheckStatusType, getCheckStatusLabel, getScoreStatusType, getScoreStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
 import type { Submission, TrainingTask } from '@/types'
@@ -123,36 +123,6 @@ async function loadTasks() {
     tasks.value = res.data.items
   } catch (e) {
     console.error('加载任务列表失败:', e)
-  }
-}
-
-async function handleParse(id: number) {
-  aiLoading[id] = true
-  try {
-    await startParse(id)
-    ElMessage.success('AI 解析任务已启动')
-    await loadData()
-    startPolling()
-  } catch (e) {
-    console.error('AI 解析失败:', e)
-    ElMessage.error('AI 解析失败')
-  } finally {
-    if (!hasRunningAiTask()) aiLoading[id] = false
-  }
-}
-
-async function handleCheck(id: number) {
-  aiLoading[id] = true
-  try {
-    await startCheck(id)
-    ElMessage.success('AI 核查任务已启动')
-    await loadData()
-    startPolling()
-  } catch (e) {
-    console.error('AI 核查失败:', e)
-    ElMessage.error('AI 核查失败')
-  } finally {
-    if (!hasRunningAiTask()) aiLoading[id] = false
   }
 }
 

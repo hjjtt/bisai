@@ -155,13 +155,87 @@ public class SubmissionService {
 
     @Transactional(rollbackFor = Exception.class)
     public Result<Void> uploadFiles(Long taskId, Long studentId, MultipartFile[] files) throws IOException {
-        // 通过数据库 MAX 查询确定当前最大版本号，避免并发冲突
+        // === 前置校验（在创建提交记录之前） ===
+
+        // 1. 校验任务存在且状态为 PUBLISHED (FILE-001)
+        TrainingTask task = taskMapper.selectById(taskId);
+        if (task == null) {
+            return Result.error(40401, "任务不存在");
+        }
+        if (!"PUBLISHED".equals(task.getStatus())) {
+            return Result.error(40901, "当前任务不可提交");
+        }
+
+        // 2. 校验成绩是否已发布 (FILE-005)
         List<Submission> existing = submissionMapper.selectList(
                 new LambdaQueryWrapper<Submission>()
                         .eq(Submission::getTaskId, taskId)
                         .eq(Submission::getStudentId, studentId)
-                        .select(Submission::getVersion)
         );
+        boolean hasPublished = existing.stream()
+                .anyMatch(s -> "PUBLISHED".equals(s.getScoreStatus()));
+        if (hasPublished) {
+            return Result.error(40902, "成绩已发布，无法重新提交，请联系教师退回");
+        }
+
+        // 3. 先校验所有文件，再创建提交记录 (FILE-002/003/004/006/007)
+        for (MultipartFile file : files) {
+            // 空文件检查 (FILE-004)
+            if (file.isEmpty() || file.getSize() == 0) {
+                return Result.error(40001, "文件不能为空: " + file.getOriginalFilename());
+            }
+
+            String originalName = file.getOriginalFilename();
+            String ext = originalName != null && originalName.contains(".")
+                    ? originalName.substring(originalName.lastIndexOf(".")) : "";
+            String extUpper = ext.replace(".", "").toUpperCase();
+
+            // 全局扩展名校验 (FILE-002)
+            if (extUpper.isEmpty() || !ALLOWED_EXTENSIONS.contains(extUpper)) {
+                return Result.error(40001, "不支持的文件类型: " + ext);
+            }
+
+            // 任务级 allowedFileTypes 校验 (FILE-007)
+            if (task.getAllowedFileTypes() != null && !task.getAllowedFileTypes().isEmpty()) {
+                String[] allowedTypes = task.getAllowedFileTypes().split(",");
+                boolean match = java.util.Arrays.stream(allowedTypes)
+                        .anyMatch(t -> t.trim().equalsIgnoreCase(extUpper));
+                if (!match) {
+                    return Result.error(40001, "该任务不允许上传 " + extUpper + " 格式的文件");
+                }
+            }
+
+            // 任务级 maxFileSize 校验 (FILE-003)
+            if (task.getMaxFileSize() != null && file.getSize() > task.getMaxFileSize()) {
+                return Result.error(40001, "文件大小超过限制: " + originalName
+                        + "（最大 " + (task.getMaxFileSize() / 1024 / 1024) + "MB）");
+            }
+
+            // ZIP 文件路径穿越基础检查 (FILE-006)
+            if ("ZIP".equals(extUpper)) {
+                try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(file.getInputStream())) {
+                    java.util.zip.ZipEntry entry;
+                    while ((entry = zis.getNextEntry()) != null) {
+                        String name = entry.getName();
+                        if (name.contains("..") || name.startsWith("/") || name.startsWith("\\")) {
+                            return Result.error(40001, "ZIP 文件包含不安全的路径: " + name);
+                        }
+                        zis.closeEntry();
+                    }
+                } catch (Exception e) {
+                    return Result.error(40001, "ZIP 文件格式异常: " + e.getMessage());
+                }
+            }
+
+            // 校验 MIME 类型
+            String contentType = file.getContentType();
+            if (contentType != null && !isValidMimeType(contentType, extUpper)) {
+                log.warn("文件MIME类型不匹配: originalName={}, contentType={}, ext={}", originalName, contentType, ext);
+            }
+        }
+
+        // === 所有校验通过，开始创建提交记录 ===
+
         int version = existing.stream()
                 .map(Submission::getVersion)
                 .filter(v -> v != null)
@@ -171,7 +245,6 @@ public class SubmissionService {
 
         // 检查版本数量限制
         if (count >= maxVersions) {
-            // 删除最早的提交记录及其关联文件
             List<Submission> oldSubmissions = submissionMapper.selectList(
                     new LambdaQueryWrapper<Submission>()
                             .eq(Submission::getTaskId, taskId)
@@ -180,9 +253,7 @@ public class SubmissionService {
                             .last("LIMIT " + ((int) count - maxVersions + 1))
             );
             for (Submission old : oldSubmissions) {
-                // 逻辑删除旧提交关联的文件
                 fileMapper.delete(new LambdaQueryWrapper<FileEntity>().eq(FileEntity::getSubmissionId, old.getId()));
-                // 逻辑删除旧提交
                 submissionMapper.deleteById(old.getId());
             }
         }
@@ -205,17 +276,6 @@ public class SubmissionService {
                     ? originalName.substring(originalName.lastIndexOf(".")) : "";
             String extUpper = ext.replace(".", "").toUpperCase();
 
-            // 校验文件扩展名
-            if (extUpper.isEmpty() || !ALLOWED_EXTENSIONS.contains(extUpper)) {
-                return Result.error(40001, "不支持的文件类型: " + ext);
-            }
-
-            // 校验 MIME 类型
-            String contentType = file.getContentType();
-            if (contentType != null && !isValidMimeType(contentType, extUpper)) {
-                log.warn("文件MIME类型不匹配: originalName={}, contentType={}, ext={}", originalName, contentType, ext);
-            }
-
             String storedName = UUID.randomUUID().toString() + ext;
 
             Path baseDir = Paths.get(uploadPath).toAbsolutePath().normalize();
@@ -231,7 +291,7 @@ public class SubmissionService {
             fileEntity.setSubmissionId(submission.getId());
             fileEntity.setOriginalName(originalName);
             fileEntity.setFilePath(filePath.toString());
-            fileEntity.setFileType(ext.replace(".", "").toUpperCase());
+            fileEntity.setFileType(extUpper);
             fileEntity.setFileSize(file.getSize());
             fileEntity.setFileHash(cn.hutool.crypto.digest.DigestUtil.md5Hex(file.getInputStream()));
             fileEntity.setVersion(version);
@@ -240,20 +300,17 @@ public class SubmissionService {
 
         // 发送消息通知教师
         try {
-            TrainingTask task = taskMapper.selectById(taskId);
-            if (task != null) {
-                Course course = courseMapper.selectById(task.getCourseId());
-                if (course != null && course.getTeacherId() != null) {
-                    String courseName = course.getName() != null ? course.getName() : "";
-                    messageService.sendMessage(
-                            course.getTeacherId(),
-                            "SUBMISSION",
-                            "学生提交实训成果",
-                            String.format("学生（ID:%d）已提交任务「%s」的成果文件（课程：%s，版本：%d），请及时处理。",
-                                    studentId, task.getTitle(), courseName, version),
-                            submission.getId()
-                    );
-                }
+            Course course = courseMapper.selectById(task.getCourseId());
+            if (course != null && course.getTeacherId() != null) {
+                String courseName = course.getName() != null ? course.getName() : "";
+                messageService.sendMessage(
+                        course.getTeacherId(),
+                        "SUBMISSION",
+                        "学生提交实训成果",
+                        String.format("学生（ID:%d）已提交任务「%s」的成果文件（课程：%s，版本：%d），请及时处理。",
+                                studentId, task.getTitle(), courseName, version),
+                        submission.getId()
+                );
             }
         } catch (Exception e) {
             log.warn("发送提交通知消息失败: {}", e.getMessage());

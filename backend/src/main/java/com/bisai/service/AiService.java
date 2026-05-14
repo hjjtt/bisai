@@ -122,6 +122,10 @@ public class AiService {
 
             updateTaskProgress(asyncTaskId, 100, "解析完成");
 
+            // 通知教师解析完成
+            notifyTeacher(submission, "AI_PARSE", "智能解析完成",
+                    String.format("提交记录（ID:%d）的智能解析已完成，可查看解析详情。", submissionId));
+
         } catch (Exception e) {
             log.error("智能解析失败, submissionId={}: {}", submissionId, e.getMessage(), e);
             submission.setParseStatus("FAILED");
@@ -223,6 +227,9 @@ public class AiService {
             submissionMapper.updateById(submission);
             updateTaskProgress(asyncTaskId, 100, "核查完成");
             log.info("智能核查完成, submissionId={}, 检查项数={}", submissionId, items.size());
+
+            notifyTeacher(submission, "AI_CHECK", "智能核查完成",
+                    String.format("提交记录（ID:%d）的智能核查已完成，共 %d 条检查项，请查看详情。", submissionId, items.size()));
 
         } catch (Exception e) {
             log.error("智能核查失败, submissionId={}: {}", submissionId, e.getMessage(), e);
@@ -422,21 +429,8 @@ public class AiService {
             submissionMapper.updateById(submission);
 
             // 发送消息通知教师AI评分完成
-            try {
-                Course course = courseMapper.selectById(task.getCourseId());
-                Long teacherId = course != null ? course.getTeacherId() : null;
-                if (teacherId != null) {
-                    messageService.sendMessage(
-                            teacherId,
-                            "AI_SCORE",
-                            "智能评分完成",
-                            String.format("提交记录（ID:%d）的智能评分已完成，请及时复核确认。", submissionId),
-                            submissionId
-                    );
-                }
-            } catch (Exception e) {
-                log.warn("发送AI评分完成消息失败: {}", e.getMessage());
-            }
+            notifyTeacher(submission, "AI_SCORE", "智能评分完成",
+                    String.format("提交记录（ID:%d）的智能评分已完成，请及时复核确认。", submissionId));
 
             log.info("智能评分完成, submissionId={}, 评分项数={}, 总分={}", submissionId, scores.size(), autoTotalScore);
 
@@ -452,6 +446,19 @@ public class AiService {
     }
 
     // ==================== 辅助方法 ====================
+
+    private void notifyTeacher(Submission submission, String type, String title, String content) {
+        try {
+            TrainingTask task = taskMapper.selectById(submission.getTaskId());
+            if (task == null) return;
+            Course course = courseMapper.selectById(task.getCourseId());
+            if (course != null && course.getTeacherId() != null) {
+                messageService.sendMessage(course.getTeacherId(), type, title, content, submission.getId());
+            }
+        } catch (Exception e) {
+            log.warn("发送通知消息失败: {}", e.getMessage());
+        }
+    }
 
     /**
      * 更新异步任务进度

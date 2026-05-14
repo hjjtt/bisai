@@ -1,4 +1,4 @@
-import { get, del, post, put, upload } from '@/utils/request'
+import { get, del, put, upload } from '@/utils/request'
 import type { PageResponse, PageRequest } from '@/types'
 
 export interface KnowledgeDocument {

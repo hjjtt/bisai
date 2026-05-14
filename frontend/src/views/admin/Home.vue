@@ -84,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import { Loading } from '@element-plus/icons-vue'
 import { getAdminStats } from '@/api/dashboard'
@@ -109,7 +109,8 @@ const serverLoad = ref(0)
 async function loadStats() {
   statsLoading.value = true
   try {
-    const res = await getAdminStats()
+    const days = timeRange.value === '30d' ? 30 : 7
+    const res = await getAdminStats(days)
     const d = res.data as BaseStats
     statCards.value[0].value = d.userCount || 0
     statCards.value[0].trend = d.userTrend || 0
@@ -136,36 +137,82 @@ function initChart(data: BaseStats) {
   chartInstance = echarts.init(chartRef.value)
 
   const option: echarts.EChartsOption = {
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['提交数', '解析成功', '评分完成'] },
-    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      borderColor: '#e2e8f0',
+      textStyle: { color: '#1e293b' },
+      padding: [12, 16],
+      extraCssText: 'box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);'
+    },
+    legend: {
+      data: ['提交数', '解析成功', '评分完成'],
+      top: 0,
+      right: '2%',
+      icon: 'circle',
+      itemWidth: 10,
+      itemHeight: 10,
+      textStyle: { color: '#64748b', fontSize: 13 }
+    },
+    grid: { top: 40, left: '2%', right: '3%', bottom: '3%', containLabel: true },
     xAxis: {
       type: 'category',
       boundaryGap: false,
       data: data.dates || [],
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
+      axisLabel: { color: '#64748b', margin: 12 },
+      axisTick: { show: false }
     },
-    yAxis: { type: 'value' },
+    yAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
+      axisLabel: { color: '#64748b' }
+    },
     series: [
       {
         name: '提交数',
         type: 'line',
         smooth: true,
+        showSymbol: false,
+        symbolSize: 8,
         data: data.submissions || [],
         itemStyle: { color: '#3b82f6' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(59, 130, 246, 0.25)' },
+            { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+          ])
+        }
       },
       {
         name: '解析成功',
         type: 'line',
         smooth: true,
+        showSymbol: false,
+        symbolSize: 8,
         data: data.parsed || [],
         itemStyle: { color: '#10b981' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(16, 185, 129, 0.25)' },
+            { offset: 1, color: 'rgba(16, 185, 129, 0.05)' }
+          ])
+        }
       },
       {
         name: '评分完成',
         type: 'line',
         smooth: true,
+        showSymbol: false,
+        symbolSize: 8,
         data: data.scored || [],
         itemStyle: { color: '#f59e0b' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(245, 158, 11, 0.25)' },
+            { offset: 1, color: 'rgba(245, 158, 11, 0.05)' }
+          ])
+        }
       },
     ],
   }
@@ -181,6 +228,8 @@ onMounted(() => {
   loadStats()
   window.addEventListener('resize', handleResize)
 })
+
+watch(timeRange, () => loadStats())
 
 onUnmounted(() => {
   chartInstance?.dispose()

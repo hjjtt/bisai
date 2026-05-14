@@ -101,5 +101,6 @@ export interface Message {
   title: string
   content: string
   isRead: boolean
+  relatedId: number | null
   createdAt: string
 }

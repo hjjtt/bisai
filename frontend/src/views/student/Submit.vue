@@ -72,9 +72,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import type { UploadFile, UploadInstance, UploadRawFile } from 'element-plus'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRoute } from 'vue-router'
+import type { UploadFile, UploadRawFile } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { getTask, getSubmissions, uploadFiles, getAsyncTasksByBizId } from '@/api/task'
 import { getParseStatusType, getParseStatusLabel, getScoreStatusType, getScoreStatusLabel, getAsyncTaskStatusType, getAsyncTaskStatusLabel } from '@/utils/status'
@@ -82,8 +82,6 @@ import { formatDate } from '@/utils/date'
 import type { TrainingTask, Submission } from '@/types'
 
 const route = useRoute()
-const router = useRouter()
-const uploadRef = ref<UploadInstance>()
 const uploading = ref(false)
 const uploadProgress = ref(0)
 const task = ref<TrainingTask | null>(null)
@@ -128,6 +126,24 @@ async function submitUpload() {
   if (selectedFiles.value.length === 0) {
     ElMessage.warning('请选择要上传的文件')
     return
+  }
+
+  // 纯图片提交提醒
+  const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'bmp', 'webp'])
+  const allImages = selectedFiles.value.every(f => {
+    const ext = f.name.split('.').pop()?.toLowerCase() ?? ''
+    return IMAGE_EXTS.has(ext)
+  })
+  if (allImages) {
+    try {
+      await ElMessageBox.confirm(
+        '您上传的全部是图片文件，AI 解析效果可能不佳。建议上传 Word/PDF 等文档文件，图片可作为补充材料一起提交。',
+        '提交提醒',
+        { confirmButtonText: '仍然提交', cancelButtonText: '返回修改', type: 'warning' }
+      )
+    } catch {
+      return
+    }
   }
 
   uploading.value = true
@@ -175,7 +191,7 @@ function startProgressPolling() {
       if (tasksRes.data.length === 0) return
 
       // 获取最新的任务（PARSE 任务）
-      const parseTask = tasksRes.data.find(t => true) // 取第一个
+      const parseTask = tasksRes.data[0]
       if (!parseTask) return
 
       aiTaskProgress.value = parseTask.progress || 0

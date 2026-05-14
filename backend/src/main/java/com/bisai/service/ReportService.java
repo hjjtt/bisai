@@ -721,7 +721,7 @@ public class ReportService {
 
                 // 可视化图表 - 班级成绩分布图
                 try {
-                    DefaultPieDataset pieDataset = new DefaultPieDataset();
+                    DefaultPieDataset<String> pieDataset = new DefaultPieDataset<>();
                     long excellent = scoredSubmissions.stream().filter(s -> s.getTotalScore().compareTo(BigDecimal.valueOf(90)) >= 0).count();
                     long good = scoredSubmissions.stream().filter(s -> s.getTotalScore().compareTo(BigDecimal.valueOf(80)) >= 0 && s.getTotalScore().compareTo(BigDecimal.valueOf(90)) < 0).count();
                     long pass = scoredSubmissions.stream().filter(s -> s.getTotalScore().compareTo(BigDecimal.valueOf(60)) >= 0 && s.getTotalScore().compareTo(BigDecimal.valueOf(80)) < 0).count();

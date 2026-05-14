@@ -3,8 +3,10 @@ package com.bisai.service;
 import com.bisai.common.PageResult;
 import com.bisai.common.Result;
 import com.bisai.dto.PageQuery;
+import com.bisai.entity.AsyncTask;
 import com.bisai.entity.Submission;
 import com.bisai.entity.TrainingTask;
+import com.bisai.mapper.AsyncTaskMapper;
 import com.bisai.mapper.SubmissionMapper;
 import com.bisai.mapper.TrainingTaskMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -17,7 +19,9 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -27,6 +31,7 @@ public class TaskService {
     private final TrainingTaskMapper taskMapper;
     private final SubmissionMapper submissionMapper;
     private final AsyncTaskService asyncTaskService;
+    private final AsyncTaskMapper asyncTaskMapper;
 
     private static final Map<Long, BatchJob> activeJobs = new ConcurrentHashMap<>();
 
@@ -55,12 +60,20 @@ public class TaskService {
     }
 
     public Result<TrainingTask> createTask(TrainingTask task) {
+        if (task.getStartTime() != null && task.getEndTime() != null
+                && !task.getEndTime().isAfter(task.getStartTime())) {
+            return Result.error(40001, "截止时间必须晚于开始时间");
+        }
         task.setStatus("DRAFT");
         taskMapper.insert(task);
         return Result.ok(task);
     }
 
     public Result<TrainingTask> updateTask(Long id, TrainingTask task) {
+        if (task.getStartTime() != null && task.getEndTime() != null
+                && !task.getEndTime().isAfter(task.getStartTime())) {
+            return Result.error(40001, "截止时间必须晚于开始时间");
+        }
         task.setId(id);
         taskMapper.updateById(task);
         return Result.ok(taskMapper.selectById(id));
@@ -73,6 +86,10 @@ public class TaskService {
         }
         if (!"DRAFT".equals(task.getStatus())) {
             return Result.error(40902, "只有草稿状态的任务可以发布");
+        }
+        if (task.getStartTime() != null && task.getEndTime() != null
+                && !task.getEndTime().isAfter(task.getStartTime())) {
+            return Result.error(40001, "截止时间必须晚于开始时间");
         }
         task.setStatus("PUBLISHED");
         taskMapper.updateById(task);
@@ -90,7 +107,7 @@ public class TaskService {
     }
 
     /**
-     * 批量解析 - 使用异步任务队列，控制并发
+     * 批量解析 - 使用异步任务队列，控制并发，DB 级去重
      */
     public Result<Map<String, Object>> batchParse(Long taskId) {
         if (activeJobs.containsKey(taskId)) {
@@ -106,11 +123,25 @@ public class TaskService {
                 new LambdaQueryWrapper<Submission>().eq(Submission::getTaskId, taskId)
         );
 
-        // 先注册活跃任务，防止竞态
-        activeJobs.put(taskId, new BatchJob(taskId, "PARSE", submissions.size()));
+        // DB 级去重：跳过已有 PENDING/RUNNING/RETRYING/SUCCESS 同类型任务的提交
+        Set<Long> busyBizIds = asyncTaskMapper.selectList(
+                new LambdaQueryWrapper<AsyncTask>()
+                        .eq(AsyncTask::getTaskType, "PARSE")
+                        .in(AsyncTask::getStatus, "PENDING", "RUNNING", "RETRYING", "SUCCESS")
+        ).stream().map(AsyncTask::getBizId).collect(Collectors.toSet());
+
+        List<Submission> toProcess = submissions.stream()
+                .filter(sub -> !busyBizIds.contains(sub.getId()))
+                .toList();
+
+        if (toProcess.isEmpty()) {
+            return Result.error(40901, "没有需要处理的提交（已全部处理或正在处理中）");
+        }
+
+        activeJobs.put(taskId, new BatchJob(taskId, "PARSE", toProcess.size()));
 
         int created = 0;
-        for (Submission sub : submissions) {
+        for (Submission sub : toProcess) {
             sub.setParseStatus("PARSING");
             submissionMapper.updateById(sub);
             asyncTaskService.createTask("PARSE", sub.getId());
@@ -120,11 +151,12 @@ public class TaskService {
         Map<String, Object> result = new HashMap<>();
         result.put("total", submissions.size());
         result.put("created", created);
+        result.put("skipped", submissions.size() - created);
         return Result.ok(result);
     }
 
     /**
-     * 批量评分 - 使用异步任务队列，控制并发
+     * 批量评分 - 使用异步任务队列，控制并发，DB 级去重
      */
     public Result<Map<String, Object>> batchScore(Long taskId) {
         if (activeJobs.containsKey(taskId)) {
@@ -140,11 +172,24 @@ public class TaskService {
                 new LambdaQueryWrapper<Submission>().eq(Submission::getTaskId, taskId)
         );
 
-        // 先注册活跃任务，防止竞态
-        activeJobs.put(taskId, new BatchJob(taskId, "SCORE", submissions.size()));
+        Set<Long> busyBizIds = asyncTaskMapper.selectList(
+                new LambdaQueryWrapper<AsyncTask>()
+                        .eq(AsyncTask::getTaskType, "SCORE")
+                        .in(AsyncTask::getStatus, "PENDING", "RUNNING", "RETRYING", "SUCCESS")
+        ).stream().map(AsyncTask::getBizId).collect(Collectors.toSet());
+
+        List<Submission> toProcess = submissions.stream()
+                .filter(sub -> !busyBizIds.contains(sub.getId()))
+                .toList();
+
+        if (toProcess.isEmpty()) {
+            return Result.error(40901, "没有需要处理的提交（已全部处理或正在处理中）");
+        }
+
+        activeJobs.put(taskId, new BatchJob(taskId, "SCORE", toProcess.size()));
 
         int created = 0;
-        for (Submission sub : submissions) {
+        for (Submission sub : toProcess) {
             sub.setScoreStatus("SCORING");
             submissionMapper.updateById(sub);
             asyncTaskService.createTask("SCORE", sub.getId());
@@ -154,11 +199,12 @@ public class TaskService {
         Map<String, Object> result = new HashMap<>();
         result.put("total", submissions.size());
         result.put("created", created);
+        result.put("skipped", submissions.size() - created);
         return Result.ok(result);
     }
 
     /**
-     * 批量核查 - 使用异步任务队列，控制并发
+     * 批量核查 - 使用异步任务队列，控制并发，DB 级去重
      */
     public Result<Map<String, Object>> batchCheck(Long taskId) {
         if (activeJobs.containsKey(taskId)) {
@@ -174,11 +220,24 @@ public class TaskService {
                 new LambdaQueryWrapper<Submission>().eq(Submission::getTaskId, taskId)
         );
 
-        // 先注册活跃任务，防止竞态
-        activeJobs.put(taskId, new BatchJob(taskId, "CHECK", submissions.size()));
+        Set<Long> busyBizIds = asyncTaskMapper.selectList(
+                new LambdaQueryWrapper<AsyncTask>()
+                        .eq(AsyncTask::getTaskType, "CHECK")
+                        .in(AsyncTask::getStatus, "PENDING", "RUNNING", "RETRYING", "SUCCESS")
+        ).stream().map(AsyncTask::getBizId).collect(Collectors.toSet());
+
+        List<Submission> toProcess = submissions.stream()
+                .filter(sub -> !busyBizIds.contains(sub.getId()))
+                .toList();
+
+        if (toProcess.isEmpty()) {
+            return Result.error(40901, "没有需要处理的提交（已全部处理或正在处理中）");
+        }
+
+        activeJobs.put(taskId, new BatchJob(taskId, "CHECK", toProcess.size()));
 
         int created = 0;
-        for (Submission sub : submissions) {
+        for (Submission sub : toProcess) {
             sub.setCheckStatus("CHECKING");
             submissionMapper.updateById(sub);
             asyncTaskService.createTask("CHECK", sub.getId());
@@ -188,38 +247,66 @@ public class TaskService {
         Map<String, Object> result = new HashMap<>();
         result.put("total", submissions.size());
         result.put("created", created);
+        result.put("skipped", submissions.size() - created);
         return Result.ok(result);
     }
 
     /**
-     * 查询批量操作进度
+     * 查询批量操作进度（区分解析/核查/评分三类状态）
      */
     public Result<Map<String, Object>> getBatchProgress(Long taskId) {
         Long total = submissionMapper.selectCount(
                 new LambdaQueryWrapper<Submission>().eq(Submission::getTaskId, taskId)
         );
+
+        // 解析状态统计
         Long parsed = submissionMapper.selectCount(
                 new LambdaQueryWrapper<Submission>()
                         .eq(Submission::getTaskId, taskId)
                         .eq(Submission::getParseStatus, "SUCCESS")
         );
+        Long parseFailed = submissionMapper.selectCount(
+                new LambdaQueryWrapper<Submission>()
+                        .eq(Submission::getTaskId, taskId)
+                        .likeRight(Submission::getParseStatus, "FAILED")
+        );
+
+        // 核查状态统计
+        Long checked = submissionMapper.selectCount(
+                new LambdaQueryWrapper<Submission>()
+                        .eq(Submission::getTaskId, taskId)
+                        .eq(Submission::getCheckStatus, "SUCCESS")
+        );
+        Long checkFailed = submissionMapper.selectCount(
+                new LambdaQueryWrapper<Submission>()
+                        .eq(Submission::getTaskId, taskId)
+                        .likeRight(Submission::getCheckStatus, "CHECK_FAILED")
+        );
+
+        // 评分状态统计
         Long scored = submissionMapper.selectCount(
                 new LambdaQueryWrapper<Submission>()
                         .eq(Submission::getTaskId, taskId)
                         .eq(Submission::getScoreStatus, "AI_SCORED")
+                        .or().eq(Submission::getScoreStatus, "TEACHER_CONFIRMED")
+                        .or().eq(Submission::getScoreStatus, "PUBLISHED")
         );
-        Long failed = submissionMapper.selectCount(
+        Long scoreFailed = submissionMapper.selectCount(
                 new LambdaQueryWrapper<Submission>()
                         .eq(Submission::getTaskId, taskId)
-                        .in(Submission::getParseStatus, "FAILED")
+                        .likeRight(Submission::getScoreStatus, "SCORE_FAILED")
         );
 
         Map<String, Object> progress = new HashMap<>();
         progress.put("total", total);
         progress.put("parsed", parsed);
+        progress.put("checked", checked);
         progress.put("scored", scored);
-        progress.put("failed", failed);
-        progress.put("running", Math.max(0, total - parsed - failed));
+        progress.put("parseFailed", parseFailed);
+        progress.put("checkFailed", checkFailed);
+        progress.put("scoreFailed", scoreFailed);
+        progress.put("totalFailed", parseFailed + checkFailed + scoreFailed);
+        progress.put("running", Math.max(0, total - parsed - parseFailed));
         return Result.ok(progress);
     }
 

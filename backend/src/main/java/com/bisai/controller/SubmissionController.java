@@ -109,7 +109,8 @@ public class SubmissionController {
                 ? com.bisai.util.JsonUtil.convertList(scoresObj, com.bisai.entity.ScoreResult.class)
                 : List.of();
         String comment = (String) body.get("comment");
-        return scoreService.saveTeacherScores(id, scores, comment);
+        String expectedUpdatedAt = (String) body.get("expectedUpdatedAt");
+        return scoreService.saveTeacherScores(id, scores, comment, expectedUpdatedAt);
     }
 
     // 发布成绩

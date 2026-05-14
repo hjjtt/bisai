@@ -29,7 +29,7 @@ public class DashboardController {
 
     @GetMapping("/admin")
     @PreAuthorize("hasRole('ADMIN')")
-    public Result<DashboardStats.AdminStats> adminStats() {
-        return Result.ok(dashboardService.getAdminStats());
+    public Result<DashboardStats.AdminStats> adminStats(@RequestParam(defaultValue = "7") int days) {
+        return Result.ok(dashboardService.getAdminStats(days));
     }
 }

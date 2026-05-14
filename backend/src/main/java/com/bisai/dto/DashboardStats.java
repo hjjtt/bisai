@@ -33,12 +33,22 @@ public class DashboardStats {
     @Data
     public static class AdminStats {
         private long userCount;
+        private double userTrend;
         private long classCount;
+        private double classTrend;
         private long courseCount;
         private long taskCount;
+        private double taskTrend;
         private long submissionCount;
         private long todayError;
+        private double errorTrend;
         private List<Map<String, Object>> recentLogs;
         private List<Map<String, Object>> systemStatus;
+        private double apiUsage;
+        private double serverLoad;
+        private List<String> dates;
+        private List<Long> submissions;
+        private List<Long> parsed;
+        private List<Long> scored;
     }
 }

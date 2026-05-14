@@ -230,9 +230,15 @@ public class AsyncTaskService {
 
         task.setStatus("PENDING");
         task.setRetryCount(0);
-        task.setErrorMessage(null);
         task.setNextRunAt(LocalDateTime.now());
         asyncTaskMapper.updateById(task);
+
+        // 显式清空 error_message（updateById 默认忽略 null）
+        com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<AsyncTask> updateWrapper =
+                new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<AsyncTask>()
+                        .eq("id", taskId)
+                        .set("error_message", null);
+        asyncTaskMapper.update(null, updateWrapper);
         return true;
     }
 

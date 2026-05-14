@@ -8,6 +8,6 @@ export function getTeacherStats() {
   return get('/dashboard/teacher')
 }
 
-export function getAdminStats() {
-  return get('/dashboard/admin')
+export function getAdminStats(days?: number) {
+  return get('/dashboard/admin', days ? { days } : undefined)
 }

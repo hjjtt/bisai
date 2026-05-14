@@ -49,6 +49,8 @@ logging:
     com.bisai.mapper: warn
     com.bisai.service: info
     com.bisai.controller: info
+    "[org.apache.fontbox]": error
+    "[org.apache.pdfbox.pdmodel.font.FileSystemFontProvider]": error
 
 # 文件存储
 file:

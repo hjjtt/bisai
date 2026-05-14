@@ -74,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getTaskList, getSubmissions } from '@/api/task'
 import { exportStudentReport as exportStudentReportApi, exportClassReport as exportClassReportApi } from '@/api/report'

@@ -178,10 +178,22 @@ public class ScoreService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Result<Void> saveTeacherScores(Long submissionId, List<ScoreResult> scores, String comment) {
+    public Result<Void> saveTeacherScores(Long submissionId, List<ScoreResult> scores, String comment, String expectedUpdatedAt) {
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
+        }
+
+        // 成绩已发布时禁止普通保存，必须走修正流程
+        if ("PUBLISHED".equals(submission.getScoreStatus())) {
+            return Result.error(40901, "成绩已发布，如需修改请使用成绩修正功能");
+        }
+
+        // 并发冲突检查：传入的 updatedAt 与数据库不一致说明数据已被其他人修改
+        if (expectedUpdatedAt != null && !expectedUpdatedAt.isEmpty() && submission.getUpdatedAt() != null) {
+            if (!submission.getUpdatedAt().toString().equals(expectedUpdatedAt)) {
+                return Result.error(40902, "数据已被其他人修改，请刷新页面后重新操作");
+            }
         }
 
         // 获取任务评分模板的所有指标（用于权重计算）
