@@ -3,7 +3,7 @@
     <!-- 欢迎区域 -->
     <header class="welcome-section">
       <div class="welcome-text">
-        <h2>你好，{{ userInfo?.realName || '学生' }}</h2>
+        <h2>你好，{{ userInfo?.realName || userInfo?.username || getRoleLabel(userStore.role) }}</h2>
         <p class="subtitle">欢迎回到实训成果智能核查系统，开始今天的学习吧。</p>
       </div>
       <div class="date-display">
@@ -69,7 +69,7 @@ import { ref, computed, onMounted } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import { getStudentStats } from '@/api/dashboard'
-import { getSubmitStatusType } from '@/utils/status'
+import { getSubmitStatusType, getRoleLabel } from '@/utils/status'
 import { formatDateShort } from '@/utils/date'
 import type { TrainingTask } from '@/types'
 

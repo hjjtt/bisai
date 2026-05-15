@@ -9,9 +9,7 @@
               <template #prefix><el-icon><Search /></el-icon></template>
             </el-input>
             <el-select v-model="roleFilter" placeholder="角色筛选" clearable @change="loadUsers" style="width: 120px">
-              <el-option label="学生" value="STUDENT" />
-              <el-option label="教师" value="TEACHER" />
-              <el-option label="管理员" value="ADMIN" />
+              <el-option v-for="role in ROLE_OPTIONS" :key="role.value" :label="role.label" :value="role.value" />
             </el-select>
             <el-button type="primary" @click="showDialog()">新增用户</el-button>
           </div>
@@ -69,9 +67,7 @@
         </el-form-item>
         <el-form-item label="角色" prop="role">
           <el-select v-model="userForm.role" style="width: 100%">
-            <el-option label="学生" value="STUDENT" />
-            <el-option label="教师" value="TEACHER" />
-            <el-option label="管理员" value="ADMIN" />
+            <el-option v-for="role in ROLE_OPTIONS" :key="role.value" :label="role.label" :value="role.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="班级" v-if="userForm.role === 'STUDENT'" prop="classId">
@@ -98,7 +94,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { getUserList, createUser, updateUser, resetPassword, toggleUserStatus } from '@/api/user'
 import { getClassList } from '@/api/course'
-import { getRoleLabel, getRoleType } from '@/utils/status'
+import { getRoleLabel, getRoleType, ROLE_OPTIONS } from '@/utils/status'
 import type { UserInfo, ClassInfo, UserRole } from '@/types'
 
 const loading = ref(false)

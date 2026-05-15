@@ -23,6 +23,7 @@ public class DashboardService {
     private final MessageMapper messageMapper;
     private final CheckResultMapper checkResultMapper;
     private final AsyncTaskMapper asyncTaskMapper;
+    private final AiCallLogMapper aiCallLogMapper;
 
     public DashboardStats.StudentStats getStudentStats(Long userId) {
         DashboardStats.StudentStats stats = new DashboardStats.StudentStats();
@@ -270,9 +271,18 @@ public class DashboardService {
         statusList.add(buildStatus("异步任务队列", "success", "运行中"));
         stats.setSystemStatus(statusList);
 
-        // API 用量（基于 ai_call_log）
-        stats.setApiUsage(0);
-        stats.setServerLoad(0);
+        // API 用量：今日已用 Token / 每日配额(200000)
+        LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
+        long todayTokens = aiCallLogMapper.sumTotalTokens(todayStart, LocalDateTime.now());
+        long dailyTokenLimit = 200000L;
+        stats.setApiUsage(Math.min(100, Math.round((double) todayTokens / dailyTokenLimit * 10000.0) / 100.0));
+
+        // 服务器负载：今日失败调用数 / 今日总调用数
+        long totalCalls = aiCallLogMapper.selectCount(
+                new LambdaQueryWrapper<AiCallLog>().ge(AiCallLog::getCreatedAt, todayStart));
+        long failedCalls = aiCallLogMapper.selectCount(
+                new LambdaQueryWrapper<AiCallLog>().ge(AiCallLog::getCreatedAt, todayStart).eq(AiCallLog::getSuccess, false));
+        stats.setServerLoad(totalCalls == 0 ? 0 : Math.min(100, Math.round((double) failedCalls / totalCalls * 10000.0) / 100.0));
 
         // 最近7天图表数据
         List<String> dates = new ArrayList<>();

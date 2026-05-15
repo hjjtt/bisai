@@ -82,7 +82,7 @@
           <el-dropdown @command="handleCommand">
             <div class="user-info">
               <span class="welcome">欢迎您，</span>
-              <span class="username">{{ userInfo?.realName || '管理员' }}</span>
+              <span class="username">{{ userInfo?.realName || userInfo?.username || getRoleLabel(userStore.role) }}</span>
               <el-avatar :size="32" icon="UserFilled" class="user-avatar" />
             </div>
             <template #dropdown>
@@ -112,6 +112,7 @@ import { studentRoutes, teacherRoutes, adminRoutes } from '@/router/guards'
 import type { RouteRecordRaw } from 'vue-router'
 import { getMessages, markMessageRead, markAllMessagesRead, getUnreadCount } from '@/api/message'
 import { formatDate } from '@/utils/date'
+import { getRoleLabel } from '@/utils/status'
 import type { Message } from '@/types'
 
 const route = useRoute()

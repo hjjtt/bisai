@@ -56,6 +56,12 @@ export function getRoleType(role: string): string {
   return map[role] || 'info'
 }
 
+export const ROLE_OPTIONS = [
+  { label: '学生', value: 'STUDENT' },
+  { label: '教师', value: 'TEACHER' },
+  { label: '管理员', value: 'ADMIN' }
+]
+
 export function getKnowledgeStatusType(status: string): string {
   switch (status) {
     case 'SUCCESS':
