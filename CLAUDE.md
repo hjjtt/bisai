@@ -38,7 +38,7 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 - **AI**: ModelScope 平台，Qwen3.5-35B-A3B 聊天模型 + 中文句向量模型，支持 RAG 知识库检索增强
 
 ### 后端包结构 (`com.bisai`)
-- `controller/` — REST API（17个），使用 `@PreAuthorize` 做角色控制
+- `controller/` — REST API（16个），使用 `@PreAuthorize` 做角色控制
 - `service/` — 业务逻辑层，核心：`AiService`（解析/核查/评分）、`KnowledgeService`（知识库管理）、`ScoreService`（评分流程）、`ModelScopeClient`（AI调用封装）
 - `entity/` — MyBatis-Plus 实体，核心业务表已启用 `@TableLogic` 逻辑删除
 - `mapper/` — MyBatis-Plus Mapper 接口
@@ -64,6 +64,19 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 ### 知识库 RAG
 `KnowledgeService` 处理文档上传→解析→分块(1200字符)→向量化。`KnowledgeRetrievalService` 两阶段检索（向量 Top-20 + 可选 Rerank Top-5），为 AI 评分提供上下文。
 
+### 核心状态机
+
+提交(Submission) 三条并行状态流：
+- **parseStatus**: `PENDING` → `PARSING` → `SUCCESS` / `FAILED`
+- **checkStatus**: `NOT_CHECKED` → `CHECKING` → `SUCCESS` / `CHECK_FAILED`
+- **scoreStatus**: `NOT_SCORED` → `SCORING` → `AI_SCORED` → `TEACHER_CONFIRMED` → `PUBLISHED`（或 `SCORE_FAILED` / `RETURNED`）
+
+任务(TrainingTask) 状态：`DRAFT` → `PUBLISHED` → `CLOSED` / `ARCHIVED`
+
+异步任务(AsyncTask) 状态：`PENDING` → `RUNNING` → `SUCCESS` / `FAILED`（失败可重试：`RETRYING` → `RUNNING`）
+
+前端状态标签统一在 `utils/status.ts` 管理，禁止在组件中硬编码状态映射。
+
 ## Conventions
 - 前端使用中文界面，代码注释中文，变量名英文
 - 后端 API 响应统一用 `Result<T>` 包装
@@ -74,6 +87,25 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 - 热部署已禁用（devtools `restart.enabled: false`），修改 Java 代码后需手动重启
 - MyBatis 日志使用 `Slf4jImpl`（非 `StdOutImpl`），避免定时任务刷屏
 - `JsonUtil` 已注册 `JavaTimeModule`，反序列化含 `LocalDateTime` 的对象不会报错
+
+## Pitfalls
+
+### 实体类命名
+- 班级实体叫 `ClassEntity`，不是 `ClassInfo`，引用时注意区分
+- 前端消息类型中文件实体是 `FileInfo`，不是 `FileEntity`
+
+### MyBatis-Plus 空值陷阱
+- `updateById()` 默认不更新 null 字段。需要清空字段时必须用 `UpdateWrapper.set("column", null)`
+
+### TypeScript 6.0.3
+- `tsconfig.app.json` 必须保留 `"ignoreDeprecations": "6.0"`，TS 6.0.3 的 `baseUrl` 已废弃，不加会报 TS5101
+
+### 关键方法签名
+- `ScoreService.saveTeacherScores()` 接收 4 个参数：`(Long submissionId, List<ScoreResult>, String comment, String expectedUpdatedAt)`，其中 `expectedUpdatedAt` 用于乐观锁
+- `DashboardService.getAdminStats()` 接收 `int days` 参数控制图表天数范围
+
+### 管理后台数据
+- 仪表盘不接受硬编码 0 或假数据，所有统计必须来自数据库查询
 
 ## Agent skills
 

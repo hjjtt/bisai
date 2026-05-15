@@ -120,13 +120,7 @@ public class DashboardService {
         List<Long> courseIds = courses.stream().map(Course::getId).collect(Collectors.toList());
 
         if (courseIds.isEmpty()) {
-            stats.setPendingScore(0L);
-            stats.setPendingReview(0L);
-            stats.setHighRisk(0L);
-            stats.setCompleted(0L);
-            stats.setPendingReviews(Collections.emptyList());
-            stats.setHighRiskSubmissions(Collections.emptyList());
-            return stats;
+            return emptyTeacherStats(stats);
         }
 
         // 教师的任务
@@ -136,13 +130,7 @@ public class DashboardService {
         List<Long> taskIds = tasks.stream().map(TrainingTask::getId).collect(Collectors.toList());
 
         if (taskIds.isEmpty()) {
-            stats.setPendingScore(0L);
-            stats.setPendingReview(0L);
-            stats.setHighRisk(0L);
-            stats.setCompleted(0L);
-            stats.setPendingReviews(Collections.emptyList());
-            stats.setHighRiskSubmissions(Collections.emptyList());
-            return stats;
+            return emptyTeacherStats(stats);
         }
 
         // 待评价（未评分的提交）
@@ -167,7 +155,7 @@ public class DashboardService {
         );
         Set<Long> highRiskSubmissionIds = highRiskResults.stream()
                 .map(CheckResult::getSubmissionId).collect(Collectors.toSet());
-        stats.setHighRisk((long) highRiskSubmissionIds.size());
+        stats.setHighRisk(highRiskSubmissionIds.size());
 
         // 已完成
         Long completed = submissionMapper.selectCount(
@@ -189,32 +177,19 @@ public class DashboardService {
         stats.setPendingReviews(pendingReviews);
 
         // 高风险列表 - 批量查询避免N+1
-        List<Map<String, Object>> highRiskList = new ArrayList<>();
         if (!highRiskSubmissionIds.isEmpty()) {
             List<Submission> highRiskSubs = submissionMapper.selectList(new LambdaQueryWrapper<Submission>().in(Submission::getId, highRiskSubmissionIds));
-            Set<Long> studentIds = highRiskSubs.stream().map(Submission::getStudentId).filter(Objects::nonNull).collect(Collectors.toSet());
-            Set<Long> hrTaskIds = highRiskSubs.stream().map(Submission::getTaskId).filter(Objects::nonNull).collect(Collectors.toSet());
-
-            Map<Long, User> studentMap = studentIds.isEmpty() ? Map.of() :
-                    userMapper.selectList(new LambdaQueryWrapper<User>().in(User::getId, studentIds)).stream().collect(Collectors.toMap(User::getId, u -> u));
-            Map<Long, TrainingTask> taskMap = hrTaskIds.isEmpty() ? Map.of() :
-                    taskMapper.selectList(new LambdaQueryWrapper<TrainingTask>().in(TrainingTask::getId, hrTaskIds)).stream().collect(Collectors.toMap(TrainingTask::getId, t -> t));
             Map<Long, CheckResult> crMap = highRiskResults.stream()
                     .collect(Collectors.toMap(CheckResult::getSubmissionId, cr -> cr, (a, b) -> a));
-
-            for (Submission sub : highRiskSubs) {
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("id", sub.getId());
-                User student = studentMap.get(sub.getStudentId());
-                item.put("studentName", student != null ? student.getRealName() : "");
-                TrainingTask task = taskMap.get(sub.getTaskId());
-                item.put("title", task != null ? task.getTitle() : "");
-                CheckResult cr = crMap.get(sub.getId());
+            List<Map<String, Object>> baseList = buildSubmissionList(highRiskSubs);
+            for (Map<String, Object> item : baseList) {
+                CheckResult cr = crMap.get((Long) item.get("id"));
                 item.put("riskReason", cr != null ? cr.getDescription() : "");
-                highRiskList.add(item);
             }
+            stats.setHighRiskSubmissions(baseList);
+        } else {
+            stats.setHighRiskSubmissions(List.of());
         }
-        stats.setHighRiskSubmissions(highRiskList);
 
         return stats;
     }
@@ -265,10 +240,10 @@ public class DashboardService {
 
         // 系统状态
         List<Map<String, Object>> statusList = new ArrayList<>();
-        statusList.add(buildStatus("数据库服务", "success", "运行正常"));
-        statusList.add(buildStatus("AI 模型服务", "success", "Qwen3.5-35B"));
-        statusList.add(buildStatus("文件存储", "success", "正常运行"));
-        statusList.add(buildStatus("异步任务队列", "success", "运行中"));
+        statusList.add(buildStatus("数据库服务", "运行正常"));
+        statusList.add(buildStatus("AI 模型服务", "Qwen3.5-35B"));
+        statusList.add(buildStatus("文件存储", "正常运行"));
+        statusList.add(buildStatus("异步任务队列", "运行中"));
         stats.setSystemStatus(statusList);
 
         // API 用量：今日已用 Token / 每日配额(200000)
@@ -321,10 +296,10 @@ public class DashboardService {
         return Math.round((double)(current - previous) / previous * 10000.0) / 100.0;
     }
 
-    private Map<String, Object> buildStatus(String name, String type, String text) {
+    private Map<String, Object> buildStatus(String name, String text) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("name", name);
-        m.put("type", type);
+        m.put("type", "success");
         m.put("text", text);
         return m;
     }
@@ -352,5 +327,15 @@ public class DashboardService {
             list.add(item);
         }
         return list;
+    }
+
+    private DashboardStats.TeacherStats emptyTeacherStats(DashboardStats.TeacherStats stats) {
+        stats.setPendingScore(0L);
+        stats.setPendingReview(0L);
+        stats.setHighRisk(0L);
+        stats.setCompleted(0L);
+        stats.setPendingReviews(Collections.emptyList());
+        stats.setHighRiskSubmissions(Collections.emptyList());
+        return stats;
     }
 }
