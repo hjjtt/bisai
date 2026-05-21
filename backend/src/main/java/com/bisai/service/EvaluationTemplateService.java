@@ -22,6 +22,11 @@ public class EvaluationTemplateService {
     private final EvaluationTemplateMapper templateMapper;
     private final IndicatorMapper indicatorMapper;
 
+    public boolean isOwner(Long templateId, Long userId) {
+        EvaluationTemplate template = templateMapper.selectById(templateId);
+        return template != null && userId.equals(template.getCreatorId());
+    }
+
     public Result<PageResult<EvaluationTemplate>> listTemplates(PageQuery query) {
         Page<EvaluationTemplate> page = new Page<>(query.getPage(), query.getSize());
         LambdaQueryWrapper<EvaluationTemplate> wrapper = new LambdaQueryWrapper<>();

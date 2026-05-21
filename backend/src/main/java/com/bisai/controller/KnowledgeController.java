@@ -5,8 +5,10 @@ import com.bisai.common.Result;
 import com.bisai.dto.PageQuery;
 import com.bisai.entity.KnowledgeDocument;
 import com.bisai.service.KnowledgeService;
+import com.bisai.service.PermissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,6 +20,7 @@ import java.util.Map;
 public class KnowledgeController {
 
     private final KnowledgeService knowledgeService;
+    private final PermissionService permissionService;
 
     @GetMapping
     public Result<PageResult<KnowledgeDocument>> list(PageQuery query) {
@@ -39,7 +42,13 @@ public class KnowledgeController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Void> delete(@PathVariable Long id) {
+    public Result<Void> delete(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream().findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("");
+        if (!permissionService.isAdmin(role) && !knowledgeService.isOwner(id, userId)) {
+            return Result.error(40301, "无权删除该文档");
+        }
         return knowledgeService.deleteDocument(id);
     }
 
@@ -48,7 +57,13 @@ public class KnowledgeController {
      */
     @PutMapping("/{id}/toggle")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Void> toggleStatus(@PathVariable Long id, @RequestBody Map<String, Boolean> body) {
+    public Result<Void> toggleStatus(@PathVariable Long id, @RequestBody Map<String, Boolean> body, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream().findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("");
+        if (!permissionService.isAdmin(role) && !knowledgeService.isOwner(id, userId)) {
+            return Result.error(40301, "无权操作该文档");
+        }
         Boolean enabled = body.get("enabled");
         return knowledgeService.toggleDocumentStatus(id, enabled);
     }

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -22,15 +23,35 @@ public class SystemService {
     private final AiConfig aiConfig;
     private final ModelScopeClient modelScopeClient;
 
+    private static final Set<String> ALLOWED_CONFIG_KEYS = Set.of(
+            "ai.api-key", "ai.chat-model", "ai.embedding-model", "ai.rerank-model",
+            "ai.api-url", "ai.max-tokens", "ai.daily-token-limit", "ai.daily-call-limit"
+    );
+
+    private static final Set<String> SENSITIVE_KEY_PATTERNS = Set.of(
+            "api-key", "apikey", "password", "secret", "token"
+    );
+
     public Result<Map<String, String>> getConfig() {
         List<SystemConfig> configs = configMapper.selectList(null);
         Map<String, String> map = new HashMap<>();
-        configs.forEach(c -> map.put(c.getConfigKey(), c.getConfigValue()));
+        configs.forEach(c -> {
+            String key = c.getConfigKey();
+            String value = c.getConfigValue();
+            if (isSensitiveKey(key) && value != null && value.length() > 4) {
+                value = "****" + value.substring(value.length() - 4);
+            }
+            map.put(key, value);
+        });
         return Result.ok(map);
     }
 
     public Result<Void> updateConfig(Map<String, String> configMap) {
         configMap.forEach((key, value) -> {
+            if (!ALLOWED_CONFIG_KEYS.contains(key)) {
+                log.warn("拒绝修改未授权的配置项: {}", key);
+                return;
+            }
             SystemConfig existing = configMapper.selectOne(
                     new LambdaQueryWrapper<SystemConfig>().eq(SystemConfig::getConfigKey, key)
             );
@@ -45,6 +66,12 @@ public class SystemService {
             }
         });
         return Result.ok();
+    }
+
+    private boolean isSensitiveKey(String key) {
+        if (key == null) return false;
+        String lower = key.toLowerCase();
+        return SENSITIVE_KEY_PATTERNS.stream().anyMatch(lower::contains);
     }
 
     /**

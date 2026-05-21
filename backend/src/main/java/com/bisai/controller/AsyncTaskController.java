@@ -89,7 +89,16 @@ public class AsyncTaskController {
 
     @PostMapping("/batch-status")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Map<String, Long>> getBatchStatus(@RequestBody List<Long> taskIds) {
+    public Result<Map<String, Long>> getBatchStatus(@RequestBody List<Long> taskIds, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream().findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("");
+        if (!permissionService.isAdmin(role)) {
+            taskIds = taskIds.stream().filter(tid -> {
+                AsyncTask task = asyncTaskService.getTaskStatus(tid);
+                return task != null && permissionService.isTeacherOwnerOfSubmission(task.getBizId(), userId);
+            }).toList();
+        }
         return Result.ok(asyncTaskService.getBatchStatus(taskIds));
     }
 }

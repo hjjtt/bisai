@@ -84,6 +84,8 @@ public class TaskService {
             return Result.error(40001, "截止时间必须晚于开始时间");
         }
         task.setStatus("DRAFT");
+        task.setId(null);
+        task.setDeleted(null);
         taskMapper.insert(task);
         return Result.ok(task);
     }
@@ -97,6 +99,9 @@ public class TaskService {
             return Result.error(40001, "截止时间必须晚于开始时间");
         }
         task.setId(id);
+        task.setCourseId(null);
+        task.setStatus(null);
+        task.setDeleted(null);
         taskMapper.updateById(task);
         return Result.ok(taskMapper.selectById(id));
     }

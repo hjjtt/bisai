@@ -48,7 +48,12 @@ public class UserService {
     }
 
     public Result<User> createUser(User user) {
-        // 检查用户名唯一
+        if (user.getUsername() == null || user.getUsername().isBlank()) {
+            return Result.error(40001, "用户名不能为空");
+        }
+        if (user.getPassword() == null || user.getPassword().isBlank()) {
+            return Result.error(40001, "密码不能为空");
+        }
         Long count = userMapper.selectCount(
                 new LambdaQueryWrapper<User>().eq(User::getUsername, user.getUsername())
         );
@@ -58,6 +63,8 @@ public class UserService {
 
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setStatus("ENABLED");
+        user.setId(null);
+        user.setDeleted(null);
         userMapper.insert(user);
         user.setPassword(null);
         return Result.ok(user);
@@ -70,7 +77,10 @@ public class UserService {
         }
 
         user.setId(id);
-        user.setPassword(null); // 不允许通过此接口修改密码
+        user.setPassword(null);
+        user.setRole(null);
+        user.setStatus(null);
+        user.setDeleted(null);
         userMapper.updateById(user);
 
         User updated = userMapper.selectById(id);

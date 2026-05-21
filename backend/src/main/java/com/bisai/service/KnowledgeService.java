@@ -10,11 +10,13 @@ import com.bisai.entity.KnowledgeDocument;
 import com.bisai.entity.FileEntity;
 import com.bisai.entity.DocumentChunk;
 import com.bisai.entity.ParseResult;
+import com.bisai.entity.Course;
 import com.bisai.mapper.DocumentChunkMapper;
 import com.bisai.mapper.FileMapper;
 import com.bisai.mapper.KnowledgeBaseMapper;
 import com.bisai.mapper.KnowledgeDocumentMapper;
 import com.bisai.mapper.ParseResultMapper;
+import com.bisai.mapper.CourseMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -48,9 +50,16 @@ public class KnowledgeService {
     private final ModelScopeClient aiClient;
     private final ObjectMapper objectMapper;
     private final Executor aiTaskExecutor;
+    private final CourseMapper courseMapper;
 
     @Value("${file.upload-path:./data/files}")
     private String uploadPath;
+
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            "DOC", "DOCX", "PDF", "TXT", "MD", "JPG", "JPEG", "PNG", "XLS", "XLSX", "PPT", "PPTX"
+    );
+
+    private static final long MAX_FILE_SIZE = 50 * 1024 * 1024;
 
     public KnowledgeService(KnowledgeDocumentMapper documentMapper,
                             KnowledgeBaseMapper knowledgeBaseMapper,
@@ -60,7 +69,8 @@ public class KnowledgeService {
                             DocumentTextExtractor documentTextExtractor,
                             ModelScopeClient aiClient,
                             ObjectMapper objectMapper,
-                            @Qualifier("aiTaskExecutor") Executor aiTaskExecutor) {
+                            @Qualifier("aiTaskExecutor") Executor aiTaskExecutor,
+                            CourseMapper courseMapper) {
         this.documentMapper = documentMapper;
         this.knowledgeBaseMapper = knowledgeBaseMapper;
         this.fileMapper = fileMapper;
@@ -70,6 +80,16 @@ public class KnowledgeService {
         this.aiClient = aiClient;
         this.objectMapper = objectMapper;
         this.aiTaskExecutor = aiTaskExecutor;
+        this.courseMapper = courseMapper;
+    }
+
+    public boolean isOwner(Long documentId, Long userId) {
+        KnowledgeDocument doc = documentMapper.selectById(documentId);
+        if (doc == null || doc.getKnowledgeBaseId() == null) return false;
+        KnowledgeBase kb = knowledgeBaseMapper.selectById(doc.getKnowledgeBaseId());
+        if (kb == null || kb.getCourseId() == null) return false;
+        Course course = courseMapper.selectById(kb.getCourseId());
+        return course != null && userId.equals(course.getTeacherId());
     }
 
     public Result<PageResult<KnowledgeDocument>> listDocuments(PageQuery query) {
@@ -113,11 +133,23 @@ public class KnowledgeService {
     public Result<KnowledgeDocument> uploadDocument(MultipartFile file, Long courseId) {
         try {
             String originalName = file.getOriginalFilename();
+            if (originalName == null || originalName.isBlank()) {
+                return Result.error("文件名不能为空");
+            }
 
-            // 保存文件到磁盘
-            String ext = originalName != null && originalName.contains(".")
-                    ? originalName.substring(originalName.lastIndexOf(".")) : "";
-            String storedName = UUID.randomUUID().toString() + ext;
+            String ext = originalName.contains(".")
+                    ? originalName.substring(originalName.lastIndexOf(".") + 1).toUpperCase()
+                    : "";
+            if (!ALLOWED_EXTENSIONS.contains(ext)) {
+                return Result.error("不支持的文件类型，允许: " + String.join(", ", ALLOWED_EXTENSIONS));
+            }
+
+            if (file.getSize() > MAX_FILE_SIZE) {
+                return Result.error("文件大小不能超过 50MB");
+            }
+
+            String storedExt = originalName.substring(originalName.lastIndexOf("."));
+            String storedName = UUID.randomUUID().toString() + storedExt;
             Path baseDir = Paths.get(uploadPath).toAbsolutePath().normalize();
             Path dir = baseDir.resolve("knowledge");
             Files.createDirectories(dir);
@@ -142,7 +174,7 @@ public class KnowledgeService {
             fileEntity.setKnowledgeDocumentId(doc.getId());
             fileEntity.setOriginalName(originalName);
             fileEntity.setFilePath(filePath.toString());
-            fileEntity.setFileType(ext.replace(".", "").toUpperCase());
+            fileEntity.setFileType(ext);
             fileEntity.setFileSize(file.getSize());
             fileEntity.setFileHash(cn.hutool.crypto.digest.DigestUtil.md5Hex(file.getInputStream()));
             fileMapper.insert(fileEntity);

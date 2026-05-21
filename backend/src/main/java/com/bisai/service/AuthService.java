@@ -36,7 +36,16 @@ public class AuthService {
         }
 
         // 验证码校验（如果提供了验证码）
-        if (request.getCaptchaUuid() != null && request.getCaptchaCode() != null) {
+        int failureCount = captchaService.getFailureCount(username);
+        boolean captchaRequired = failureCount >= 3;
+        if (captchaRequired) {
+            if (request.getCaptchaUuid() == null || request.getCaptchaCode() == null) {
+                return Result.error(40003, "请输入验证码");
+            }
+            if (!captchaService.verifyCaptcha(request.getCaptchaUuid(), request.getCaptchaCode())) {
+                return Result.error(40003, "验证码错误或已过期");
+            }
+        } else if (request.getCaptchaUuid() != null && request.getCaptchaCode() != null) {
             if (!captchaService.verifyCaptcha(request.getCaptchaUuid(), request.getCaptchaCode())) {
                 return Result.error(40003, "验证码错误或已过期");
             }
@@ -63,7 +72,7 @@ public class AuthService {
             if (remaining <= 0) {
                 return Result.error(40102, "密码错误次数过多，账号已锁定 " + LOCK_DURATION_MINUTES + " 分钟");
             }
-            return Result.error(40101, "用户名或密码错误（剩余" + remaining + "次机会）");
+            return Result.error(40101, "用户名或密码错误");
         }
 
         // 登录成功，清除失败记录
