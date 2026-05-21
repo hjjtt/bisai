@@ -5,6 +5,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,6 +16,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+@Slf4j
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -30,23 +32,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @org.springframework.lang.NonNull FilterChain filterChain) throws ServletException, IOException {
         String token = resolveToken(request);
 
-        if (StringUtils.hasText(token) && !jwtUtil.isTokenExpired(token)) {
-            Long userId = jwtUtil.getUserId(token);
-            String username = jwtUtil.getUsername(token);
-            String role = jwtUtil.getRole(token);
+        if (StringUtils.hasText(token)) {
+            if (!jwtUtil.isTokenExpired(token)) {
+                Long userId = jwtUtil.getUserId(token);
+                String username = jwtUtil.getUsername(token);
+                String role = jwtUtil.getRole(token);
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            userId, null,
-                            List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                    );
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userId, null,
+                                List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                        );
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // 将用户信息放入请求属性，方便后续使用
-            request.setAttribute("userId", userId);
-            request.setAttribute("username", username);
-            request.setAttribute("role", role);
+                request.setAttribute("userId", userId);
+                request.setAttribute("username", username);
+                request.setAttribute("role", role);
+            } else {
+                String path = request.getRequestURI();
+                if (!path.startsWith("/api/auth/")) {
+                    log.debug("JWT token无效或已过期: path={}, ip={}", path, request.getRemoteAddr());
+                }
+            }
         }
 
         filterChain.doFilter(request, response);

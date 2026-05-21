@@ -63,7 +63,15 @@ public class FileController {
             return ResponseEntity.status(403).build();
         }
 
-        Path path = Path.of(fileEntity.getFilePath());
+        Path path = Path.of(fileEntity.getFilePath()).normalize();
+        Path basePath = Path.of("./data/files/").normalize().toAbsolutePath();
+        if (!path.isAbsolute()) {
+            path = basePath.resolve(path).normalize();
+        }
+        if (!path.toAbsolutePath().startsWith(basePath)) {
+            log.warn("文件路径遍历攻击检测: fileId={}, path={}", fileId, fileEntity.getFilePath());
+            return ResponseEntity.status(403).build();
+        }
         if (!path.toFile().exists()) {
             return ResponseEntity.notFound().build();
         }
@@ -108,7 +116,15 @@ public class FileController {
             return ResponseEntity.status(403).build();
         }
 
-        Path path = Path.of(fileEntity.getFilePath());
+        Path path = Path.of(fileEntity.getFilePath()).normalize();
+        Path basePath = Path.of("./data/files/").normalize().toAbsolutePath();
+        if (!path.isAbsolute()) {
+            path = basePath.resolve(path).normalize();
+        }
+        if (!path.toAbsolutePath().startsWith(basePath)) {
+            log.warn("文件路径遍历攻击检测: fileId={}, path={}", fileId, fileEntity.getFilePath());
+            return ResponseEntity.status(403).build();
+        }
         if (!path.toFile().exists()) {
             return ResponseEntity.notFound().build();
         }

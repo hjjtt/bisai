@@ -26,6 +26,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal")
     public Result<User> get(@PathVariable Long id) {
         return userService.getUser(id);
     }

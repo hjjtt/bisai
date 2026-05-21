@@ -31,11 +31,24 @@ public class ScoreService {
     private final ParseResultMapper parseResultMapper;
     private final AsyncTaskService asyncTaskService;
     private final ScoreCorrectionMapper scoreCorrectionMapper;
+    private final PermissionService permissionService;
+
+    /**
+     * 校验教师对提交的操作权限
+     */
+    private Result<Void> checkTeacherAccess(Long submissionId, Long userId, String role) {
+        if (permissionService.isAdmin(role)) return Result.ok();
+        if (permissionService.isTeacherOwnerOfSubmission(submissionId, userId)) return Result.ok();
+        return Result.error(40301, "无权操作该提交");
+    }
 
     /**
      * 触发智能解析
      */
-    public Result<Void> triggerParse(Long submissionId) {
+    public Result<Void> triggerParse(Long submissionId, Long userId, String role) {
+        Result<Void> accessCheck = checkTeacherAccess(submissionId, userId, role);
+        if (accessCheck.getCode() != 0) return accessCheck;
+
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
@@ -60,7 +73,10 @@ public class ScoreService {
     /**
      * 触发智能核查
      */
-    public Result<Void> triggerCheck(Long submissionId) {
+    public Result<Void> triggerCheck(Long submissionId, Long userId, String role) {
+        Result<Void> accessCheck = checkTeacherAccess(submissionId, userId, role);
+        if (accessCheck.getCode() != 0) return accessCheck;
+
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
@@ -85,7 +101,10 @@ public class ScoreService {
     /**
      * 触发智能评分
      */
-    public Result<Void> triggerScore(Long submissionId) {
+    public Result<Void> triggerScore(Long submissionId, Long userId, String role) {
+        Result<Void> accessCheck = checkTeacherAccess(submissionId, userId, role);
+        if (accessCheck.getCode() != 0) return accessCheck;
+
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
@@ -118,14 +137,20 @@ public class ScoreService {
         );
     }
 
-    public Result<List<CheckResult>> getCheckResults(Long submissionId) {
+    public Result<List<CheckResult>> getCheckResults(Long submissionId, Long userId, String role) {
+        Result<Void> accessCheck = checkTeacherAccess(submissionId, userId, role);
+        if (accessCheck.getCode() != 0) return Result.error(accessCheck.getCode(), accessCheck.getMessage());
+
         List<CheckResult> results = checkResultMapper.selectList(
                 new LambdaQueryWrapper<CheckResult>().eq(CheckResult::getSubmissionId, submissionId)
         );
         return Result.ok(results);
     }
 
-    public Result<List<ScoreResult>> getScoreResults(Long submissionId) {
+    public Result<List<ScoreResult>> getScoreResults(Long submissionId, Long userId, String role) {
+        Result<Void> accessCheck = checkTeacherAccess(submissionId, userId, role);
+        if (accessCheck.getCode() != 0) return Result.error(accessCheck.getCode(), accessCheck.getMessage());
+
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
@@ -215,7 +240,10 @@ public class ScoreService {
 
         return Result.ok(results);
     }
-    public Result<Void> saveTeacherScores(Long submissionId, List<ScoreResult> scores, String comment, String expectedUpdatedAt) {
+    public Result<Void> saveTeacherScores(Long submissionId, List<ScoreResult> scores, String comment, String expectedUpdatedAt, Long userId, String role) {
+        Result<Void> accessCheck = checkTeacherAccess(submissionId, userId, role);
+        if (accessCheck.getCode() != 0) return accessCheck;
+
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
@@ -306,7 +334,10 @@ public class ScoreService {
         return Result.ok();
     }
 
-    public Result<Void> publishScore(Long submissionId) {
+    public Result<Void> publishScore(Long submissionId, Long userId, String role) {
+        Result<Void> accessCheck = checkTeacherAccess(submissionId, userId, role);
+        if (accessCheck.getCode() != 0) return accessCheck;
+
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
@@ -331,7 +362,10 @@ public class ScoreService {
         return Result.ok();
     }
 
-    public Result<Void> returnSubmission(Long submissionId, String reason) {
+    public Result<Void> returnSubmission(Long submissionId, String reason, Long userId, String role) {
+        Result<Void> accessCheck = checkTeacherAccess(submissionId, userId, role);
+        if (accessCheck.getCode() != 0) return accessCheck;
+
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
@@ -344,7 +378,10 @@ public class ScoreService {
     /**
      * 客观评分 - 基于明确规则自动计算
      */
-    public Result<Map<String, Object>> calculateObjectiveScore(Long submissionId) {
+    public Result<Map<String, Object>> calculateObjectiveScore(Long submissionId, Long userId, String role) {
+        Result<Void> accessCheck = checkTeacherAccess(submissionId, userId, role);
+        if (accessCheck.getCode() != 0) return Result.error(accessCheck.getCode(), accessCheck.getMessage());
+
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
@@ -458,7 +495,10 @@ public class ScoreService {
      * 成绩修正流程
      */
     @Transactional(rollbackFor = Exception.class)
-    public Result<Void> correctScore(Long submissionId, Long indicatorId, BigDecimal newScore, String reason, Long correctedBy) {
+    public Result<Void> correctScore(Long submissionId, Long indicatorId, BigDecimal newScore, String reason, Long correctedBy, String role) {
+        Result<Void> accessCheck = checkTeacherAccess(submissionId, correctedBy, role);
+        if (accessCheck.getCode() != 0) return accessCheck;
+
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");

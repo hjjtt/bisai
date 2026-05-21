@@ -84,11 +84,15 @@ public class UserService {
             return Result.error(40401, "用户不存在");
         }
         user.setPassword(passwordEncoder.encode("123456"));
+        user.setMustChangePassword(true);
         userMapper.updateById(user);
         return Result.ok();
     }
 
     public Result<Void> toggleStatus(Long id, String status) {
+        if (!java.util.List.of("ENABLED", "DISABLED").contains(status)) {
+            return Result.error(40001, "无效的状态值");
+        }
         User user = userMapper.selectById(id);
         if (user == null) {
             return Result.error(40401, "用户不存在");

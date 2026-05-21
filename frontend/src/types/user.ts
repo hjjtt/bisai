@@ -18,6 +18,8 @@ export interface UserInfo {
 export interface LoginRequest {
   username: string
   password: string
+  captchaUuid?: string
+  captchaCode?: string
 }
 
 // 登录响应

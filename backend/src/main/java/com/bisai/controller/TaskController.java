@@ -7,6 +7,7 @@ import com.bisai.entity.TrainingTask;
 import com.bisai.service.TaskService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -21,64 +22,107 @@ public class TaskController {
     @GetMapping
     public Result<PageResult<TrainingTask>> list(PageQuery query,
                                                   @RequestParam(required = false) Long courseId,
-                                                  @RequestParam(required = false) String status) {
-        return taskService.listTasks(query, courseId, status);
+                                                  @RequestParam(required = false) String status,
+                                                  Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return taskService.listTasks(query, courseId, status, userId, role);
     }
 
     @GetMapping("/{id}")
-    public Result<TrainingTask> get(@PathVariable Long id) {
-        return taskService.getTask(id);
+    public Result<TrainingTask> get(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return taskService.getTask(id, userId, role);
     }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<TrainingTask> create(@RequestBody TrainingTask task) {
-        return taskService.createTask(task);
+    public Result<TrainingTask> create(@RequestBody TrainingTask task, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        return taskService.createTask(task, userId);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<TrainingTask> update(@PathVariable Long id, @RequestBody TrainingTask task) {
-        return taskService.updateTask(id, task);
+    public Result<TrainingTask> update(@PathVariable Long id, @RequestBody TrainingTask task, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return taskService.updateTask(id, task, userId, role);
     }
 
     @PutMapping("/{id}/publish")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Void> publish(@PathVariable Long id) {
-        return taskService.publishTask(id);
+    public Result<Void> publish(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return taskService.publishTask(id, userId, role);
     }
 
     @PutMapping("/{id}/close")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Void> close(@PathVariable Long id) {
-        return taskService.closeTask(id);
+    public Result<Void> close(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return taskService.closeTask(id, userId, role);
     }
 
-    // 批量解析 - 对任务下所有提交触发解析
     @PostMapping("/{id}/batch-parse")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Map<String, Object>> batchParse(@PathVariable Long id) {
-        return taskService.batchParse(id);
+    public Result<Map<String, Object>> batchParse(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return taskService.batchParse(id, userId, role);
     }
 
-    // 批量评分 - 对任务下所有提交触发评分
     @PostMapping("/{id}/batch-score")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Map<String, Object>> batchScore(@PathVariable Long id) {
-        return taskService.batchScore(id);
+    public Result<Map<String, Object>> batchScore(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return taskService.batchScore(id, userId, role);
     }
 
-    // 批量核查 - 对任务下所有提交触发核查
     @PostMapping("/{id}/batch-check")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Map<String, Object>> batchCheck(@PathVariable Long id) {
-        return taskService.batchCheck(id);
+    public Result<Map<String, Object>> batchCheck(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return taskService.batchCheck(id, userId, role);
     }
 
-    // 批量操作进度查询
     @GetMapping("/{id}/batch-progress")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Map<String, Object>> batchProgress(@PathVariable Long id) {
-        return taskService.getBatchProgress(id);
+    public Result<Map<String, Object>> batchProgress(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return taskService.getBatchProgress(id, userId, role);
     }
 }

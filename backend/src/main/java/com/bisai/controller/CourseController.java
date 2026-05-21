@@ -7,6 +7,7 @@ import com.bisai.entity.Course;
 import com.bisai.service.CourseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -23,13 +24,19 @@ public class CourseController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Course> create(@RequestBody Course course) {
-        return courseService.createCourse(course);
+    public Result<Course> create(@RequestBody Course course, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        return courseService.createCourse(course, userId);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Course> update(@PathVariable Long id, @RequestBody Course course) {
-        return courseService.updateCourse(id, course);
+    public Result<Course> update(@PathVariable Long id, @RequestBody Course course, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return courseService.updateCourse(id, course, userId, role);
     }
 }

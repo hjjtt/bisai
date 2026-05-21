@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 public class CourseService {
 
     private final CourseMapper courseMapper;
+    private final PermissionService permissionService;
 
     public Result<PageResult<Course>> listCourses(PageQuery query) {
         Page<Course> page = new Page<>(query.getPage(), query.getSize());
@@ -29,13 +30,17 @@ public class CourseService {
         return Result.ok(new PageResult<>(result.getRecords(), result.getCurrent(), result.getSize(), result.getTotal()));
     }
 
-    public Result<Course> createCourse(Course course) {
+    public Result<Course> createCourse(Course course, Long userId) {
+        course.setTeacherId(userId);
         course.setStatus("ENABLED");
         courseMapper.insert(course);
         return Result.ok(course);
     }
 
-    public Result<Course> updateCourse(Long id, Course course) {
+    public Result<Course> updateCourse(Long id, Course course, Long userId, String role) {
+        if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfCourse(id, userId)) {
+            return Result.error(40301, "无权操作该课程");
+        }
         course.setId(id);
         courseMapper.updateById(course);
         return Result.ok(courseMapper.selectById(id));

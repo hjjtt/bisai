@@ -82,16 +82,19 @@ public class AsyncTaskService {
      * 执行单个任务
      */
     private void executeTask(AsyncTask task) {
-        // 使用乐观锁防止重复执行
-        AsyncTask fresh = asyncTaskMapper.selectById(task.getId());
-        if (fresh == null || !"PENDING".equals(fresh.getStatus()) && !"RETRYING".equals(fresh.getStatus())) {
-            return;
-        }
+        // 使用 CAS 更新防止并发执行
+        com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<AsyncTask> casWrapper =
+                new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<AsyncTask>()
+                        .eq("id", task.getId())
+                        .in("status", "PENDING", "RETRYING")
+                        .set("status", "RUNNING")
+                        .set("progress", 5)
+                        .set("current_step", "任务开始执行...");
+        int updated = asyncTaskMapper.update(null, casWrapper);
+        if (updated == 0) return;
 
-        fresh.setStatus("RUNNING");
-        fresh.setProgress(5);
-        fresh.setCurrentStep("任务开始执行...");
-        asyncTaskMapper.updateById(fresh);
+        AsyncTask fresh = asyncTaskMapper.selectById(task.getId());
+        if (fresh == null) return;
 
         try {
             switch (fresh.getTaskType()) {

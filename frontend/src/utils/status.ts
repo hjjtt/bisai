@@ -1,22 +1,34 @@
 // 统一的状态映射工具函数
 
 export function getParseStatusType(status: string): string {
-  const map: Record<string, string> = { PENDING: 'info', PARSING: 'warning', SUCCESS: 'success', FAILED: 'danger' }
+  const map: Record<string, string> = {
+    PENDING: 'info', PARSING: 'warning', SUCCESS: 'success', FAILED: 'danger',
+    RETRYING: 'warning', CANCELLED: 'info',
+  }
   return map[status] || 'info'
 }
 
 export function getParseStatusLabel(status: string): string {
-  const map: Record<string, string> = { PENDING: '待解析', PARSING: '解析中', SUCCESS: '已完成', FAILED: '失败' }
+  const map: Record<string, string> = {
+    PENDING: '待解析', PARSING: '解析中', SUCCESS: '已完成', FAILED: '失败',
+    RETRYING: '重试中', CANCELLED: '已取消',
+  }
   return map[status] || status
 }
 
 export function getCheckStatusType(status?: string): string {
-  const map: Record<string, string> = { NOT_CHECKED: 'info', CHECKING: 'warning', SUCCESS: 'success', CHECK_FAILED: 'danger' }
+  const map: Record<string, string> = {
+    NOT_CHECKED: 'info', CHECKING: 'warning', SUCCESS: 'success', CHECK_FAILED: 'danger',
+    RETRYING: 'warning', CANCELLED: 'info',
+  }
   return map[status || 'NOT_CHECKED'] || 'info'
 }
 
 export function getCheckStatusLabel(status?: string): string {
-  const map: Record<string, string> = { NOT_CHECKED: '未核查', CHECKING: '核查中', SUCCESS: '已完成', CHECK_FAILED: '失败' }
+  const map: Record<string, string> = {
+    NOT_CHECKED: '未核查', CHECKING: '核查中', SUCCESS: '已完成', CHECK_FAILED: '失败',
+    RETRYING: '重试中', CANCELLED: '已取消',
+  }
   return map[status || 'NOT_CHECKED'] || status || '未核查'
 }
 
@@ -46,12 +58,14 @@ export function getSubmitStatusType(status: string): string {
   return map[status] || 'info'
 }
 
-export function getRoleLabel(role: string): string {
+export function getRoleLabel(role?: string | null): string {
+  if (!role) return ''
   const map: Record<string, string> = { STUDENT: '学生', TEACHER: '教师', ADMIN: '管理员' }
   return map[role] || role
 }
 
-export function getRoleType(role: string): string {
+export function getRoleType(role?: string | null): string {
+  if (!role) return 'info'
   const map: Record<string, string> = { STUDENT: 'info', TEACHER: 'success', ADMIN: 'warning' }
   return map[role] || 'info'
 }
@@ -76,12 +90,18 @@ export function getKnowledgeStatusType(status: string): string {
 }
 
 export function getResultType(result: string): string {
-  const map: Record<string, string> = { PASS: 'success', WARNING: 'warning', FAIL: 'danger' }
+  const map: Record<string, string> = {
+    PASS: 'success', WARNING: 'warning', FAIL: 'danger',
+    COMPLETED: 'success', PARTIAL: 'warning', NOT_COMPLETED: 'danger',
+  }
   return map[result] || 'info'
 }
 
 export function getResultLabel(result: string): string {
-  const map: Record<string, string> = { PASS: '通过', WARNING: '警告', FAIL: '不通过' }
+  const map: Record<string, string> = {
+    PASS: '通过', WARNING: '警告', FAIL: '不通过',
+    COMPLETED: '已完成', PARTIAL: '部分完成', NOT_COMPLETED: '未完成',
+  }
   return map[result] || result
 }
 
@@ -96,12 +116,18 @@ export function getRiskLabel(level: string): string {
 }
 
 export function getAsyncTaskStatusType(status: string): string {
-  const map: Record<string, string> = { PENDING: 'info', RUNNING: 'warning', SUCCESS: 'success', FAILED: 'danger' }
+  const map: Record<string, string> = {
+    PENDING: 'info', RUNNING: 'warning', SUCCESS: 'success', FAILED: 'danger',
+    RETRYING: 'warning', CANCELLED: 'info',
+  }
   return map[status] || 'info'
 }
 
 export function getAsyncTaskStatusLabel(status: string): string {
-  const map: Record<string, string> = { PENDING: '等待中', RUNNING: '处理中', SUCCESS: '已完成', FAILED: '失败' }
+  const map: Record<string, string> = {
+    PENDING: '等待中', RUNNING: '处理中', SUCCESS: '已完成', FAILED: '失败',
+    RETRYING: '重试中', CANCELLED: '已取消',
+  }
   return map[status] || status
 }
 

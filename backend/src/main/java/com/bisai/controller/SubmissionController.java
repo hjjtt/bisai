@@ -48,6 +48,7 @@ public class SubmissionController {
     }
 
     @PostMapping("/{taskId}/files")
+    @PreAuthorize("hasRole('STUDENT')")
     public Result<Void> uploadFiles(@PathVariable Long taskId,
                                      @RequestParam("files") MultipartFile[] files,
                                      Authentication auth) {
@@ -72,36 +73,61 @@ public class SubmissionController {
     // 智能解析 - 触发解析任务
     @PostMapping("/{id}/parse")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Void> triggerParse(@PathVariable Long id) {
-        return scoreService.triggerParse(id);
+    public Result<Void> triggerParse(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return scoreService.triggerParse(id, userId, role);
     }
 
     // 智能核查 - 触发核查任务
     @PostMapping("/{id}/check")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Void> triggerCheck(@PathVariable Long id) {
-        return scoreService.triggerCheck(id);
+    public Result<Void> triggerCheck(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return scoreService.triggerCheck(id, userId, role);
     }
 
     // 智能评分 - 触发评分任务
     @PostMapping("/{id}/score")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Void> triggerScore(@PathVariable Long id) {
-        return scoreService.triggerScore(id);
+    public Result<Void> triggerScore(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return scoreService.triggerScore(id, userId, role);
     }
 
     // 智能核查结果
     @GetMapping("/{id}/check-results")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<List<com.bisai.entity.CheckResult>> getCheckResults(@PathVariable Long id) {
-        return scoreService.getCheckResults(id);
+    public Result<List<com.bisai.entity.CheckResult>> getCheckResults(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return scoreService.getCheckResults(id, userId, role);
     }
 
     // 智能评分结果
     @GetMapping("/{id}/scores")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<List<com.bisai.entity.ScoreResult>> getScoreResults(@PathVariable Long id) {
-        return scoreService.getScoreResults(id);
+    public Result<List<com.bisai.entity.ScoreResult>> getScoreResults(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return scoreService.getScoreResults(id, userId, role);
     }
 
     // 学生查看已发布成绩
@@ -115,35 +141,56 @@ public class SubmissionController {
     @PutMapping("/{id}/scores")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Void> saveTeacherScores(@PathVariable Long id,
-                                           @RequestBody Map<String, Object> body) {
+                                           @RequestBody Map<String, Object> body,
+                                           Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
         Object scoresObj = body.get("scores");
         List<com.bisai.entity.ScoreResult> scores = scoresObj != null
                 ? com.bisai.util.JsonUtil.convertList(scoresObj, com.bisai.entity.ScoreResult.class)
                 : List.of();
         String comment = (String) body.get("comment");
         String expectedUpdatedAt = (String) body.get("expectedUpdatedAt");
-        return scoreService.saveTeacherScores(id, scores, comment, expectedUpdatedAt);
+        return scoreService.saveTeacherScores(id, scores, comment, expectedUpdatedAt, userId, role);
     }
 
     // 发布成绩
     @PutMapping("/{id}/publish")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Void> publishScore(@PathVariable Long id) {
-        return scoreService.publishScore(id);
+    public Result<Void> publishScore(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return scoreService.publishScore(id, userId, role);
     }
 
     // 退回提交
     @PutMapping("/{id}/return")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Void> returnSubmission(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return scoreService.returnSubmission(id, body.get("reason"));
+    public Result<Void> returnSubmission(@PathVariable Long id, @RequestBody Map<String, String> body, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return scoreService.returnSubmission(id, body.get("reason"), userId, role);
     }
 
     // 客观评分
     @GetMapping("/{id}/objective-score")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Map<String, Object>> getObjectiveScore(@PathVariable Long id) {
-        return scoreService.calculateObjectiveScore(id);
+    public Result<Map<String, Object>> getObjectiveScore(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return scoreService.calculateObjectiveScore(id, userId, role);
     }
 
     // 成绩修正
@@ -151,12 +198,16 @@ public class SubmissionController {
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Void> correctScore(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
         Object indicatorIdObj = body.get("indicatorId");
         Long indicatorId = indicatorIdObj != null ? Long.valueOf(indicatorIdObj.toString()) : null;
         Object newScoreObj = body.get("newScore");
         if (newScoreObj == null) return Result.error(40001, "newScore 不能为空");
         java.math.BigDecimal newScore = new java.math.BigDecimal(newScoreObj.toString());
         String reason = (String) body.get("reason");
-        return scoreService.correctScore(id, indicatorId, newScore, reason, userId);
+        return scoreService.correctScore(id, indicatorId, newScore, reason, userId, role);
     }
 }

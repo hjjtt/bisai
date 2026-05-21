@@ -41,10 +41,6 @@ export function getSubmission(id: number) {
 }
 
 // 文件预览
-export function getFilePreviewUrl(fileId: number) {
-  return `/api/files/${fileId}/preview`
-}
-
 export function getFilePreview(fileId: number) {
   return service.get(`/files/${fileId}/preview`, { responseType: 'blob' })
 }

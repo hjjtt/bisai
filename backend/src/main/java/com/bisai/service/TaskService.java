@@ -32,12 +32,23 @@ public class TaskService {
     private final SubmissionMapper submissionMapper;
     private final AsyncTaskService asyncTaskService;
     private final AsyncTaskMapper asyncTaskMapper;
+    private final PermissionService permissionService;
 
     private static final Map<Long, BatchJob> activeJobs = new ConcurrentHashMap<>();
 
-    public Result<PageResult<TrainingTask>> listTasks(PageQuery query, Long courseId, String status) {
+    public Result<PageResult<TrainingTask>> listTasks(PageQuery query, Long courseId, String status, Long userId, String role) {
         Page<TrainingTask> page = new Page<>(query.getPage(), query.getSize());
         LambdaQueryWrapper<TrainingTask> wrapper = new LambdaQueryWrapper<>();
+
+        // 教师只能看自己课程下的任务
+        if ("TEACHER".equals(role)) {
+            wrapper.inSql(TrainingTask::getCourseId,
+                    "SELECT id FROM course WHERE teacher_id = " + userId + " AND deleted = 0");
+        }
+        // 学生只能看已发布的任务
+        if ("STUDENT".equals(role)) {
+            wrapper.eq(TrainingTask::getStatus, "PUBLISHED");
+        }
 
         if (courseId != null) {
             wrapper.eq(TrainingTask::getCourseId, courseId);
@@ -51,15 +62,23 @@ public class TaskService {
         return Result.ok(new PageResult<>(result.getRecords(), result.getCurrent(), result.getSize(), result.getTotal()));
     }
 
-    public Result<TrainingTask> getTask(Long id) {
+    public Result<TrainingTask> getTask(Long id, Long userId, String role) {
         TrainingTask task = taskMapper.selectById(id);
         if (task == null) {
             return Result.error(40401, "任务不存在");
         }
+        if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(id, userId)) {
+            if ("STUDENT".equals(role) && !"PUBLISHED".equals(task.getStatus())) {
+                return Result.error(40301, "无权访问该任务");
+            }
+        }
         return Result.ok(task);
     }
 
-    public Result<TrainingTask> createTask(TrainingTask task) {
+    public Result<TrainingTask> createTask(TrainingTask task, Long userId) {
+        if (task.getCourseId() != null && !permissionService.isTeacherOwnerOfCourse(task.getCourseId(), userId)) {
+            return Result.error(40301, "无权在该课程下创建任务");
+        }
         if (task.getStartTime() != null && task.getEndTime() != null
                 && !task.getEndTime().isAfter(task.getStartTime())) {
             return Result.error(40001, "截止时间必须晚于开始时间");
@@ -69,7 +88,10 @@ public class TaskService {
         return Result.ok(task);
     }
 
-    public Result<TrainingTask> updateTask(Long id, TrainingTask task) {
+    public Result<TrainingTask> updateTask(Long id, TrainingTask task, Long userId, String role) {
+        if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(id, userId)) {
+            return Result.error(40301, "无权操作该任务");
+        }
         if (task.getStartTime() != null && task.getEndTime() != null
                 && !task.getEndTime().isAfter(task.getStartTime())) {
             return Result.error(40001, "截止时间必须晚于开始时间");
@@ -79,7 +101,10 @@ public class TaskService {
         return Result.ok(taskMapper.selectById(id));
     }
 
-    public Result<Void> publishTask(Long id) {
+    public Result<Void> publishTask(Long id, Long userId, String role) {
+        if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(id, userId)) {
+            return Result.error(40301, "无权操作该任务");
+        }
         TrainingTask task = taskMapper.selectById(id);
         if (task == null) {
             return Result.error(40401, "任务不存在");
@@ -96,7 +121,10 @@ public class TaskService {
         return Result.ok();
     }
 
-    public Result<Void> closeTask(Long id) {
+    public Result<Void> closeTask(Long id, Long userId, String role) {
+        if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(id, userId)) {
+            return Result.error(40301, "无权操作该任务");
+        }
         TrainingTask task = taskMapper.selectById(id);
         if (task == null) {
             return Result.error(40401, "任务不存在");
@@ -109,7 +137,10 @@ public class TaskService {
     /**
      * 批量解析 - 使用异步任务队列，控制并发，DB 级去重
      */
-    public Result<Map<String, Object>> batchParse(Long taskId) {
+    public Result<Map<String, Object>> batchParse(Long taskId, Long userId, String role) {
+        if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(taskId, userId)) {
+            return Result.error(40301, "无权操作该任务");
+        }
         if (activeJobs.containsKey(taskId)) {
             return Result.error(40901, "该任务正在批量处理中，请稍后重试");
         }
@@ -158,7 +189,10 @@ public class TaskService {
     /**
      * 批量评分 - 使用异步任务队列，控制并发，DB 级去重
      */
-    public Result<Map<String, Object>> batchScore(Long taskId) {
+    public Result<Map<String, Object>> batchScore(Long taskId, Long userId, String role) {
+        if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(taskId, userId)) {
+            return Result.error(40301, "无权操作该任务");
+        }
         if (activeJobs.containsKey(taskId)) {
             return Result.error(40901, "该任务正在批量处理中，请稍后重试");
         }
@@ -206,7 +240,10 @@ public class TaskService {
     /**
      * 批量核查 - 使用异步任务队列，控制并发，DB 级去重
      */
-    public Result<Map<String, Object>> batchCheck(Long taskId) {
+    public Result<Map<String, Object>> batchCheck(Long taskId, Long userId, String role) {
+        if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(taskId, userId)) {
+            return Result.error(40301, "无权操作该任务");
+        }
         if (activeJobs.containsKey(taskId)) {
             return Result.error(40901, "该任务正在批量处理中，请稍后重试");
         }
@@ -254,7 +291,10 @@ public class TaskService {
     /**
      * 查询批量操作进度（区分解析/核查/评分三类状态）
      */
-    public Result<Map<String, Object>> getBatchProgress(Long taskId) {
+    public Result<Map<String, Object>> getBatchProgress(Long taskId, Long userId, String role) {
+        if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(taskId, userId)) {
+            return Result.error(40301, "无权查看该任务进度");
+        }
         Long total = submissionMapper.selectCount(
                 new LambdaQueryWrapper<Submission>().eq(Submission::getTaskId, taskId)
         );
