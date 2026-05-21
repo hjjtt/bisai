@@ -79,7 +79,6 @@ async function loadSubmissions() {
     submissions.value = res.data.items
     pagination.total = res.data.total
   } catch (e) {
-    console.error('加载提交记录失败:', e)
   } finally {
     loading.value = false
   }

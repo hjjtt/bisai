@@ -1,12 +1,24 @@
 import { get, put, post, del } from '@/utils/request'
 import service from '@/utils/request'
 
-// 系统配置
-export function getSystemConfig() {
-  return get<Record<string, any>>('/system/config')
+export interface SystemConfigMap {
+  'ai.api-key'?: string
+  'ai.chat-model'?: string
+  'ai.embedding-model'?: string
+  'ai.rerank-model'?: string
+  'ai.api-url'?: string
+  'ai.max-tokens'?: string
+  'ai.daily-token-limit'?: string
+  'ai.daily-call-limit'?: string
+  [key: string]: string | undefined
 }
 
-export function updateSystemConfig(data: Record<string, any>) {
+// 系统配置
+export function getSystemConfig() {
+  return get<SystemConfigMap>('/system/config')
+}
+
+export function updateSystemConfig(data: Partial<SystemConfigMap>) {
   return put('/system/config', data)
 }
 

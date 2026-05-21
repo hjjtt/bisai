@@ -151,7 +151,6 @@ async function loadTasks() {
     const res = await getTaskList({ size: 100 })
     tasks.value = res.data.items
   } catch (e) {
-    console.error('加载任务列表失败:', e)
   }
 }
 
@@ -175,7 +174,6 @@ async function loadProgress() {
     progress.value = progressRes.data
     submissions.value = submissionsRes.data.items || []
   } catch (e) {
-    console.error('加载进度失败:', e)
     ElMessage.error('加载进度失败')
   } finally {
     listLoading.value = false
@@ -219,7 +217,6 @@ async function retryParse(submissionId: number) {
     ElMessage.success('解析任务已重新提交')
     await loadProgress()
   } catch (e) {
-    console.error('重试解析失败:', e)
     ElMessage.error('重试解析失败')
   } finally {
     actionLoading.value.set(submissionId, false)
@@ -233,7 +230,6 @@ async function retryScore(submissionId: number) {
     ElMessage.success('评分任务已重新提交')
     await loadProgress()
   } catch (e) {
-    console.error('重试评分失败:', e)
     ElMessage.error('重试评分失败')
   } finally {
     actionLoading.value.set(submissionId, false)
@@ -255,7 +251,6 @@ async function cancelTask(submissionId: number) {
     ElMessage.success('任务已取消')
     await loadProgress()
   } catch (e) {
-    console.error('取消任务失败:', e)
     ElMessage.error('取消任务失败')
   } finally {
     actionLoading.value.set(submissionId, false)
@@ -278,7 +273,6 @@ async function handleBatchParse() {
     ElMessage.success('批量解析任务已提交')
     await loadProgress()
   } catch (e) {
-    console.error('批量解析失败:', e)
     ElMessage.error('批量解析失败')
   } finally {
     parseLoading.value = false
@@ -301,7 +295,6 @@ async function handleBatchScore() {
     ElMessage.success('批量评分任务已提交')
     await loadProgress()
   } catch (e) {
-    console.error('批量评分失败:', e)
     ElMessage.error('批量评分失败')
   } finally {
     scoreLoading.value = false

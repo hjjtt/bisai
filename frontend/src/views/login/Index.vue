@@ -61,7 +61,7 @@ const userStore = useUserStore()
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
-const showCaptcha = ref(false)
+const showCaptcha = ref(true)
 const captchaImage = ref('')
 
 const form = reactive<LoginRequest>({
@@ -83,11 +83,15 @@ async function refreshCaptcha() {
   try {
     const res = await getCaptcha()
     form.captchaUuid = res.data.uuid
-    captchaImage.value = 'data:image/png;base64,' + res.data.image
+    captchaImage.value = res.data.image.startsWith('data:')
+      ? res.data.image
+      : 'data:image/png;base64,' + res.data.image
   } catch {
     // 验证码获取失败不影响登录
   }
 }
+
+refreshCaptcha()
 
 async function handleLogin() {
   const valid = await formRef.value?.validate().catch(() => false)
@@ -100,7 +104,13 @@ async function handleLogin() {
 
   loading.value = true
   try {
-    const res = await login(form)
+    const loginData: LoginRequest = {
+      username: form.username,
+      password: form.password,
+      captchaUuid: form.captchaUuid,
+      captchaCode: form.captchaCode,
+    }
+    const res = await login(loginData)
     userStore.setLogin(res.data.token, res.data.user)
     ElMessage.success('登录成功')
     loginFailCount = 0
@@ -109,16 +119,8 @@ async function handleLogin() {
     router.push(redirect)
   } catch (e: unknown) {
     loginFailCount++
-    // 失败3次后强制显示验证码
-    if (loginFailCount >= 3 && !showCaptcha.value) {
-      showCaptcha.value = true
-      refreshCaptcha()
-    }
-    // 验证码用过后刷新
-    if (showCaptcha.value) {
-      refreshCaptcha()
-      form.captchaCode = ''
-    }
+    refreshCaptcha()
+    form.captchaCode = ''
   } finally {
     loading.value = false
   }

@@ -66,7 +66,6 @@ async function loadTasks() {
     tasks.value = res.data.items
     pagination.total = res.data.total
   } catch (e) {
-    console.error('加载任务列表失败:', e)
   } finally {
     loading.value = false
   }
@@ -77,7 +76,6 @@ async function loadCourses() {
     const res = await getCourseList({ size: 100 })
     courses.value = res.data.items
   } catch (e) {
-    console.error('加载课程列表失败:', e)
   }
 }
 

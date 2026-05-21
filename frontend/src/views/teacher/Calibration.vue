@@ -142,7 +142,6 @@ async function loadTasks() {
     const res = await getTaskList({ size: 100 })
     tasks.value = res.data.items
   } catch {
-    console.error('加载任务列表失败')
   }
 }
 
@@ -161,7 +160,6 @@ async function loadSubmissions() {
     const res = await getSubmissions({ taskId: selectedTaskId.value, size: 100 })
     submissions.value = res.data.items
   } catch {
-    console.error('加载提交列表失败')
   }
 }
 

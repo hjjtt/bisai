@@ -107,7 +107,6 @@ async function loadStats() {
     statCards.value[3].value = d.unreadMessages || 0
     recentTasks.value = d.recentTasks || []
   } catch (e) {
-    console.error('加载学生统计失败:', e)
   } finally {
     loading.value = false
   }

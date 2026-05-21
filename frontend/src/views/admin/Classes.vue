@@ -150,7 +150,6 @@ async function loadClasses() {
     const res = await getClassList({ size: 100 })
     classes.value = res.data.items
   } catch (e) {
-    console.error('加载班级列表失败:', e)
     ElMessage.error('加载班级列表失败')
   } finally {
     classLoading.value = false
@@ -163,7 +162,6 @@ async function loadCourses() {
     const res = await getCourseList({ size: 100 })
     courses.value = res.data.items
   } catch (e) {
-    console.error('加载课程列表失败:', e)
     ElMessage.error('加载课程列表失败')
   } finally {
     courseLoading.value = false
@@ -175,7 +173,6 @@ async function loadTeachers() {
     const res = await getUserList({ role: 'TEACHER', size: 100 })
     teachers.value = res.data.items
   } catch (e) {
-    console.error('加载教师列表失败:', e)
   }
 }
 
@@ -189,7 +186,6 @@ async function saveClass() {
     classDialogVisible.value = false
     loadClasses()
   } catch (e) {
-    console.error('保存班级失败:', e)
     ElMessage.error('保存失败')
   }
 }
@@ -204,7 +200,6 @@ async function saveCourse() {
     courseDialogVisible.value = false
     loadCourses()
   } catch (e) {
-    console.error('保存课程失败:', e)
     ElMessage.error('保存失败')
   }
 }

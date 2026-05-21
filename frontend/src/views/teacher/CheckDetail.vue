@@ -124,7 +124,6 @@ async function loadData() {
       startPolling()
     }
   } catch (e) {
-    console.error('加载详情失败:', e)
     ElMessage.error('加载详情失败')
   } finally {
     loading.value = false
@@ -138,7 +137,6 @@ async function handleRecheck() {
     ElMessage.success('AI 核查任务已启动')
     startPolling()
   } catch (e) {
-    console.error('触发核查失败:', e)
     ElMessage.error('触发核查失败')
     rechecking.value = false
   }

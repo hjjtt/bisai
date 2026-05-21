@@ -164,7 +164,6 @@ async function submitUpload() {
     // 开始轮询 AI 任务进度
     startProgressPolling()
   } catch (e) {
-    console.error('上传失败:', e)
     ElMessage.error('上传失败，请重试')
   } finally {
     uploading.value = false
@@ -211,7 +210,6 @@ function startProgressPolling() {
         loadSubmissions()
       }
     } catch (e) {
-      console.error('获取进度失败:', e)
     }
   }, 2000) // 每 2 秒查询一次
 }
@@ -229,7 +227,6 @@ async function loadTask() {
     const res = await getTask(taskId.value)
     task.value = res.data
   } catch (e) {
-    console.error('加载任务信息失败:', e)
     ElMessage.error('加载任务信息失败')
   }
 }
@@ -240,7 +237,6 @@ async function loadSubmissions() {
     const res = await getSubmissions({ taskId: taskId.value, size: 5, sort: 'version', order: 'desc' })
     submissions.value = res.data.items
   } catch (e) {
-    console.error('加载提交历史失败:', e)
   }
 }
 

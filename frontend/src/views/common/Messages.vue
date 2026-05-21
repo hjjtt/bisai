@@ -112,7 +112,6 @@ async function loadMessages() {
     messages.value = res.data.items
     pagination.total = res.data.total
   } catch (e) {
-    console.error('加载消息列表失败:', e)
   } finally {
     loading.value = false
   }
@@ -123,7 +122,6 @@ async function loadUnreadCount() {
     const res = await getUnreadCount()
     appStore.unreadMessageCount = res.data
   } catch (e) {
-    console.error('加载未读数量失败:', e)
   }
 }
 
@@ -135,7 +133,6 @@ async function handleMarkRead(id: number) {
     if (msg) msg.isRead = true
     appStore.unreadMessageCount = Math.max(0, appStore.unreadMessageCount - 1)
   } catch (e) {
-    console.error('标记已读失败:', e)
   }
 }
 
@@ -146,7 +143,6 @@ async function handleMarkAllRead() {
     messages.value.forEach(m => m.isRead = true)
     appStore.unreadMessageCount = 0
   } catch (e) {
-    console.error('全部标记已读失败:', e)
   }
 }
 

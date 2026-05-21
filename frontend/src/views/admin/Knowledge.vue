@@ -129,7 +129,6 @@ const loadData = async () => {
     knowledgeList.value = res.data.items
     total.value = res.data.total
   } catch (e) {
-    console.error('加载知识库列表失败:', e)
     ElMessage.error('加载知识库列表失败')
   } finally {
     loading.value = false
@@ -144,7 +143,6 @@ const handleDelete = async (row: KnowledgeDocument) => {
     loadData()
   } catch (err) {
     if (err !== 'cancel') {
-      console.error('删除知识库文档失败:', err)
       ElMessage.error('删除失败')
     }
   }
@@ -171,7 +169,6 @@ const handleUpload = async () => {
     uploadForm.value.courseId = ''
     loadData()
   } catch (e) {
-    console.error('上传知识库文档失败:', e)
     ElMessage.error('上传失败')
   }
 }
@@ -181,7 +178,6 @@ async function loadCourses() {
     const res = await getCourseList({ size: 100 })
     courses.value = res.data.items
   } catch (e) {
-    console.error('加载课程列表失败:', e)
   }
 }
 

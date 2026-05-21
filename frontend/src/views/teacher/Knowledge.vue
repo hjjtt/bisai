@@ -79,7 +79,6 @@ async function handleToggle(row: KnowledgeDocument) {
     ElMessage.success(row.enabled ? '已启用' : '已停用')
   } catch (e) {
     row.enabled = !row.enabled
-    console.error('状态更新失败:', e)
     ElMessage.error('状态更新失败')
   }
 }
@@ -90,7 +89,6 @@ async function handleDelete(id: number) {
     ElMessage.success('已删除')
     loadDocuments()
   } catch (e) {
-    console.error('删除失败:', e)
     ElMessage.error('删除失败')
   }
 }
@@ -111,7 +109,6 @@ async function handleUpload() {
     await loadDocuments()
     startPolling()
   } catch (e) {
-    console.error('上传失败:', e)
     ElMessage.error('上传失败')
   } finally {
     uploading.value = false
@@ -124,7 +121,6 @@ async function loadDocuments() {
     const res = await getKnowledgeList({ page: 1, size: 100 })
     documents.value = res.data.items || []
   } catch (e) {
-    console.error('加载知识库列表失败:', e)
     ElMessage.error('加载知识库列表失败')
   } finally {
     loading.value = false

@@ -100,7 +100,6 @@ async function loadStats() {
     pendingReviews.value = d.pendingReviews || []
     highRiskSubmissions.value = d.highRiskSubmissions || []
   } catch (e) {
-    console.error('加载教师统计失败:', e)
   } finally {
     loading.value = false
   }

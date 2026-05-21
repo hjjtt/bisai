@@ -140,7 +140,6 @@ async function handleSave() {
     }
     router.push('/teacher/tasks')
   } catch (e) {
-    console.error('保存任务失败:', e)
     ElMessage.error(isEdit.value ? '保存失败' : '创建失败')
   } finally {
     saving.value = false
@@ -156,7 +155,6 @@ async function loadOptions() {
     courses.value = courseRes.data.items
     templates.value = templateRes.data.items
   } catch (e) {
-    console.error('加载选项失败:', e)
     ElMessage.error('加载选项失败')
   }
 }
@@ -179,7 +177,6 @@ async function loadTask() {
     }
     Object.assign(form, data)
   } catch (e) {
-    console.error('加载任务失败:', e)
     ElMessage.error('加载任务失败')
   }
 }

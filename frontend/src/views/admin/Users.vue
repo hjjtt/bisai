@@ -130,7 +130,6 @@ async function loadUsers() {
     users.value = res.data.items
     pagination.total = res.data.total
   } catch (e) {
-    console.error('加载用户列表失败:', e)
     ElMessage.error('加载用户列表失败')
   } finally {
     loading.value = false
@@ -142,7 +141,6 @@ async function loadClasses() {
     const res = await getClassList({ size: 100 })
     classes.value = res.data.items
   } catch (e) {
-    console.error('加载班级列表失败:', e)
   }
 }
 
@@ -172,7 +170,6 @@ async function handleSaveUser() {
     dialogVisible.value = false
     loadUsers()
   } catch (e) {
-    console.error('保存用户失败:', e)
     ElMessage.error('操作失败')
   } finally {
     saving.value = false
@@ -186,7 +183,6 @@ async function toggleStatus(user: UserInfo) {
     ElMessage.success('操作成功')
     loadUsers()
   } catch (e) {
-    console.error('切换用户状态失败:', e)
   }
 }
 

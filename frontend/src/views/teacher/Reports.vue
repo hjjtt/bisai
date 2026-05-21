@@ -100,7 +100,6 @@ async function loadTasks() {
       ElMessage.warning('暂无任务数据，请先创建实训任务')
     }
   } catch (e: unknown) {
-    console.error('加载任务列表失败:', e)
     ElMessage.error('加载任务列表失败: ' + (e instanceof Error ? e.message : '未知错误'))
   }
 }
@@ -118,7 +117,6 @@ async function loadSubmissions() {
       ElMessage.info('该任务下暂无学生提交记录')
     }
   } catch (e: unknown) {
-    console.error('加载提交列表失败:', e)
     ElMessage.error('加载学生列表失败: ' + (e instanceof Error ? e.message : '未知错误'))
     submissionList.value = []
   } finally {
@@ -142,7 +140,6 @@ async function doExportStudentReport(format: 'PDF' | 'WORD') {
     const res = await exportStudentReportApi(studentReport.submissionId, format)
     await downloadFile(res.data.fileId)
   } catch (e) {
-    console.error('导出报告失败:', e)
     ElMessage.error('导出失败')
   } finally {
     exporting.value = false
@@ -156,7 +153,6 @@ async function doExportClassReport(format: 'PDF' | 'EXCEL') {
     const res = await exportClassReportApi(classReport.taskId, format)
     await downloadFile(res.data.fileId)
   } catch (e) {
-    console.error('导出报表失败:', e)
     ElMessage.error('导出失败')
   } finally {
     exporting.value = false

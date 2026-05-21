@@ -85,10 +85,21 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
-import * as echarts from 'echarts'
+import * as echarts from 'echarts/core'
+import type { LinearGradientObject } from 'echarts/core'
+import { LineChart } from 'echarts/charts'
+import {
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+} from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
 import { Loading } from '@element-plus/icons-vue'
 import { getAdminStats } from '@/api/dashboard'
 import type { SystemStatusItem, BaseStats } from '@/types'
+
+echarts.use([LineChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent, CanvasRenderer])
 
 const timeRange = ref('7d')
 const chartRef = ref<HTMLElement>()
@@ -125,7 +136,6 @@ async function loadStats() {
     serverLoad.value = d.serverLoad || 0
     initChart(d)
   } catch (e) {
-    console.error('加载管理统计失败:', e)
   } finally {
     statsLoading.value = false
   }
@@ -136,7 +146,7 @@ function initChart(data: BaseStats) {
 
   chartInstance = echarts.init(chartRef.value)
 
-  const option: echarts.EChartsOption = {
+  const option: echarts.EChartsCoreOption = {
     tooltip: {
       trigger: 'axis',
       backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -178,10 +188,10 @@ function initChart(data: BaseStats) {
         data: data.submissions || [],
         itemStyle: { color: '#3b82f6' },
         areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
             { offset: 0, color: 'rgba(59, 130, 246, 0.25)' },
             { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
-          ])
+          ] } as LinearGradientObject
         }
       },
       {
@@ -193,10 +203,10 @@ function initChart(data: BaseStats) {
         data: data.parsed || [],
         itemStyle: { color: '#10b981' },
         areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
             { offset: 0, color: 'rgba(16, 185, 129, 0.25)' },
             { offset: 1, color: 'rgba(16, 185, 129, 0.05)' }
-          ])
+          ] } as LinearGradientObject
         }
       },
       {
@@ -208,10 +218,10 @@ function initChart(data: BaseStats) {
         data: data.scored || [],
         itemStyle: { color: '#f59e0b' },
         areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
             { offset: 0, color: 'rgba(245, 158, 11, 0.25)' },
             { offset: 1, color: 'rgba(245, 158, 11, 0.05)' }
-          ])
+          ] } as LinearGradientObject
         }
       },
     ],

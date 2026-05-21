@@ -14,7 +14,7 @@
           <el-tag>{{ getTaskStatusLabel(task.status) }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="允许文件类型" :span="2">
-          <el-tag v-for="ft in (task.allowedFileTypes || [])" :key="ft" size="small" style="margin-right: 4px">{{ ft }}</el-tag>
+          <el-tag v-for="ft in parseFileTypes(task.allowedFileTypes)" :key="ft" size="small" style="margin-right: 4px">{{ ft }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="实训要求" :span="2">
           <div class="requirements">{{ task.requirements }}</div>
@@ -63,6 +63,12 @@ const mySubmission = ref<Submission | null>(null)
 
 const taskId = computed(() => Number(route.params.id) || 0)
 
+function parseFileTypes(val: string | string[] | undefined): string[] {
+  if (!val) return []
+  if (Array.isArray(val)) return val
+  return val.split(',').map(s => s.trim()).filter(Boolean)
+}
+
 async function loadTask() {
   if (!taskId.value) return
   loading.value = true
@@ -70,7 +76,6 @@ async function loadTask() {
     const res = await getTask(taskId.value)
     task.value = res.data
   } catch (e) {
-    console.error('加载任务失败:', e)
     ElMessage.error('加载任务失败')
   } finally {
     loading.value = false
@@ -88,7 +93,6 @@ async function loadMySubmission() {
       mySubmission.value = items[0]
     }
   } catch (e) {
-    console.error('加载提交状态失败:', e)
   }
 }
 

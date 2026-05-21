@@ -74,7 +74,6 @@ async function loadData() {
     submissions.value = res.data.items
     pagination.total = res.data.total
   } catch (e) {
-    console.error('加载提交列表失败:', e)
     ElMessage.error('加载提交列表失败')
   } finally {
     loading.value = false
@@ -109,7 +108,6 @@ async function loadTasks() {
     const res = await getTaskList({ size: 100 })
     tasks.value = res.data.items
   } catch (e) {
-    console.error('加载任务列表失败:', e)
   }
 }
 
@@ -121,7 +119,6 @@ async function handleCheck(id: number) {
     await loadData()
     startPolling()
   } catch (e) {
-    console.error('AI 核查失败:', e)
     ElMessage.error('AI 核查失败')
   } finally {
     if (!hasRunningAiTask()) aiLoading[id] = false
@@ -137,7 +134,6 @@ async function handleBatchCheck() {
     await loadData()
     startPolling()
   } catch (e) {
-    console.error('批量核查失败:', e)
     ElMessage.error('批量核查失败')
   } finally {
     if (!hasRunningAiTask()) batchLoading.value = false
