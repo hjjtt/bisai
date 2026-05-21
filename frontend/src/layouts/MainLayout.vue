@@ -82,7 +82,7 @@
           <el-dropdown @command="handleCommand">
             <div class="user-info">
               <span class="welcome">欢迎您，</span>
-              <span class="username">{{ userInfo?.realName || userInfo?.username || getRoleLabel(userStore.role) }}</span>
+              <span class="username">{{ userInfo?.realName || userInfo?.username || getRoleLabel(userStore.role || '') }}</span>
               <el-avatar :size="32" icon="UserFilled" class="user-avatar" />
             </div>
             <template #dropdown>

@@ -60,8 +60,13 @@ public class SubmissionController {
     }
 
     @GetMapping("/{submissionId}/files")
-    public Result<List<FileEntity>> getFileList(@PathVariable Long submissionId) {
-        return submissionService.getFileList(submissionId);
+    public Result<List<FileEntity>> getFileList(@PathVariable Long submissionId, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("STUDENT");
+        return submissionService.getFileList(submissionId, userId, role);
     }
 
     // 智能解析 - 触发解析任务

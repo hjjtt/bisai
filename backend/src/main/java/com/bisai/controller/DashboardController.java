@@ -16,12 +16,14 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping("/student")
+    @PreAuthorize("hasRole('STUDENT')")
     public Result<DashboardStats.StudentStats> studentStats(Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
         return Result.ok(dashboardService.getStudentStats(userId));
     }
 
     @GetMapping("/teacher")
+    @PreAuthorize("hasRole('TEACHER')")
     public Result<DashboardStats.TeacherStats> teacherStats(Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
         return Result.ok(dashboardService.getTeacherStats(userId));

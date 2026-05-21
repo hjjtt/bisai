@@ -243,6 +243,34 @@ public class AsyncTaskService {
     }
 
     /**
+     * 批量查询任务状态统计（替代 N+1 查询）
+     */
+    public java.util.Map<String, Long> getBatchStatus(java.util.List<Long> taskIds) {
+        if (taskIds == null || taskIds.isEmpty()) {
+            return java.util.Map.of("total", 0L, "pending", 0L, "running", 0L, "success", 0L, "failed", 0L);
+        }
+        List<AsyncTask> tasks = asyncTaskMapper.selectList(
+                new LambdaQueryWrapper<AsyncTask>().in(AsyncTask::getId, taskIds)
+        );
+        long pending = 0, running = 0, success = 0, failed = 0;
+        for (AsyncTask t : tasks) {
+            switch (t.getStatus()) {
+                case "PENDING", "RETRYING" -> pending++;
+                case "RUNNING" -> running++;
+                case "SUCCESS" -> success++;
+                case "FAILED" -> failed++;
+            }
+        }
+        return java.util.Map.of(
+                "total", (long) taskIds.size(),
+                "pending", pending,
+                "running", running,
+                "success", success,
+                "failed", failed
+        );
+    }
+
+    /**
      * 检查批量任务是否全部完成，完成后发布事件
      */
     private void checkBatchJobCompletion(Long submissionId) {

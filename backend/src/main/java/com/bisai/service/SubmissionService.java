@@ -319,7 +319,27 @@ public class SubmissionService {
         return Result.ok();
     }
 
-    public Result<List<FileEntity>> getFileList(Long submissionId) {
+    public Result<List<FileEntity>> getFileList(Long submissionId, Long userId, String role) {
+        Submission submission = submissionMapper.selectById(submissionId);
+        if (submission == null) {
+            return Result.error(40401, "提交记录不存在");
+        }
+
+        // 数据权限校验
+        if ("STUDENT".equals(role) && !submission.getStudentId().equals(userId)) {
+            return Result.error(40301, "无权访问该提交的文件");
+        }
+        if ("TEACHER".equals(role)) {
+            TrainingTask task = taskMapper.selectById(submission.getTaskId());
+            if (task == null) {
+                return Result.error(40301, "无权访问该提交的文件");
+            }
+            Course course = courseMapper.selectById(task.getCourseId());
+            if (course == null || !course.getTeacherId().equals(userId)) {
+                return Result.error(40301, "无权访问该提交的文件");
+            }
+        }
+
         List<FileEntity> files = fileMapper.selectList(
                 new LambdaQueryWrapper<FileEntity>()
                         .eq(FileEntity::getSubmissionId, submissionId)
