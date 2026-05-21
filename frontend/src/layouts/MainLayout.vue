@@ -87,7 +87,8 @@
             </div>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+                <el-dropdown-item command="changePassword">修改密码</el-dropdown-item>
+                <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -99,12 +100,32 @@
         <router-view />
       </el-main>
     </el-container>
+
+    <!-- 修改密码弹窗 -->
+    <el-dialog v-model="changePasswordVisible" title="修改密码" width="400px">
+      <el-form :model="passwordForm" label-width="80px">
+        <el-form-item label="当前密码">
+          <el-input v-model="passwordForm.oldPassword" type="password" show-password />
+        </el-form-item>
+        <el-form-item label="新密码">
+          <el-input v-model="passwordForm.newPassword" type="password" show-password />
+        </el-form-item>
+        <el-form-item label="确认密码">
+          <el-input v-model="passwordForm.confirmPassword" type="password" show-password />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="changePasswordVisible = false">取消</el-button>
+        <el-button type="primary" :loading="passwordLoading" @click="handleChangePassword">确认</el-button>
+      </template>
+    </el-dialog>
   </el-container>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { Fold, Expand, Bell, Monitor } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import { useAppStore } from '@/store/app'
@@ -113,6 +134,7 @@ import type { RouteRecordRaw } from 'vue-router'
 import { getMessages, markMessageRead, markAllMessagesRead, getUnreadCount } from '@/api/message'
 import { formatDate } from '@/utils/date'
 import { getRoleLabel } from '@/utils/status'
+import { changePassword } from '@/api/auth'
 import type { Message } from '@/types'
 
 const route = useRoute()
@@ -170,10 +192,45 @@ const menuItems = computed((): MenuItem[] => {
   })
 })
 
+const changePasswordVisible = ref(false)
+const passwordForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
+const passwordLoading = ref(false)
+
 const handleCommand = (command: string) => {
   if (command === 'logout') {
     userStore.logout()
     router.push('/login')
+  } else if (command === 'changePassword') {
+    passwordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+    changePasswordVisible.value = true
+  }
+}
+
+async function handleChangePassword() {
+  const { oldPassword, newPassword, confirmPassword } = passwordForm.value
+  if (!oldPassword || !newPassword) {
+    ElMessage.warning('请填写完整')
+    return
+  }
+  if (newPassword !== confirmPassword) {
+    ElMessage.warning('两次输入的密码不一致')
+    return
+  }
+  if (newPassword.length < 6) {
+    ElMessage.warning('新密码至少 6 位')
+    return
+  }
+  passwordLoading.value = true
+  try {
+    await changePassword(oldPassword, newPassword)
+    ElMessage.success('密码修改成功，请重新登录')
+    changePasswordVisible.value = false
+    userStore.logout()
+    router.push('/login')
+  } catch {
+    // 错误已被 request.ts 拦截器处理
+  } finally {
+    passwordLoading.value = false
   }
 }
 

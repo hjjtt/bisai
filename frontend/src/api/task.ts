@@ -77,7 +77,7 @@ export function getScoreResults(submissionId: number) {
 }
 
 // 教师复核
-export function saveTeacherScores(submissionId: number, data: { scores: ScoreResult[]; comment?: string }) {
+export function saveTeacherScores(submissionId: number, data: { scores: ScoreResult[]; comment?: string; expectedUpdatedAt?: string }) {
   return put(`/submissions/${submissionId}/scores`, data)
 }
 
@@ -128,6 +128,11 @@ export function retryAsyncTask(taskId: number) {
 
 export function cancelAsyncTask(taskId: number) {
   return post(`/async-tasks/${taskId}/cancel`)
+}
+
+// 学生查看已发布成绩
+export function getStudentScores(submissionId: number) {
+  return get<ScoreResult[]>(`/submissions/${submissionId}/student-scores`)
 }
 
 // 评分校准

@@ -241,9 +241,13 @@ function stopScorePolling() {
 async function handleSave() {
   saving.value = true
   try {
-    await saveTeacherScores(submissionId.value, { scores: scores.value, comment: comment.value })
+    await saveTeacherScores(submissionId.value, {
+      scores: scores.value,
+      comment: comment.value,
+      expectedUpdatedAt: submission.value?.updatedAt,
+    })
     ElMessage.success('保存成功')
-    await loadSubmission() // 重新加载以获取最新总分
+    await loadSubmission()
   } catch {
     ElMessage.error('保存失败')
   } finally {
@@ -257,7 +261,11 @@ async function handlePublish() {
   } catch { return }
   saving.value = true
   try {
-    await saveTeacherScores(submissionId.value, { scores: scores.value, comment: comment.value })
+    await saveTeacherScores(submissionId.value, {
+      scores: scores.value,
+      comment: comment.value,
+      expectedUpdatedAt: submission.value?.updatedAt,
+    })
     await publishScore(submissionId.value)
     ElMessage.success('成绩已发布')
     router.back()

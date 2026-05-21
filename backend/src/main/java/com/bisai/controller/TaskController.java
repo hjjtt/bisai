@@ -77,6 +77,7 @@ public class TaskController {
 
     // 批量操作进度查询
     @GetMapping("/{id}/batch-progress")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Map<String, Object>> batchProgress(@PathVariable Long id) {
         return taskService.getBatchProgress(id);
     }

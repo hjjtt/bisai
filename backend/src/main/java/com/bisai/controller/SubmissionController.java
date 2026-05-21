@@ -104,6 +104,13 @@ public class SubmissionController {
         return scoreService.getScoreResults(id);
     }
 
+    // 学生查看已发布成绩
+    @GetMapping("/{id}/student-scores")
+    public Result<List<com.bisai.entity.ScoreResult>> getStudentScores(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        return scoreService.getStudentScores(id, userId);
+    }
+
     // 教师保存评分
     @PutMapping("/{id}/scores")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")

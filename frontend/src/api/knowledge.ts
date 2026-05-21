@@ -27,7 +27,7 @@ export function uploadKnowledge(file: File, courseId?: number) {
 }
 
 export function deleteKnowledge(id: number) {
-  return del(`/knowledge/${id}`)
+  return del<void>(`/knowledge/${id}`)
 }
 
 export function toggleKnowledgeStatus(id: number, enabled: boolean) {

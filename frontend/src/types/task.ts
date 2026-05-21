@@ -37,6 +37,7 @@ export interface Submission {
   parseCompleteness?: string
   parseQuality?: string
   parseSuggestions?: string
+  updatedAt?: string
 }
 
 // 文件

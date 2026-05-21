@@ -177,7 +177,44 @@ public class ScoreService {
         return Result.ok(results);
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    public Result<List<ScoreResult>> getStudentScores(Long submissionId, Long userId) {
+        Submission submission = submissionMapper.selectById(submissionId);
+        if (submission == null) {
+            return Result.error(40401, "提交记录不存在");
+        }
+
+        // 只能查看自己的提交
+        if (!submission.getStudentId().equals(userId)) {
+            return Result.error(40301, "无权访问该提交");
+        }
+
+        // 成绩必须已发布
+        if (!"PUBLISHED".equals(submission.getScoreStatus())) {
+            return Result.ok(List.of());
+        }
+
+        List<ScoreResult> results = scoreResultMapper.selectList(
+                new LambdaQueryWrapper<ScoreResult>().eq(ScoreResult::getSubmissionId, submissionId)
+        );
+
+        // 补齐指标名称
+        TrainingTask task = taskMapper.selectById(submission.getTaskId());
+        if (task != null && task.getTemplateId() != null) {
+            List<Indicator> indicators = indicatorMapper.selectList(
+                    new LambdaQueryWrapper<Indicator>().eq(Indicator::getTemplateId, task.getTemplateId()));
+            Map<Long, Indicator> indMap = indicators.stream()
+                    .collect(java.util.stream.Collectors.toMap(Indicator::getId, i -> i, (a, b) -> a));
+            results.forEach(r -> {
+                Indicator ind = indMap.get(r.getIndicatorId());
+                if (ind != null) {
+                    r.setIndicatorName(ind.getName());
+                    r.setMaxScore(ind.getMaxScore());
+                }
+            });
+        }
+
+        return Result.ok(results);
+    }
     public Result<Void> saveTeacherScores(Long submissionId, List<ScoreResult> scores, String comment, String expectedUpdatedAt) {
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {

@@ -39,7 +39,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getSubmission, getScoreResults } from '@/api/task'
+import { getSubmission, getStudentScores } from '@/api/task'
 import { exportStudentReport } from '@/api/report'
 import { downloadFile } from '@/api/system'
 import type { Submission, ScoreResult } from '@/types'
@@ -58,7 +58,7 @@ async function loadData() {
   try {
     const [subRes, scoreRes] = await Promise.all([
       getSubmission(submissionId.value),
-      getScoreResults(submissionId.value),
+      getStudentScores(submissionId.value),
     ])
     submission.value = subRes.data
     scores.value = scoreRes.data

@@ -9,3 +9,7 @@ export function logout() {
   return post('/auth/logout')
 }
 
+export function changePassword(oldPassword: string, newPassword: string) {
+  return post('/auth/change-password', { oldPassword, newPassword })
+}
+
