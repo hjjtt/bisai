@@ -104,7 +104,9 @@
 - **URL 级**：Spring Security 配置，`/api/auth/**` 放行，其余需 JWT 认证
 - **方法级**：Controller 使用 `@PreAuthorize` 注解控制角色访问
 - **数据级**：Service 层按角色过滤，学生只能查看自己的数据，教师只能查看所管理课程的数据
+- **文件访问**：通过 `submissionId` 关联验证权限，前端使用 axios blob 下载（非 `window.open`）
 - **前端路由级**：路由 `meta.roles` 控制页面级访问
+- **前端签名校验**：localStorage 用户信息带签名防篡改
 
 ## 项目结构
 
@@ -165,7 +167,7 @@ bisai/
 │       │   ├── dto/                  # 数据传输对象
 │       │   ├── common/               # 公共类（Result、PageResult）
 │       │   ├── interceptor/          # JWT 认证过滤器
-│       │   └── util/                 # 工具类（JWT、密码、JSON）
+│       │   └── util/                 # 工具类（JWT、JSON、验证码）
 │       └── resources/
 │           ├── application.yml       # 应用配置
 │           └── schema.sql            # 数据库建表脚本（21张表）
@@ -426,6 +428,7 @@ npm run build
 | 后端开发 | ✅ 完成 |
 | 前端开发 | ✅ 完成 |
 | AI 集成 | ✅ 完成 |
+| 安全加固 | ✅ 已修复 IDOR、路径遍历、Mass Assignment、配置暴露等 |
 | 自动化测试 | 🚧 暂无 |
 | CI/CD | 🚧 暂无 |
 | Docker 部署 | 🚧 暂无 |
