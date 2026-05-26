@@ -9,7 +9,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cd backend
 mvn compile                 # 编译
 mvn spring-boot:run         # 启动 (端口 8080)
-mvn test                    # 运行测试
+mvn test                    # 运行全部测试
+mvn test -Dtest=ClassName   # 运行单个测试类
+mvn test -Dtest=ClassName#methodName  # 运行单个测试方法
+mvn clean package -DskipTests         # 生产构建 (target/backend-1.0.0.jar)
 ```
 
 ### Frontend (Vue 3 + Vite)
@@ -20,9 +23,13 @@ npm run dev                 # 开发服务器 (端口 3000，代理 /api → loc
 npm run build               # 生产构建 (vue-tsc + vite build)
 npx vue-tsc --noEmit        # 仅类型检查
 ```
+- `@` 别名映射到 `src/`（`@/api/xxx` = `src/api/xxx`），配置在 `tsconfig.app.json` 的 `paths` 和 `vite.config.ts` 的 `resolve.alias`
+- Vite 开发代理：`/api` → `http://localhost:8080`，无需在前端配置后端地址
 
 ### Database
 MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema.sql`，包含增量迁移 SQL。默认管理员账号 `admin` / `admin123`。
+
+**前置条件**：需先创建空数据库 `CREATE DATABASE bisai`，然后导入 `schema.sql`。应用启动时不会自动建表。
 
 ## Architecture
 
@@ -43,6 +50,7 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 - `entity/` — MyBatis-Plus 实体，核心业务表已启用 `@TableLogic` 逻辑删除
 - `mapper/` — MyBatis-Plus Mapper 接口
 - `config/` — `SecurityConfig`（CORS/JWT/权限）、`AsyncConfig`（AI任务线程池）
+- 工具库：Hutool 5.8（通用工具）、EasyExcel 3.3（Excel 导入导出）、JFreeChart 1.5（可视化报表图表）、Lombok（实体类注解）
 
 ### 前端结构
 - `src/router/guards.ts` — 路由守卫，三套路由：`studentRoutes`、`teacherRoutes`、`adminRoutes`
@@ -99,6 +107,7 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 
 ### TypeScript 6.0.3
 - `tsconfig.app.json` 必须保留 `"ignoreDeprecations": "6.0"`，TS 6.0.3 的 `baseUrl` 已废弃，不加会报 TS5101
+- `noUnusedLocals: true` + `noUnusedParameters: true` — 未使用的导入或变量会导致 `vue-tsc` 类型检查失败，进而导致 `npm run build` 失败
 
 ### 关键方法签名
 - `ScoreService.saveTeacherScores()` 接收 4 个参数：`(Long submissionId, List<ScoreResult>, String comment, String expectedUpdatedAt)`，其中 `expectedUpdatedAt` 用于乐观锁
