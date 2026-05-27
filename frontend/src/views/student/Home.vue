@@ -141,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ArrowRight,
@@ -159,7 +159,7 @@ import {
 import { useUserStore } from '@/store/user'
 import { getStudentStats } from '@/api/dashboard'
 import { getSubmitStatusType, getRoleLabel } from '@/utils/status'
-import { formatDateShort } from '@/utils/date'
+import { formatDateShort, getDaysLeft, getDeadlineTone } from '@/utils/date'
 import type { TrainingTask } from '@/types'
 
 type StudentTask = TrainingTask & {
@@ -195,10 +195,10 @@ const recentTasks = ref<StudentTask[]>([])
 const primaryTask = computed(() => recentTasks.value[0])
 
 const statCards = computed(() => [
-  { title: '进行中任务', value: stats.value.ongoingTasks, icon: Document, tone: 'is-blue' },
-  { title: '已提交成果', value: stats.value.submittedCount, icon: DocumentChecked, tone: 'is-green' },
-  { title: '待评价反馈', value: stats.value.pendingFeedback, icon: Medal, tone: 'is-amber' },
-  { title: '系统通知', value: stats.value.unreadMessages, icon: Bell, tone: 'is-slate' },
+  { title: '进行中任务', value: stats.value.ongoingTasks, icon: markRaw(Document), tone: 'is-blue' },
+  { title: '已提交成果', value: stats.value.submittedCount, icon: markRaw(DocumentChecked), tone: 'is-green' },
+  { title: '待评价反馈', value: stats.value.pendingFeedback, icon: markRaw(Medal), tone: 'is-amber' },
+  { title: '系统通知', value: stats.value.unreadMessages, icon: markRaw(Bell), tone: 'is-slate' },
 ])
 
 const feedbackTitle = computed(() => {
@@ -212,38 +212,6 @@ const feedbackDescription = computed(() => {
   if (stats.value.unreadMessages > 0) return '有新的任务或系统通知等待处理。'
   return '保持提交节奏，新的反馈会在这里提醒。'
 })
-
-function getDaysLeft(value: string | null | undefined) {
-  if (!value) return '-'
-  const end = new Date(value)
-  if (Number.isNaN(end.getTime())) return '-'
-
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  end.setHours(0, 0, 0, 0)
-  const diff = Math.ceil((end.getTime() - start.getTime()) / 86400000)
-
-  if (diff < 0) return '已截止'
-  if (diff === 0) return '今天截止'
-  if (diff === 1) return '明天截止'
-  return `${diff} 天后`
-}
-
-function getDeadlineTone(value: string | null | undefined) {
-  if (!value) return 'normal'
-  const end = new Date(value)
-  if (Number.isNaN(end.getTime())) return 'normal'
-
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  end.setHours(0, 0, 0, 0)
-  const diff = Math.ceil((end.getTime() - start.getTime()) / 86400000)
-
-  if (diff < 0) return 'overdue'
-  if (diff <= 1) return 'urgent'
-  if (diff <= 3) return 'soon'
-  return 'normal'
-}
 
 function getTaskActionLabel(task: StudentTask) {
   return task.submitStatus === '已提交' ? '详情' : '提交'

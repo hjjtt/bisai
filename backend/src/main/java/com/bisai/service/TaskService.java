@@ -4,9 +4,11 @@ import com.bisai.common.PageResult;
 import com.bisai.common.Result;
 import com.bisai.dto.PageQuery;
 import com.bisai.entity.AsyncTask;
+import com.bisai.entity.Course;
 import com.bisai.entity.Submission;
 import com.bisai.entity.TrainingTask;
 import com.bisai.mapper.AsyncTaskMapper;
+import com.bisai.mapper.CourseMapper;
 import com.bisai.mapper.SubmissionMapper;
 import com.bisai.mapper.TrainingTaskMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -33,6 +36,7 @@ public class TaskService {
     private final AsyncTaskService asyncTaskService;
     private final AsyncTaskMapper asyncTaskMapper;
     private final PermissionService permissionService;
+    private final CourseMapper courseMapper;
 
     private static final Map<Long, BatchJob> activeJobs = new ConcurrentHashMap<>();
 
@@ -59,7 +63,9 @@ public class TaskService {
         wrapper.orderByDesc(TrainingTask::getCreatedAt);
 
         Page<TrainingTask> result = taskMapper.selectPage(page, wrapper);
-        return Result.ok(new PageResult<>(result.getRecords(), result.getCurrent(), result.getSize(), result.getTotal()));
+        List<TrainingTask> tasks = result.getRecords();
+        fillCourseName(tasks);
+        return Result.ok(new PageResult<>(tasks, result.getCurrent(), result.getSize(), result.getTotal()));
     }
 
     public Result<TrainingTask> getTask(Long id, Long userId, String role) {
@@ -72,6 +78,7 @@ public class TaskService {
                 return Result.error(40301, "无权访问该任务");
             }
         }
+        fillCourseName(List.of(task));
         return Result.ok(task);
     }
 
@@ -362,6 +369,18 @@ public class TaskService {
     public void onBatchJobCompleted(AsyncTaskService.BatchJobCompletedEvent event) {
         activeJobs.remove(event.taskId);
         log.info("批量任务完成: taskId={}", event.taskId);
+    }
+
+    private void fillCourseName(List<TrainingTask> tasks) {
+        Set<Long> courseIds = tasks.stream()
+                .map(TrainingTask::getCourseId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (courseIds.isEmpty()) return;
+        Map<Long, String> courseNameMap = new HashMap<>();
+        courseMapper.selectList(new LambdaQueryWrapper<Course>().in(Course::getId, courseIds))
+                .forEach(c -> courseNameMap.put(c.getId(), c.getName()));
+        tasks.forEach(t -> t.setCourseName(courseNameMap.getOrDefault(t.getCourseId(), "")));
     }
 
     private static class BatchJob {

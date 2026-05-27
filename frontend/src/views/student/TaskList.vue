@@ -106,7 +106,7 @@ import { ArrowRight, Clock, Document, UploadFilled } from '@element-plus/icons-v
 import { getTaskList } from '@/api/task'
 import { getCourseList } from '@/api/course'
 import { getTaskStatusLabel, getTaskStatusType } from '@/utils/status'
-import { formatDate } from '@/utils/date'
+import { formatDate, getDaysLeft, getDeadlineTone } from '@/utils/date'
 import type { TrainingTask, Course } from '@/types'
 
 const router = useRouter()
@@ -125,38 +125,6 @@ const activeFilterText = computed(() => {
 function handleFilterChange() {
   pagination.page = 1
   loadTasks()
-}
-
-function getDaysLeft(value: string | null | undefined) {
-  if (!value) return '-'
-  const end = new Date(value)
-  if (Number.isNaN(end.getTime())) return '-'
-
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  end.setHours(0, 0, 0, 0)
-  const diff = Math.ceil((end.getTime() - start.getTime()) / 86400000)
-
-  if (diff < 0) return '已截止'
-  if (diff === 0) return '今天截止'
-  if (diff === 1) return '明天截止'
-  return `${diff} 天后`
-}
-
-function getDeadlineTone(value: string | null | undefined) {
-  if (!value) return 'normal'
-  const end = new Date(value)
-  if (Number.isNaN(end.getTime())) return 'normal'
-
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  end.setHours(0, 0, 0, 0)
-  const diff = Math.ceil((end.getTime() - start.getTime()) / 86400000)
-
-  if (diff < 0) return 'overdue'
-  if (diff <= 1) return 'urgent'
-  if (diff <= 3) return 'soon'
-  return 'normal'
 }
 
 async function loadTasks() {

@@ -77,24 +77,27 @@ public class DashboardService {
             );
         }
 
+        // 批量查询学生对这些任务的提交，避免 N+1
+        List<Long> taskIds = tasks.stream().map(TrainingTask::getId).collect(Collectors.toList());
+        Map<Long, Submission> taskSubmissionMap = new HashMap<>();
+        if (!taskIds.isEmpty()) {
+            submissionMapper.selectList(
+                    new LambdaQueryWrapper<Submission>()
+                            .in(Submission::getTaskId, taskIds)
+                            .eq(Submission::getStudentId, userId)
+                            .orderByDesc(Submission::getVersion)
+            ).forEach(s -> taskSubmissionMap.putIfAbsent(s.getTaskId(), s));
+        }
+
         List<Map<String, Object>> recentTasks = new ArrayList<>();
         for (TrainingTask task : tasks) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", task.getId());
             item.put("title", task.getTitle());
             item.put("endTime", task.getEndTime());
-            // 添加课程名称
             item.put("courseName", courseNameMap.getOrDefault(task.getCourseId(), ""));
 
-            // 查该学生对此任务的提交状态
-            Submission sub = submissionMapper.selectOne(
-                    new LambdaQueryWrapper<Submission>()
-                            .eq(Submission::getTaskId, task.getId())
-                            .eq(Submission::getStudentId, userId)
-                            .orderByDesc(Submission::getVersion)
-                            .last("LIMIT 1")
-            );
-
+            Submission sub = taskSubmissionMap.get(task.getId());
             if (sub == null) {
                 item.put("submitStatus", "未提交");
                 item.put("score", null);
@@ -238,16 +241,54 @@ public class DashboardService {
         long prevErrors = submissionMapper.selectCount(new LambdaQueryWrapper<Submission>().eq(Submission::getParseStatus, "FAILED").ge(Submission::getCreatedAt, fourteenDaysAgo).lt(Submission::getCreatedAt, sevenDaysAgo));
         stats.setErrorTrend(calcTrend(recentErrors, prevErrors));
 
-        // 系统状态
+        LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
+
+        // 系统状态（真实检测）
         List<Map<String, Object>> statusList = new ArrayList<>();
-        statusList.add(buildStatus("数据库服务", "运行正常"));
-        statusList.add(buildStatus("AI 模型服务", "Qwen3.5-35B"));
-        statusList.add(buildStatus("文件存储", "正常运行"));
-        statusList.add(buildStatus("异步任务队列", "运行中"));
+
+        // 数据库：尝试查询验证连通性
+        try {
+            userMapper.selectCount(null);
+            statusList.add(buildStatus("数据库服务", "运行正常"));
+        } catch (Exception e) {
+            statusList.add(buildErrorStatus("数据库服务", "连接异常"));
+        }
+
+        // AI 模型：根据今日调用成功率判断
+        long aiTotalToday = aiCallLogMapper.selectCount(
+                new LambdaQueryWrapper<AiCallLog>().ge(AiCallLog::getCreatedAt, todayStart));
+        if (aiTotalToday == 0) {
+            statusList.add(buildStatus("AI 模型服务", "Qwen3.5-35B（今日无调用）"));
+        } else {
+            long aiSuccessToday = aiCallLogMapper.selectCount(
+                    new LambdaQueryWrapper<AiCallLog>().ge(AiCallLog::getCreatedAt, todayStart).eq(AiCallLog::getSuccess, true));
+            double aiRate = (double) aiSuccessToday / aiTotalToday * 100;
+            if (aiRate >= 90) {
+                statusList.add(buildStatus("AI 模型服务", String.format("Qwen3.5-35B（成功率 %.0f%%）", aiRate)));
+            } else {
+                statusList.add(buildErrorStatus("AI 模型服务", String.format("成功率 %.0f%%", aiRate)));
+            }
+        }
+
+        // 文件存储
+        String uploadPath = System.getProperty("file.upload-path", "./data/files/");
+        java.io.File uploadDir = new java.io.File(uploadPath);
+        if (uploadDir.exists() && uploadDir.canWrite()) {
+            statusList.add(buildStatus("文件存储", "正常运行"));
+        } else {
+            statusList.add(buildErrorStatus("文件存储", "目录不可用"));
+        }
+
+        // 异步任务队列
+        long runningTasks = asyncTaskMapper.selectCount(
+                new LambdaQueryWrapper<AsyncTask>().eq(AsyncTask::getStatus, "RUNNING"));
+        long pendingTasks = asyncTaskMapper.selectCount(
+                new LambdaQueryWrapper<AsyncTask>().eq(AsyncTask::getStatus, "PENDING"));
+        statusList.add(buildStatus("异步任务队列", String.format("运行中（%d 运行 / %d 排队）", runningTasks, pendingTasks)));
+
         stats.setSystemStatus(statusList);
 
         // API 用量：今日已用 Token / 每日配额(200000)
-        LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
         long todayTokens = aiCallLogMapper.sumTotalTokens(todayStart, LocalDateTime.now());
         long dailyTokenLimit = 200000L;
         stats.setApiUsage(Math.min(100, Math.round((double) todayTokens / dailyTokenLimit * 10000.0) / 100.0));
@@ -300,6 +341,14 @@ public class DashboardService {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("name", name);
         m.put("type", "success");
+        m.put("text", text);
+        return m;
+    }
+
+    private Map<String, Object> buildErrorStatus(String name, String text) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("name", name);
+        m.put("type", "danger");
         m.put("text", text);
         return m;
     }

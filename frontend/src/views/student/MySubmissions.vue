@@ -14,14 +14,6 @@
           <strong>{{ pagination.total }}</strong>
           <span>提交总数</span>
         </div>
-        <div>
-          <strong>{{ publishedCount }}</strong>
-          <span>已发布</span>
-        </div>
-        <div>
-          <strong>{{ processingCount }}</strong>
-          <span>处理中</span>
-        </div>
       </div>
     </section>
 
@@ -101,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Clock, Document, Files, Medal } from '@element-plus/icons-vue'
 import { getSubmissions } from '@/api/task'
@@ -121,9 +113,6 @@ const router = useRouter()
 const loading = ref(false)
 const submissions = ref<Submission[]>([])
 const pagination = reactive({ page: 1, size: 20, total: 0 })
-
-const publishedCount = computed(() => submissions.value.filter(item => item.scoreStatus === 'PUBLISHED').length)
-const processingCount = computed(() => submissions.value.filter(item => !['PUBLISHED', 'SCORE_FAILED', 'RETURNED'].includes(item.scoreStatus)).length)
 
 async function loadSubmissions() {
   loading.value = true

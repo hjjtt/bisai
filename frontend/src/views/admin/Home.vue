@@ -107,7 +107,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, markRaw } from 'vue'
 import * as echarts from 'echarts/core'
 import type { LinearGradientObject } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
@@ -140,10 +140,10 @@ const statsLoading = ref(true)
 let chartInstance: echarts.ECharts | null = null
 
 const statCards = ref([
-  { title: '用户总数', value: 0, trend: 0, icon: User, tone: 'is-blue' },
-  { title: '活跃班级', value: 0, trend: 0, icon: School, tone: 'is-green' },
-  { title: '核查任务', value: 0, trend: 0, icon: Document, tone: 'is-amber' },
-  { title: '系统异常', value: 0, trend: 0, icon: Warning, tone: 'is-red' },
+  { title: '用户总数', value: 0, trend: 0, icon: markRaw(User), tone: 'is-blue' },
+  { title: '活跃班级', value: 0, trend: 0, icon: markRaw(School), tone: 'is-green' },
+  { title: '核查任务', value: 0, trend: 0, icon: markRaw(Document), tone: 'is-amber' },
+  { title: '系统异常', value: 0, trend: 0, icon: markRaw(Warning), tone: 'is-red' },
 ])
 
 const systemStatus = ref<SystemStatusItem[]>([])

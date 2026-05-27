@@ -116,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ArrowRight,
@@ -158,10 +158,10 @@ const pendingReviews = ref<ReviewSubmission[]>([])
 const highRiskSubmissions = ref<ReviewSubmission[]>([])
 
 const statCards = computed(() => [
-  { title: '待评价', value: stats.value.pendingScore, icon: EditPen, tone: 'is-amber' },
-  { title: '待复核', value: stats.value.pendingReview, icon: Document, tone: 'is-blue' },
-  { title: '高风险成果', value: stats.value.highRisk, icon: Warning, tone: 'is-red' },
-  { title: '已完成', value: stats.value.completed, icon: CircleCheck, tone: 'is-green' },
+  { title: '待评价', value: stats.value.pendingScore, icon: markRaw(EditPen), tone: 'is-amber' },
+  { title: '待复核', value: stats.value.pendingReview, icon: markRaw(Document), tone: 'is-blue' },
+  { title: '高风险成果', value: stats.value.highRisk, icon: markRaw(Warning), tone: 'is-red' },
+  { title: '已完成', value: stats.value.completed, icon: markRaw(CircleCheck), tone: 'is-green' },
 ])
 
 const focusTitle = computed(() => {

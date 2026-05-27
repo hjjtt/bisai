@@ -39,3 +39,35 @@ export function formatRelativeTime(value: string | null | undefined): string {
   if (days < 30) return `${days}天前`
   return formatDate(value)
 }
+
+export function getDaysLeft(value: string | null | undefined): string {
+  if (!value) return '-'
+  const end = new Date(value)
+  if (Number.isNaN(end.getTime())) return '-'
+
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  end.setHours(0, 0, 0, 0)
+  const diff = Math.ceil((end.getTime() - start.getTime()) / 86400000)
+
+  if (diff < 0) return '已截止'
+  if (diff === 0) return '今天截止'
+  if (diff === 1) return '明天截止'
+  return `${diff} 天后`
+}
+
+export function getDeadlineTone(value: string | null | undefined): string {
+  if (!value) return 'normal'
+  const end = new Date(value)
+  if (Number.isNaN(end.getTime())) return 'normal'
+
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  end.setHours(0, 0, 0, 0)
+  const diff = Math.ceil((end.getTime() - start.getTime()) / 86400000)
+
+  if (diff < 0) return 'overdue'
+  if (diff <= 1) return 'urgent'
+  if (diff <= 3) return 'soon'
+  return 'normal'
+}
