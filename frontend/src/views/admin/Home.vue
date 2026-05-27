@@ -1,90 +1,113 @@
 <template>
   <div class="admin-home">
-    <!-- 统计卡片区 -->
-    <el-row :gutter="20">
-      <el-col :span="6" v-for="item in statCards" :key="item.title">
-        <el-card shadow="never" class="stat-card">
-          <div class="card-body">
-            <div class="stat-info">
-              <div class="stat-label">{{ item.title }}</div>
-              <div class="stat-value" v-if="statsLoading">
-                <el-icon class="is-loading"><Loading /></el-icon>
-              </div>
-              <div class="stat-value" v-else>{{ item.value.toLocaleString() }}</div>
-            </div>
-            <div class="stat-icon" :style="{ background: item.color + '15', color: item.color }">
-              <el-icon><component :is="item.icon" /></el-icon>
-            </div>
-          </div>
-          <div class="card-footer">
-            <span class="trend" :class="item.trend >= 0 ? 'up' : 'down'">
-              <el-icon><CaretTop v-if="item.trend >= 0" /><CaretBottom v-else /></el-icon>
-              {{ item.trend >= 0 ? '+' : '' }}{{ item.trend }}%
-            </span>
-            <span class="footer-text">较上期统计</span>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <section class="hero-panel">
+      <div class="hero-copy">
+        <div class="eyebrow">
+          <el-icon><Monitor /></el-icon>
+          <span>管理员控制台</span>
+        </div>
+        <h2>系统运行与核查概览</h2>
+        <p>集中查看用户、班级、核查任务和异常情况，确保 AI 核查流程稳定运行。</p>
+        <div class="hero-actions">
+          <el-button type="primary" :icon="User" @click="$router.push('/admin/users')">用户管理</el-button>
+          <el-button :icon="School" @click="$router.push('/admin/classes')">班级课程</el-button>
+          <el-button :icon="Setting" @click="$router.push('/admin/model-config')">模型配置</el-button>
+        </div>
+      </div>
 
-    <!-- 图表与列表区 -->
-    <el-row :gutter="20" class="mt-20">
-      <el-col :span="16">
-        <el-card shadow="never" v-loading="statsLoading">
-          <template #header>
-            <div class="card-header">
-              <span class="title">系统核查概览</span>
-              <el-radio-group v-model="timeRange" size="small">
-                <el-radio-button value="7d">近7天</el-radio-button>
-                <el-radio-button value="30d">近30天</el-radio-button>
-              </el-radio-group>
-            </div>
-          </template>
-          <div ref="chartRef" class="chart-container"></div>
-        </el-card>
-      </el-col>
-      <el-col :span="8">
-        <el-card shadow="never" class="status-card">
-          <template #header>
-            <div class="card-header">
-              <span class="title">服务运行状态</span>
-            </div>
-          </template>
-          <div class="status-list">
-            <div class="status-item" v-for="status in systemStatus" :key="status.name">
-              <div class="status-name">
-                <el-badge is-dot :type="status.type" />
-                <span>{{ status.name }}</span>
-              </div>
-              <el-tag :type="status.type" size="small" effect="plain">{{ status.text }}</el-tag>
-            </div>
-          </div>
-          <el-empty v-if="systemStatus.length === 0 && !statsLoading" description="暂无状态数据" :image-size="60" />
-          <div class="usage-stats">
-            <div class="usage-item">
-              <div class="usage-header">
-                <span>API 调用频率 (每日)</span>
-                <span>{{ apiUsage }}%</span>
-              </div>
-              <el-progress :percentage="apiUsage" :show-text="false" />
-            </div>
-            <div class="usage-item">
-              <div class="usage-header">
-                <span>服务器负载</span>
-                <span>{{ serverLoad }}%</span>
-              </div>
-              <el-progress :percentage="serverLoad" :show-text="false" :status="serverLoad < 50 ? 'success' : 'warning'" />
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+      <div class="health-card">
+        <div class="health-header">
+          <span>服务健康度</span>
+          <el-tag :type="healthType" effect="light">{{ healthLabel }}</el-tag>
+        </div>
+        <strong>{{ Math.max(0, 100 - serverLoad) }}%</strong>
+        <p>综合服务器负载与接口调用频率，辅助判断当前系统压力。</p>
+        <div class="health-metrics">
+          <span>API {{ apiUsage }}%</span>
+          <span>负载 {{ serverLoad }}%</span>
+        </div>
+      </div>
+    </section>
 
+    <section class="stat-grid">
+      <article v-for="item in statCards" :key="item.title" class="stat-card" :class="item.tone">
+        <div class="stat-main">
+          <div class="stat-icon">
+            <el-icon><component :is="item.icon" /></el-icon>
+          </div>
+          <div>
+            <span>{{ item.title }}</span>
+            <strong v-if="statsLoading"><el-icon class="is-loading"><Loading /></el-icon></strong>
+            <strong v-else>{{ item.value.toLocaleString() }}</strong>
+          </div>
+        </div>
+        <div class="stat-footer">
+          <span class="trend" :class="item.trend >= 0 ? 'up' : 'down'">
+            <el-icon><CaretTop v-if="item.trend >= 0" /><CaretBottom v-else /></el-icon>
+            {{ item.trend >= 0 ? '+' : '' }}{{ item.trend }}%
+          </span>
+          <span>较上期</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="content-grid">
+      <div class="chart-panel" v-loading="statsLoading">
+        <div class="section-header">
+          <div>
+            <h3>系统核查概览</h3>
+            <p>提交、解析与评分完成趋势。</p>
+          </div>
+          <el-radio-group v-model="timeRange" size="small">
+            <el-radio-button value="7d">近 7 天</el-radio-button>
+            <el-radio-button value="30d">近 30 天</el-radio-button>
+          </el-radio-group>
+        </div>
+        <div ref="chartRef" class="chart-container"></div>
+      </div>
+
+      <aside class="status-panel">
+        <div class="section-header compact">
+          <div>
+            <h3>服务运行状态</h3>
+            <p>关键服务与资源占用。</p>
+          </div>
+        </div>
+
+        <div class="status-list">
+          <div class="status-item" v-for="status in systemStatus" :key="status.name">
+            <div class="status-name">
+              <el-badge is-dot :type="status.type" />
+              <span>{{ status.name }}</span>
+            </div>
+            <el-tag :type="status.type" size="small" effect="light">{{ status.text }}</el-tag>
+          </div>
+        </div>
+        <el-empty v-if="systemStatus.length === 0 && !statsLoading" description="暂无状态数据" :image-size="70" />
+
+        <div class="usage-list">
+          <div class="usage-item">
+            <div class="usage-header">
+              <span>API 调用频率</span>
+              <strong>{{ apiUsage }}%</strong>
+            </div>
+            <el-progress :percentage="apiUsage" :show-text="false" />
+          </div>
+          <div class="usage-item">
+            <div class="usage-header">
+              <span>服务器负载</span>
+              <strong>{{ serverLoad }}%</strong>
+            </div>
+            <el-progress :percentage="serverLoad" :show-text="false" :status="serverLoad < 50 ? 'success' : 'warning'" />
+          </div>
+        </div>
+      </aside>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts/core'
 import type { LinearGradientObject } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
@@ -95,7 +118,17 @@ import {
   GridComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
-import { Loading } from '@element-plus/icons-vue'
+import {
+  CaretBottom,
+  CaretTop,
+  Document,
+  Loading,
+  Monitor,
+  School,
+  Setting,
+  User,
+  Warning,
+} from '@element-plus/icons-vue'
 import { getAdminStats } from '@/api/dashboard'
 import type { SystemStatusItem, BaseStats } from '@/types'
 
@@ -107,15 +140,27 @@ const statsLoading = ref(true)
 let chartInstance: echarts.ECharts | null = null
 
 const statCards = ref([
-  { title: '用户总数', value: 0, trend: 0, icon: 'User', color: '#3b82f6' },
-  { title: '活跃班级', value: 0, trend: 0, icon: 'School', color: '#10b981' },
-  { title: '核查任务', value: 0, trend: 0, icon: 'Document', color: '#f59e0b' },
-  { title: '系统异常', value: 0, trend: 0, icon: 'Warning', color: '#ef4444' },
+  { title: '用户总数', value: 0, trend: 0, icon: User, tone: 'is-blue' },
+  { title: '活跃班级', value: 0, trend: 0, icon: School, tone: 'is-green' },
+  { title: '核查任务', value: 0, trend: 0, icon: Document, tone: 'is-amber' },
+  { title: '系统异常', value: 0, trend: 0, icon: Warning, tone: 'is-red' },
 ])
 
 const systemStatus = ref<SystemStatusItem[]>([])
 const apiUsage = ref(0)
 const serverLoad = ref(0)
+
+const healthType = computed(() => {
+  if (serverLoad.value >= 80 || apiUsage.value >= 90) return 'danger'
+  if (serverLoad.value >= 50 || apiUsage.value >= 70) return 'warning'
+  return 'success'
+})
+
+const healthLabel = computed(() => {
+  if (healthType.value === 'danger') return '高压力'
+  if (healthType.value === 'warning') return '需关注'
+  return '稳定'
+})
 
 async function loadStats() {
   statsLoading.value = true
@@ -135,7 +180,8 @@ async function loadStats() {
     apiUsage.value = d.apiUsage || 0
     serverLoad.value = d.serverLoad || 0
     initChart(d)
-  } catch (e) {
+  } catch {
+    // 请求错误已由拦截器处理
   } finally {
     statsLoading.value = false
   }
@@ -144,27 +190,29 @@ async function loadStats() {
 function initChart(data: BaseStats) {
   if (!chartRef.value) return
 
-  chartInstance = echarts.init(chartRef.value)
+  if (!chartInstance) {
+    chartInstance = echarts.init(chartRef.value)
+  }
 
   const option: echarts.EChartsCoreOption = {
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      backgroundColor: 'rgba(255, 255, 255, 0.96)',
       borderColor: '#e2e8f0',
       textStyle: { color: '#1e293b' },
       padding: [12, 16],
-      extraCssText: 'box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);'
+      extraCssText: 'box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);'
     },
     legend: {
       data: ['提交数', '解析成功', '评分完成'],
       top: 0,
-      right: '2%',
+      right: 0,
       icon: 'circle',
       itemWidth: 10,
       itemHeight: 10,
       textStyle: { color: '#64748b', fontSize: 13 }
     },
-    grid: { top: 40, left: '2%', right: '3%', bottom: '3%', containLabel: true },
+    grid: { top: 44, left: '2%', right: '3%', bottom: '4%', containLabel: true },
     xAxis: {
       type: 'category',
       boundaryGap: false,
@@ -175,7 +223,7 @@ function initChart(data: BaseStats) {
     },
     yAxis: {
       type: 'value',
-      splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
+      splitLine: { lineStyle: { color: '#eef2f7', type: 'dashed' } },
       axisLabel: { color: '#64748b' }
     },
     series: [
@@ -184,13 +232,12 @@ function initChart(data: BaseStats) {
         type: 'line',
         smooth: true,
         showSymbol: false,
-        symbolSize: 8,
         data: data.submissions || [],
-        itemStyle: { color: '#3b82f6' },
+        itemStyle: { color: '#2563eb' },
         areaStyle: {
           color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
-            { offset: 0, color: 'rgba(59, 130, 246, 0.25)' },
-            { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+            { offset: 0, color: 'rgba(37, 99, 235, 0.25)' },
+            { offset: 1, color: 'rgba(37, 99, 235, 0.03)' }
           ] } as LinearGradientObject
         }
       },
@@ -199,13 +246,12 @@ function initChart(data: BaseStats) {
         type: 'line',
         smooth: true,
         showSymbol: false,
-        symbolSize: 8,
         data: data.parsed || [],
-        itemStyle: { color: '#10b981' },
+        itemStyle: { color: '#059669' },
         areaStyle: {
           color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
-            { offset: 0, color: 'rgba(16, 185, 129, 0.25)' },
-            { offset: 1, color: 'rgba(16, 185, 129, 0.05)' }
+            { offset: 0, color: 'rgba(5, 150, 105, 0.22)' },
+            { offset: 1, color: 'rgba(5, 150, 105, 0.03)' }
           ] } as LinearGradientObject
         }
       },
@@ -214,13 +260,12 @@ function initChart(data: BaseStats) {
         type: 'line',
         smooth: true,
         showSymbol: false,
-        symbolSize: 8,
         data: data.scored || [],
-        itemStyle: { color: '#f59e0b' },
+        itemStyle: { color: '#d97706' },
         areaStyle: {
           color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
-            { offset: 0, color: 'rgba(245, 158, 11, 0.25)' },
-            { offset: 1, color: 'rgba(245, 158, 11, 0.05)' }
+            { offset: 0, color: 'rgba(217, 119, 6, 0.2)' },
+            { offset: 1, color: 'rgba(217, 119, 6, 0.03)' }
           ] } as LinearGradientObject
         }
       },
@@ -249,112 +294,308 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 .admin-home {
-  max-width: 1400px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
-.mt-20 {
-  margin-top: 20px;
+.hero-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  .title {
-    font-size: 15px;
+.hero-copy,
+.health-card,
+.stat-card,
+.chart-panel,
+.status-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+}
+
+.hero-copy {
+  padding: 30px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(242, 248, 255, 0.94)),
+    url('@/assets/hero.png') right center / auto 100% no-repeat;
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    color: #2563eb;
+    font-size: 13px;
     font-weight: 600;
-    color: #1e293b;
   }
+
+  h2 {
+    margin-bottom: 10px;
+    color: #0f172a;
+    font-size: 30px;
+    font-weight: 700;
+  }
+
+  p {
+    max-width: 620px;
+    color: #52657a;
+    font-size: 15px;
+    line-height: 1.8;
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 24px;
+  }
+}
+
+.health-card {
+  display: flex;
+  min-height: 220px;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px;
+  border-color: #d7e6f7;
+
+  .health-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  strong {
+    color: #0f172a;
+    font-size: 46px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  p {
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  .health-metrics {
+    display: flex;
+    gap: 10px;
+
+    span {
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 600;
+    }
+  }
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .stat-card {
-  .card-body {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
+  min-height: 132px;
+  padding: 20px;
 
-    .stat-label {
-      font-size: 13px;
-      color: #64748b;
-      margin-bottom: 4px;
-    }
-    .stat-value {
-      font-size: 24px;
-      font-weight: 700;
-      color: #0f172a;
-    }
-    .stat-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-    }
+  .stat-main {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
   }
 
-  .card-footer {
-    border-top: 1px solid #f1f5f9;
-    padding-top: 12px;
-    font-size: 12px;
+  .stat-icon {
+    display: flex;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 22px;
+  }
+
+  span {
+    display: block;
+    color: #64748b;
+    font-size: 13px;
+  }
+
+  strong {
+    display: block;
+    margin-top: 7px;
+    color: #0f172a;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .stat-footer {
     display: flex;
     align-items: center;
     gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #eef2f7;
+    color: #94a3b8;
+    font-size: 12px;
 
     .trend {
-      font-weight: 600;
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      &.up { color: #10b981; }
+      color: #dc2626;
+      font-weight: 700;
+
+      &.up {
+        color: #059669;
+      }
     }
-    .footer-text {
-      color: #94a3b8;
-    }
+  }
+
+  &.is-blue .stat-icon {
+    background: #eaf2ff;
+    color: #2563eb;
+  }
+
+  &.is-green .stat-icon {
+    background: #e8f7ef;
+    color: #059669;
+  }
+
+  &.is-amber .stat-icon {
+    background: #fff4df;
+    color: #d97706;
+  }
+
+  &.is-red .stat-icon {
+    background: #fff1f2;
+    color: #dc2626;
+  }
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+}
+
+.chart-panel,
+.status-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid #eef2f7;
+
+  &.compact {
+    align-items: flex-start;
+  }
+
+  h3 {
+    margin-bottom: 6px;
+    color: #0f172a;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  p {
+    color: #64748b;
+    font-size: 13px;
   }
 }
 
 .chart-container {
-  height: 300px;
   width: 100%;
+  height: 330px;
+  padding: 14px 20px 20px;
 }
 
-.status-card {
-  .status-list {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    margin-bottom: 24px;
+.status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px;
+}
 
-    .status-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      .status-name {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 14px;
-        color: #475569;
-      }
+.status-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  .status-name {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    color: #475569;
+    font-size: 14px;
+  }
+}
+
+.usage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 24px 24px;
+}
+
+.usage-item {
+  .usage-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    color: #64748b;
+    font-size: 13px;
+
+    strong {
+      color: #0f172a;
+    }
+  }
+}
+
+@media (max-width: 1180px) {
+  .hero-panel,
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .hero-copy {
+    padding: 22px;
+    background: #ffffff;
+
+    h2 {
+      font-size: 26px;
     }
   }
 
-  .usage-stats {
-    display: flex;
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .section-header {
+    align-items: flex-start;
     flex-direction: column;
-    gap: 16px;
-    .usage-item {
-      .usage-header {
-        display: flex;
-        justify-content: space-between;
-        font-size: 12px;
-        color: #64748b;
-        margin-bottom: 6px;
-      }
-    }
   }
 }
 </style>
