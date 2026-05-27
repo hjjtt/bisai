@@ -1,20 +1,23 @@
 <template>
   <el-container class="main-layout">
-    <!-- 侧边栏：经典企业级深色 -->
-    <el-aside :width="sidebarCollapsed ? '64px' : '240px'" class="sidebar">
+    <!-- 侧边栏 -->
+    <el-aside :width="sidebarCollapsed ? '76px' : '248px'" class="sidebar">
       <div class="logo">
-        <div class="logo-circle">
+        <div class="logo-mark">
           <el-icon><Monitor /></el-icon>
         </div>
-        <h1 v-show="!sidebarCollapsed">实训成果核查</h1>
+        <div v-show="!sidebarCollapsed" class="logo-text">
+          <h1>实训成果核查</h1>
+          <span>BisAI Evaluation</span>
+        </div>
       </div>
       <el-menu
         :default-active="currentRoute"
         :collapse="sidebarCollapsed"
         :router="true"
-        background-color="#1e293b"
-        text-color="#94a3b8"
-        active-text-color="#ffffff"
+        background-color="#ffffff"
+        text-color="#64748b"
+        active-text-color="#0f172a"
         class="sidebar-menu"
       >
         <el-menu-item
@@ -29,17 +32,22 @@
     </el-aside>
 
     <el-container>
-      <!-- 顶栏：白色简约投影 -->
+      <!-- 顶栏 -->
       <el-header class="header">
         <div class="header-left">
-          <el-icon class="collapse-btn" @click="toggleSidebar">
-            <Fold v-if="!sidebarCollapsed" />
-            <Expand v-else />
-          </el-icon>
-          <el-breadcrumb separator="/">
-            <el-breadcrumb-item>首页</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="currentTitle">{{ currentTitle }}</el-breadcrumb-item>
-          </el-breadcrumb>
+          <el-button class="collapse-btn" text circle @click="toggleSidebar">
+            <el-icon>
+              <Fold v-if="!sidebarCollapsed" />
+              <Expand v-else />
+            </el-icon>
+          </el-button>
+          <div class="route-meta">
+            <strong>{{ currentTitle || '首页' }}</strong>
+            <el-breadcrumb separator="/">
+              <el-breadcrumb-item>首页</el-breadcrumb-item>
+              <el-breadcrumb-item v-if="currentTitle">{{ currentTitle }}</el-breadcrumb-item>
+            </el-breadcrumb>
+          </div>
         </div>
         <div class="header-right">
           <div class="header-actions">
@@ -51,7 +59,9 @@
             >
               <template #reference>
                 <el-badge :value="appStore.unreadMessageCount" :hidden="appStore.unreadMessageCount === 0" class="notice-badge">
-                  <el-icon :size="20" style="cursor: pointer"><Bell /></el-icon>
+                  <el-button class="icon-btn" text circle>
+                    <el-icon><Bell /></el-icon>
+                  </el-button>
                 </el-badge>
               </template>
               <div class="notification-panel">
@@ -293,58 +303,120 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 .main-layout {
   height: 100vh;
+  background: #f6f8fb;
 }
 
 .sidebar {
-  background-color: #1e293b;
-  transition: width 0.3s;
+  background: #ffffff;
+  border-right: 1px solid #e5edf5;
+  transition: width 0.25s ease;
   overflow: hidden;
   z-index: 100;
 
   .logo {
-    height: 64px;
+    height: 72px;
     display: flex;
     align-items: center;
-    padding: 0 16px;
+    padding: 0 18px;
     gap: 12px;
-    background-color: #0f172a;
+    border-bottom: 1px solid #edf2f7;
 
-    .logo-circle {
-      width: 32px;
-      height: 32px;
-      background: #3b82f6;
-      border-radius: 6px;
+    .logo-mark {
+      width: 40px;
+      height: 40px;
+      flex: 0 0 40px;
+      background: #edf7ff;
+      border: 1px solid #d9e9f8;
+      border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: white;
-      font-size: 18px;
+      color: #2563eb;
+      font-size: 20px;
     }
 
-    h1 {
-      font-size: 16px;
-      color: #fff;
-      font-weight: 600;
-      white-space: nowrap;
+    .logo-text {
+      min-width: 0;
+
+      h1 {
+        font-size: 16px;
+        color: #0f172a;
+        font-weight: 700;
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+
+      span {
+        display: block;
+        margin-top: 4px;
+        color: #8a98aa;
+        font-size: 11px;
+        letter-spacing: 0;
+        white-space: nowrap;
+      }
     }
   }
 
   .sidebar-menu {
     border-right: none;
-    padding-top: 12px;
+    padding: 14px 12px;
+    background: transparent !important;
 
     :deep(.el-menu-item) {
-      height: 50px;
-      line-height: 50px;
+      height: 44px;
+      line-height: 44px;
+      margin: 4px 0;
+      border-radius: 8px;
+      color: #64748b;
+      font-weight: 500;
+
+      .el-icon {
+        color: #8a98aa;
+      }
 
       &:hover {
-        color: #fff !important;
-        background-color: rgba(255, 255, 255, 0.05) !important;
+        color: #0f172a !important;
+        background-color: #f5f8fb !important;
+
+        .el-icon {
+          color: #2563eb;
+        }
       }
 
       &.is-active {
-        background-color: #3b82f6 !important;
-        color: #fff !important;
+        color: #0f172a !important;
+        background-color: #eaf4ff !important;
+        box-shadow: inset 3px 0 0 #2563eb;
+
+        .el-icon {
+          color: #2563eb;
+        }
+      }
+    }
+
+    :deep(.el-menu--collapse) {
+      width: auto;
+    }
+
+    :deep(.el-menu-tooltip__trigger) {
+      justify-content: center;
+      padding: 0;
+    }
+
+    :deep(.el-menu-item [class^='el-icon']) {
+      margin-right: 10px;
+    }
+
+    &.el-menu--collapse {
+      padding-right: 10px;
+      padding-left: 10px;
+
+      :deep(.el-menu-item) {
+        justify-content: center;
+      }
+
+      :deep(.el-menu-item [class^='el-icon']) {
+        margin-right: 0;
       }
     }
   }
@@ -354,23 +426,39 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #ffffff;
-  padding: 0 24px;
-  height: 64px !important;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0 28px;
+  height: 72px !important;
+  border-bottom: 1px solid #e5edf5;
+  backdrop-filter: blur(12px);
   z-index: 99;
 
   .header-left {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 14px;
 
     .collapse-btn {
-      font-size: 20px;
-      cursor: pointer;
+      width: 36px;
+      height: 36px;
       color: #64748b;
+
       &:hover {
+        background: #f1f5f9;
         color: #3b82f6;
+      }
+    }
+
+    .route-meta {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 5px;
+
+      strong {
+        color: #0f172a;
+        font-size: 16px;
+        font-weight: 700;
       }
     }
   }
@@ -378,17 +466,23 @@ onUnmounted(() => {
   .header-right {
     display: flex;
     align-items: center;
-    gap: 24px;
+    gap: 18px;
 
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 10px;
       color: #64748b;
-      font-size: 18px;
-      cursor: pointer;
 
-      .el-icon:hover {
+      .icon-btn {
+        width: 36px;
+        height: 36px;
+        color: #64748b;
+        font-size: 18px;
+      }
+
+      .icon-btn:hover {
+        background: #f1f5f9;
         color: #3b82f6;
       }
     }
@@ -396,8 +490,17 @@ onUnmounted(() => {
     .user-info {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       cursor: pointer;
+      min-height: 40px;
+      padding: 4px 6px 4px 12px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+
+      &:hover {
+        border-color: #e2e8f0;
+        background: #f8fafc;
+      }
 
       .welcome {
         font-size: 13px;
@@ -407,21 +510,22 @@ onUnmounted(() => {
       .username {
         font-size: 14px;
         color: #1e293b;
-        font-weight: 500;
+        font-weight: 600;
         margin-right: 4px;
       }
 
       .user-avatar {
-        background: #e2e8f0;
-        color: #64748b;
+        background: #e9f2ff;
+        color: #2563eb;
       }
     }
   }
 }
 
 .main-content {
-  background-color: #f1f5f9;
-  padding: 24px;
+  background:
+    linear-gradient(180deg, #f6f8fb 0%, #f8fafc 42%, #f6f8fb 100%);
+  padding: 28px;
   overflow-y: auto;
 }
 
@@ -483,6 +587,26 @@ onUnmounted(() => {
     padding: 12px 0;
     text-align: center;
     border-top: 1px solid #f1f5f9;
+  }
+}
+
+@media (max-width: 900px) {
+  .header {
+    padding: 0 16px;
+
+    .header-left .route-meta {
+      .el-breadcrumb {
+        display: none;
+      }
+    }
+
+    .header-right .user-info .welcome {
+      display: none;
+    }
+  }
+
+  .main-content {
+    padding: 16px;
   }
 }
 </style>

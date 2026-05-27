@@ -1,45 +1,93 @@
 <template>
   <div class="my-submissions">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>我的提交记录</span>
+    <section class="page-hero">
+      <div>
+        <div class="eyebrow">
+          <el-icon><Files /></el-icon>
+          <span>我的提交</span>
         </div>
-      </template>
+        <h2>跟踪成果处理进度</h2>
+        <p>查看每次提交的解析、核查与评分状态，成绩发布后可进入详情页查看反馈。</p>
+      </div>
+      <div class="hero-stats">
+        <div>
+          <strong>{{ pagination.total }}</strong>
+          <span>提交总数</span>
+        </div>
+        <div>
+          <strong>{{ publishedCount }}</strong>
+          <span>已发布</span>
+        </div>
+        <div>
+          <strong>{{ processingCount }}</strong>
+          <span>处理中</span>
+        </div>
+      </div>
+    </section>
 
-      <el-table :data="submissions" stripe v-loading="loading">
-        <el-table-column prop="taskTitle" label="任务名称" min-width="180" show-overflow-tooltip />
-        <el-table-column label="提交时间" width="170">
-          <template #default="{ row }">{{ formatDate(row.submitTime) }}</template>
-        </el-table-column>
-        <el-table-column label="版本" width="80" align="center">
-          <template #default="{ row }">V{{ row.version }}</template>
-        </el-table-column>
-        <el-table-column label="解析状态" width="100">
+    <section class="list-panel">
+      <div class="toolbar">
+        <div>
+          <h3>提交记录</h3>
+          <p>按最新提交顺序查看处理结果。</p>
+        </div>
+        <el-button type="primary" :icon="Document" @click="router.push('/student/tasks')">继续提交任务</el-button>
+      </div>
+
+      <el-table :data="submissions" v-loading="loading">
+        <el-table-column label="任务名称" min-width="220">
           <template #default="{ row }">
-            <el-tag :type="getParseStatusType(row.parseStatus)" size="small">{{ getParseStatusLabel(row.parseStatus) }}</el-tag>
+            <div class="task-name">
+              <strong>{{ row.taskTitle || '未命名任务' }}</strong>
+              <span>{{ formatDate(row.submitTime) }}</span>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="核查状态" width="100">
+        <el-table-column label="版本" width="90" align="center">
           <template #default="{ row }">
-            <el-tag :type="getCheckStatusType(row.checkStatus)" size="small">{{ getCheckStatusLabel(row.checkStatus) }}</el-tag>
+            <span class="version-pill">V{{ row.version }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="评分状态" width="120">
+        <el-table-column label="处理进度" min-width="300">
           <template #default="{ row }">
-            <el-tag :type="getScoreStatusType(row.scoreStatus)" size="small">{{ getScoreStatusLabel(row.scoreStatus) }}</el-tag>
+            <div class="status-chain">
+              <el-tag :type="getParseStatusType(row.parseStatus)" effect="light">{{ getParseStatusLabel(row.parseStatus) }}</el-tag>
+              <el-tag :type="getCheckStatusType(row.checkStatus)" effect="light">{{ getCheckStatusLabel(row.checkStatus) }}</el-tag>
+              <el-tag :type="getScoreStatusType(row.scoreStatus)" effect="light">{{ getScoreStatusLabel(row.scoreStatus) }}</el-tag>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="最终得分" width="110" align="right">
           <template #default="{ row }">
-            <el-button type="primary" link @click="$router.push(`/student/tasks/${row.taskId}`)">任务详情</el-button>
-            <el-button v-if="row.scoreStatus === 'PUBLISHED'" type="success" link @click="$router.push(`/student/result/${row.id}`)">查看成绩</el-button>
-            <el-button v-else-if="row.scoreStatus !== 'NOT_SCORED'" type="warning" link @click="$router.push(`/student/result/${row.id}`)">查看进度</el-button>
+            <span class="score-text">{{ row.totalScore ?? '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="210" fixed="right" align="right">
+          <template #default="{ row }">
+            <el-button text type="primary" :icon="Document" @click="router.push(`/student/tasks/${row.taskId}`)">任务</el-button>
+            <el-button
+              v-if="row.scoreStatus === 'PUBLISHED'"
+              text
+              type="success"
+              :icon="Medal"
+              @click="router.push(`/student/result/${row.id}`)"
+            >
+              成绩
+            </el-button>
+            <el-button
+              v-else-if="row.scoreStatus !== 'NOT_SCORED'"
+              text
+              type="warning"
+              :icon="Clock"
+              @click="router.push(`/student/result/${row.id}`)"
+            >
+              进度
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <el-empty v-if="!loading && submissions.length === 0" description="暂无提交记录，快去完成任务吧" />
+      <el-empty v-if="!loading && submissions.length === 0" description="暂无提交记录，快去完成任务吧" :image-size="96" />
 
       <el-pagination
         v-model:current-page="pagination.page"
@@ -47,38 +95,51 @@
         :total="pagination.total"
         layout="total, prev, pager, next"
         @change="loadSubmissions"
-        style="margin-top: 16px; justify-content: flex-end"
       />
-    </el-card>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { Clock, Document, Files, Medal } from '@element-plus/icons-vue'
 import { getSubmissions } from '@/api/task'
-import { getParseStatusType, getParseStatusLabel, getCheckStatusType, getCheckStatusLabel, getScoreStatusType, getScoreStatusLabel } from '@/utils/status'
+import {
+  getParseStatusType,
+  getParseStatusLabel,
+  getCheckStatusType,
+  getCheckStatusLabel,
+  getScoreStatusType,
+  getScoreStatusLabel,
+} from '@/utils/status'
 import { formatDate } from '@/utils/date'
 import { getUserInfo } from '@/utils/auth'
 import type { Submission } from '@/types'
 
+const router = useRouter()
 const loading = ref(false)
 const submissions = ref<Submission[]>([])
 const pagination = reactive({ page: 1, size: 20, total: 0 })
+
+const publishedCount = computed(() => submissions.value.filter(item => item.scoreStatus === 'PUBLISHED').length)
+const processingCount = computed(() => submissions.value.filter(item => !['PUBLISHED', 'SCORE_FAILED', 'RETURNED'].includes(item.scoreStatus)).length)
 
 async function loadSubmissions() {
   loading.value = true
   try {
     const info = getUserInfo()
     if (!info?.id) return
-    
-    const res = await getSubmissions({ 
-      page: pagination.page, 
-      size: pagination.size, 
-      studentId: info.id 
+
+    const res = await getSubmissions({
+      page: pagination.page,
+      size: pagination.size,
+      studentId: info.id
     })
     submissions.value = res.data.items
     pagination.total = res.data.total
-  } catch (e) {
+  } catch {
+    // 请求错误已由拦截器处理
   } finally {
     loading.value = false
   }
@@ -87,10 +148,190 @@ async function loadSubmissions() {
 onMounted(loadSubmissions)
 </script>
 
-<style scoped>
-.card-header {
+<style lang="scss" scoped>
+.my-submissions {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.page-hero,
+.list-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+}
+
+.page-hero {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding: 28px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(242, 248, 255, 0.94)),
+    url('@/assets/hero.png') right center / auto 100% no-repeat;
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    color: #2563eb;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  h2 {
+    margin-bottom: 8px;
+    color: #0f172a;
+    font-size: 28px;
+    font-weight: 700;
+  }
+
+  p {
+    color: #52657a;
+    font-size: 14px;
+    line-height: 1.8;
+  }
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 96px);
+  gap: 10px;
+
+  div {
+    display: flex;
+    min-height: 92px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #dbeafe;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.84);
+  }
+
+  strong {
+    color: #0f172a;
+    font-size: 28px;
+    line-height: 1;
+  }
+
+  span {
+    margin-top: 8px;
+    color: #64748b;
+    font-size: 12px;
+  }
+}
+
+.list-panel {
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid #eef2f7;
+
+  h3 {
+    margin-bottom: 6px;
+    color: #0f172a;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  p {
+    color: #64748b;
+    font-size: 13px;
+  }
+}
+
+:deep(.el-table) {
+  --el-table-border-color: #eef2f7;
+  --el-table-header-bg-color: #ffffff;
+  --el-table-row-hover-bg-color: #f8fbff;
+}
+
+:deep(.el-table__header th) {
+  height: 54px;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+:deep(.el-table__body td) {
+  height: 68px;
+}
+
+.task-name {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+
+  strong {
+    overflow: hidden;
+    color: #111827;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    color: #64748b;
+    font-size: 12px;
+  }
+}
+
+.version-pill {
+  display: inline-flex;
+  min-width: 42px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-chain {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.score-text {
+  color: #2563eb;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.el-pagination {
+  justify-content: flex-end;
+  padding: 18px 24px 22px;
+}
+
+@media (max-width: 920px) {
+  .page-hero,
+  .toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .page-hero {
+    padding: 22px;
+    background: #ffffff;
+  }
+
+  .hero-stats {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 </style>
