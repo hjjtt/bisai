@@ -53,6 +53,11 @@ export function getTaskStatusLabel(status: string): string {
   return map[status] || status
 }
 
+export function getTaskStatusType(status: string): string {
+  const map: Record<string, string> = { DRAFT: 'info', PUBLISHED: 'success', CLOSED: 'warning', ARCHIVED: 'info' }
+  return map[status] || 'info'
+}
+
 export function getSubmitStatusType(status: string): string {
   const map: Record<string, string> = { '已提交': 'success', '未提交': 'info', '待提交': 'warning' }
   return map[status] || 'info'

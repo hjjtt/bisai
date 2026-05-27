@@ -1,10 +1,10 @@
-// 企业级专业设计系统 (Professional SaaS Style)
-$primary-color: #3b82f6;    // 经典专业蓝
-$bg-body: #f1f5f9;         // 浅灰蓝背景
-$bg-card: #ffffff;         // 纯白卡片
-$text-main: #1e293b;       // 深色正文
-$text-muted: #64748b;      // 辅助文字
-$border-color: #e2e8f0;    // 细腻边框线
+// 产品级工作台视觉基调
+$primary-color: #2563eb;
+$bg-body: #f6f8fb;
+$bg-card: #ffffff;
+$text-main: #1e293b;
+$text-muted: #64748b;
+$border-color: #e2e8f0;
 
 * {
   margin: 0;
@@ -43,17 +43,18 @@ h1, h2, h3, h4 {
 .el-card {
   border-radius: 8px !important;
   border: 1px solid $border-color !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
-  transition: box-shadow 0.3s ease !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
 
   &:hover {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02) !important;
+    border-color: #cbd8e6 !important;
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08) !important;
   }
 
   .el-card__header {
-    background-color: #fafafa;
+    background-color: #ffffff;
     border-bottom: 1px solid $border-color !important;
-    padding: 12px 20px !important;
+    padding: 14px 20px !important;
     font-size: 14px;
     font-weight: 600;
   }
@@ -71,7 +72,30 @@ h1, h2, h3, h4 {
 }
 
 .el-tag {
-  border-radius: 4px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.el-table {
+  --el-table-header-text-color: #64748b;
+  --el-table-text-color: #1f2937;
+  --el-table-row-hover-bg-color: #f8fbff;
+  border-radius: 8px;
+}
+
+.el-table th.el-table__cell {
+  font-weight: 600;
+}
+
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  border-radius: 6px !important;
+  box-shadow: 0 0 0 1px #dbe4ee inset !important;
+
+  &:hover {
+    box-shadow: 0 0 0 1px #b9c7d8 inset !important;
+  }
 }
 
 .el-breadcrumb__inner {
