@@ -4,12 +4,12 @@
       <template #header>
         <div class="card-header">
           <span>模型配置</span>
-          <el-tag type="success">当前接入: ModelScope (通义千问)</el-tag>
+          <el-tag type="success">当前接入: {{ form.model || 'Qwen/Qwen3.5-35B-A3B' }}</el-tag>
         </div>
       </template>
 
       <el-alert
-        title="当前系统已接入 ModelScope AI 平台，使用通义千问大语言模型提供智能解析、核查和评分服务。"
+        title="当前系统已接入 ModelScope AI 平台，使用已配置的大语言模型提供智能解析、核查和评分服务。"
         type="info"
         :closable="false"
         show-icon
@@ -102,7 +102,8 @@ async function loadConfig() {
 async function handleTest() {
   testing.value = true
   try {
-    const res = await testModelConnection({ apiUrl: form.textModelApiUrl, apiKey: form.textModelApiKey })
+    const model = form.model || 'Qwen/Qwen3.5-35B-A3B'
+    const res = await testModelConnection({ apiUrl: form.textModelApiUrl, apiKey: form.textModelApiKey, model })
     if (res.data.success) {
       ElMessage.success(res.data.message || '连通性测试通过')
     } else {
@@ -118,7 +119,9 @@ async function handleTest() {
 async function handleSave() {
   saving.value = true
   try {
-    await updateSystemConfig(form)
+    const payload = { ...form }
+    if (!payload.model) payload.model = 'Qwen/Qwen3.5-35B-A3B'
+    await updateSystemConfig(payload)
     ElMessage.success('保存成功')
   } catch {
     ElMessage.error('保存失败')

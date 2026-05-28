@@ -18,8 +18,13 @@ public class CourseController {
     private final CourseService courseService;
 
     @GetMapping
-    public Result<PageResult<Course>> list(PageQuery query) {
-        return courseService.listCourses(query);
+    public Result<PageResult<Course>> list(PageQuery query, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return courseService.listCourses(query, userId, role);
     }
 
     @PostMapping

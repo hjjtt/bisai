@@ -32,6 +32,7 @@ public class SystemController {
     public Result<Map<String, Object>> testModel(@RequestBody Map<String, String> body) {
         String apiUrl = body.get("apiUrl");
         String apiKey = body.get("apiKey");
-        return systemService.testModelConnection(apiUrl, apiKey);
+        String model = body.get("model");
+        return systemService.testModelConnection(apiUrl, apiKey, model);
     }
 }

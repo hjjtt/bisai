@@ -35,6 +35,12 @@ public class PermissionService {
         return sub != null && isTeacherOwnerOfTask(sub.getTaskId(), userId);
     }
 
+    public boolean isStudentOwnerOfSubmission(Long submissionId, Long userId) {
+        if (submissionId == null || userId == null) return false;
+        Submission sub = submissionMapper.selectById(submissionId);
+        return sub != null && userId.equals(sub.getStudentId());
+    }
+
     public Long getCourseIdByTask(Long taskId) {
         if (taskId == null) return null;
         TrainingTask task = taskMapper.selectById(taskId);

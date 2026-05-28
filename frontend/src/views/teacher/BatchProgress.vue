@@ -40,7 +40,7 @@
 
       <el-progress
         v-if="progress"
-        :percentage="Math.round(((progress.success + progress.failed) / progress.total) * 100)"
+        :percentage="progress.total > 0 ? Math.round(((progress.success + progress.failed) / progress.total) * 100) : 0"
         style="margin-top: 20px"
       />
 

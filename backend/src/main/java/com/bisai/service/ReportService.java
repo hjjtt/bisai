@@ -118,7 +118,8 @@ public class ReportService {
             }
 
             // 保存文件记录到 file 表
-            Path reportPath = Path.of(uploadPath, "reports", fileName);
+            Path reportDir = Path.of(uploadPath).toAbsolutePath().normalize().resolve("reports");
+            Path reportPath = reportDir.resolve(fileName);
             FileEntity fileEntity = new FileEntity();
             fileEntity.setSubmissionId(submissionId);
             fileEntity.setOriginalName(fileName);
@@ -170,7 +171,8 @@ public class ReportService {
             }
 
             // 保存文件记录到 file 表
-            Path reportPath = Path.of(uploadPath, "reports", fileName);
+            Path reportDir = Path.of(uploadPath).toAbsolutePath().normalize().resolve("reports");
+            Path reportPath = reportDir.resolve(fileName);
             FileEntity fileEntity = new FileEntity();
             fileEntity.setSubmissionId(submissions.get(0).getId());
             fileEntity.setOriginalName(fileName);

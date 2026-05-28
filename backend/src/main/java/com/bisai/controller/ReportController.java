@@ -38,7 +38,7 @@ public class ReportController {
      * 导出学生个人报告
      */
     @PostMapping("/student/{submissionId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
     public Result<Map<String, Object>> exportStudentReport(
             @PathVariable Long submissionId,
             @RequestBody Map<String, String> body,
@@ -47,7 +47,8 @@ public class ReportController {
         String role = auth.getAuthorities().stream().findFirst()
                 .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("");
         if (!permissionService.isAdmin(role)
-                && !permissionService.isTeacherOwnerOfSubmission(submissionId, userId)) {
+                && !permissionService.isTeacherOwnerOfSubmission(submissionId, userId)
+                && !permissionService.isStudentOwnerOfSubmission(submissionId, userId)) {
             return Result.error(40301, "无权导出该提交的报告");
         }
         String format = body.getOrDefault("format", "PDF");
@@ -78,7 +79,7 @@ public class ReportController {
      * 下载报告文件
      */
     @GetMapping("/download/report/{fileName}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
     public ResponseEntity<Resource> downloadReport(@PathVariable String fileName, Authentication auth) {
         if (fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
             return ResponseEntity.badRequest().build();
@@ -94,7 +95,8 @@ public class ReportController {
             if (fileEntity == null || fileEntity.getSubmissionId() == null) {
                 return ResponseEntity.status(403).build();
             }
-            if (!permissionService.isTeacherOwnerOfSubmission(fileEntity.getSubmissionId(), userId)) {
+            if (!permissionService.isTeacherOwnerOfSubmission(fileEntity.getSubmissionId(), userId)
+                    && !permissionService.isStudentOwnerOfSubmission(fileEntity.getSubmissionId(), userId)) {
                 return ResponseEntity.status(403).build();
             }
         }

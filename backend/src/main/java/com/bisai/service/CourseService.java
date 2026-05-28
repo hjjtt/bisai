@@ -17,9 +17,14 @@ public class CourseService {
     private final CourseMapper courseMapper;
     private final PermissionService permissionService;
 
-    public Result<PageResult<Course>> listCourses(PageQuery query) {
+    public Result<PageResult<Course>> listCourses(PageQuery query, Long userId, String role) {
         Page<Course> page = new Page<>(query.getPage(), query.getSize());
         LambdaQueryWrapper<Course> wrapper = new LambdaQueryWrapper<>();
+
+        // 教师只能看到自己的课程
+        if ("TEACHER".equals(role)) {
+            wrapper.eq(Course::getTeacherId, userId);
+        }
 
         if (query.getKeyword() != null && !query.getKeyword().isEmpty()) {
             wrapper.like(Course::getName, query.getKeyword());

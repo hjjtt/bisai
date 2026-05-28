@@ -159,7 +159,7 @@ public class ModelScopeClient {
     }
 
     /**
-     * 测试连通性
+     * 测试连通性（使用当前配置）
      */
     public boolean testConnection() {
         try {
@@ -167,6 +167,36 @@ public class ModelScopeClient {
             return result != null && !result.isEmpty();
         } catch (Exception e) {
             log.warn("模型连通性测试失败: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 测试连通性（使用临时参数）
+     */
+    public boolean testConnection(String model, String apiUrl, String apiKey) {
+        String testModel = model != null ? model : aiConfig.getModel();
+        try {
+            OpenAiChatOptions testOptions = OpenAiChatOptions.builder()
+                    .model(testModel)
+                    .maxTokens(100)
+                    .temperature(0.1)
+                    .build();
+            ChatResponse response = chatModel.call(new Prompt(
+                    List.of(new SystemMessage("你是一个测试助手。"), new org.springframework.ai.chat.messages.UserMessage("请回复：连接成功")),
+                    testOptions
+            ));
+            boolean success = response != null && response.getResult() != null
+                    && response.getResult().getOutput() != null
+                    && !response.getResult().getOutput().getText().isEmpty();
+            int inputTokens = estimateTokens("你是一个测试助手。请回复：连接成功");
+            int outputTokens = success ? estimateTokens(response.getResult().getOutput().getText()) : 0;
+            aiUsageService.record(testModel, "TEST", inputTokens, outputTokens, success, success ? null : "AI 返回空响应");
+            return success;
+        } catch (Exception e) {
+            int inputTokens = estimateTokens("你是一个测试助手。请回复：连接成功");
+            aiUsageService.record(testModel, "TEST", inputTokens, 0, false, e.getMessage());
+            log.warn("模型连通性测试失败(model={}): {}", testModel, e.getMessage());
             return false;
         }
     }
