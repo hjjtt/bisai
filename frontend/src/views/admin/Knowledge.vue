@@ -36,8 +36,9 @@
         <el-table-column label="最后更新" min-width="180" align="center">
           <template #default="{ row }">{{ formatDate(row.updateTime) }}</template>
         </el-table-column>
-        <el-table-column label="操作" min-width="100" align="center" fixed="right">
+        <el-table-column label="操作" min-width="120" align="center" fixed="right">
           <template #default="{ row }">
+            <el-button type="primary" size="small" @click="openEditDialog(row)">编辑</el-button>
             <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -95,6 +96,29 @@
         <el-button type="primary" @click="handleUpload">开始上传</el-button>
       </template>
     </el-dialog>
+
+    <!-- 编辑对话框 -->
+    <el-dialog v-model="showEditDialog" title="编辑实训知识资源" width="560px" destroy-on-close>
+      <el-form label-position="top">
+        <el-form-item label="文档名称" required>
+          <el-input v-model="editForm.name" placeholder="请输入文档名称" />
+        </el-form-item>
+        <el-form-item label="关联实训任务" required>
+          <el-select v-model="editForm.taskId" filterable placeholder="请选择实训任务" style="width: 100%">
+            <el-option
+              v-for="task in tasks"
+              :key="task.id"
+              :label="`${task.title}${task.courseName ? ' / ' + task.courseName : ''}`"
+              :value="task.id"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditDialog = false">取消</el-button>
+        <el-button type="primary" :loading="editing" @click="handleEditSubmit">确认修改</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -103,7 +127,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Upload, UploadFilled, CircleCheck, Loading } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
-import { getKnowledgeList, deleteKnowledge, uploadKnowledge, type KnowledgeDocument } from '@/api/knowledge'
+import { getKnowledgeList, deleteKnowledge, uploadKnowledge, updateKnowledge, type KnowledgeDocument } from '@/api/knowledge'
 import { getTaskList } from '@/api/task'
 import { getKnowledgeStatusType, getKnowledgeStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
@@ -120,6 +144,14 @@ const selectedFile = ref<File | null>(null)
 
 const uploadForm = ref({
   taskId: ''
+})
+
+const showEditDialog = ref(false)
+const editing = ref(false)
+const editForm = ref({
+  id: 0,
+  name: '',
+  taskId: undefined as number | undefined
 })
 
 const knowledgeList = ref<KnowledgeDocument[]>([])
@@ -151,6 +183,40 @@ const handleDelete = async (row: KnowledgeDocument) => {
     if (err !== 'cancel') {
       ElMessage.error('删除失败')
     }
+  }
+}
+
+const openEditDialog = (row: KnowledgeDocument) => {
+  editForm.value = {
+    id: row.id,
+    name: row.name,
+    taskId: row.taskId
+  }
+  showEditDialog.value = true
+}
+
+const handleEditSubmit = async () => {
+  if (!editForm.value.name) {
+    ElMessage.warning('请输入文档名称')
+    return
+  }
+  if (!editForm.value.taskId) {
+    ElMessage.warning('请选择关联实训任务')
+    return
+  }
+  editing.value = true
+  try {
+    await updateKnowledge(editForm.value.id, {
+      name: editForm.value.name,
+      taskId: editForm.value.taskId
+    })
+    ElMessage.success('修改成功')
+    showEditDialog.value = false
+    loadData()
+  } catch (e) {
+    ElMessage.error('修改失败')
+  } finally {
+    editing.value = false
   }
 }
 

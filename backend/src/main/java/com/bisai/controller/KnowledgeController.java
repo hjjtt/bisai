@@ -83,4 +83,21 @@ public class KnowledgeController {
         Boolean enabled = body.get("enabled");
         return knowledgeService.toggleDocumentStatus(id, enabled);
     }
+
+    /**
+     * 编辑知识库文档信息（名称、关联任务）
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<KnowledgeDocument> update(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream().findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("");
+        if (!permissionService.isAdmin(role) && !knowledgeService.isOwner(id, userId)) {
+            return Result.error(40301, "无权操作该文档");
+        }
+        String newName = (String) body.get("name");
+        Long newTaskId = body.get("taskId") != null ? Long.valueOf(body.get("taskId").toString()) : null;
+        return knowledgeService.updateDocument(id, newName, newTaskId);
+    }
 }
