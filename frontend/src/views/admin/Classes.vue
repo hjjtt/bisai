@@ -25,9 +25,13 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="150" fixed="right">
+            <el-table-column label="操作" width="140" fixed="right" align="center">
               <template #default="{ row }">
-                <el-button type="primary" link @click="showClassDialog(row)">编辑</el-button>
+                <div class="table-actions">
+                  <el-button class="action-btn" type="primary" plain :icon="EditPen" @click="showClassDialog(row)">
+                    编辑
+                  </el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -49,9 +53,13 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="120" fixed="right">
+            <el-table-column label="操作" width="140" fixed="right" align="center">
               <template #default="{ row }">
-                <el-button type="primary" link @click="showCourseDialog(row)">编辑</el-button>
+                <div class="table-actions">
+                  <el-button class="action-btn" type="primary" plain :icon="EditPen" @click="showCourseDialog(row)">
+                    编辑
+                  </el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -99,6 +107,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
+import { EditPen } from '@element-plus/icons-vue'
 import { getClassList, createClass, updateClass, getCourseList, createCourse, updateCourse } from '@/api/course'
 import { getUserList } from '@/api/user'
 import type { ClassInfo, Course, UserInfo } from '@/types'
@@ -216,5 +225,36 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.table-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+:deep(.table-actions .el-button) {
+  margin-left: 0;
+}
+
+:deep(.action-btn) {
+  min-width: 76px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 7px;
+  font-weight: 600;
+}
+
+:deep(.action-btn.el-button--primary.is-plain) {
+  color: #1d4ed8 !important;
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+
+:deep(.action-btn.el-button--primary.is-plain:hover) {
+  color: #ffffff !important;
+  background-color: #2563eb !important;
+  border-color: #2563eb !important;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
 }
 </style>
