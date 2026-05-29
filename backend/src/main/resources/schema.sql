@@ -297,18 +297,20 @@ CREATE TABLE `knowledge_base`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '鐭ヨ瘑搴揑D',
   `name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '鐭ヨ瘑搴撳悕绉',
   `course_id` bigint NULL DEFAULT NULL COMMENT '閫傜敤璇剧▼ID',
+  `task_id` bigint NULL DEFAULT NULL COMMENT '关联实训任务ID',
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '璇存槑',
   `status` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'ENABLED' COMMENT '鐘舵?',
   `deleted` tinyint NOT NULL DEFAULT 0,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`) USING BTREE
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_course_task`(`course_id` ASC, `task_id` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '鐭ヨ瘑搴撹〃' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of knowledge_base
 -- ----------------------------
-INSERT INTO `knowledge_base` VALUES (1, '课程知识库-1', 1, NULL, 'ENABLED', 0, '2026-05-03 11:56:16', '2026-05-03 11:56:16');
+INSERT INTO `knowledge_base` VALUES (1, '课程知识库-1', 1, NULL, NULL, 'ENABLED', 0, '2026-05-03 11:56:16', '2026-05-03 11:56:16');
 
 -- ----------------------------
 -- Table structure for knowledge_document

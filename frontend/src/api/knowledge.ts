@@ -5,6 +5,8 @@ export interface KnowledgeDocument {
   id: number
   name: string
   knowledgeBaseId?: number
+  taskId?: number
+  taskName?: string
   courseName?: string
   parseStatus: string
   vectorStatus: string
@@ -17,11 +19,14 @@ export function getKnowledgeList(params?: PageRequest & { keyword?: string }) {
   return get<PageResponse<KnowledgeDocument>>('/knowledge', params)
 }
 
-export function uploadKnowledge(file: File, courseId?: number) {
+export function uploadKnowledge(file: File, options?: { courseId?: number; taskId?: number }) {
   const formData = new FormData()
   formData.append('file', file)
-  if (courseId !== undefined) {
-    formData.append('courseId', String(courseId))
+  if (options?.courseId !== undefined) {
+    formData.append('courseId', String(options.courseId))
+  }
+  if (options?.taskId !== undefined) {
+    formData.append('taskId', String(options.taskId))
   }
   return upload<KnowledgeDocument>('/knowledge/upload', formData)
 }

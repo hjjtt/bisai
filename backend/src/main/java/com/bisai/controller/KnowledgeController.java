@@ -33,11 +33,27 @@ public class KnowledgeController {
     @PostMapping("/upload")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<KnowledgeDocument> upload(@RequestParam("file") MultipartFile file,
-                                             @RequestParam(value = "courseId", required = false) Long courseId) {
+                                             @RequestParam(value = "courseId", required = false) Long courseId,
+                                             @RequestParam(value = "taskId", required = false) Long taskId,
+                                             Authentication auth) {
         if (file.isEmpty()) {
             return Result.error("上传文件不能为空");
         }
-        return knowledgeService.uploadDocument(file, courseId);
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream().findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("");
+        if (!permissionService.isAdmin(role)) {
+            if (taskId != null && !permissionService.isTeacherOwnerOfTask(taskId, userId)) {
+                return Result.error(40301, "无权为该实训任务上传知识库文档");
+            }
+            if (taskId == null && courseId != null && !permissionService.isTeacherOwnerOfCourse(courseId, userId)) {
+                return Result.error(40301, "无权为该课程上传知识库文档");
+            }
+            if (taskId == null && courseId == null) {
+                return Result.error(40001, "请选择关联实训任务");
+            }
+        }
+        return knowledgeService.uploadDocument(file, courseId, taskId);
     }
 
     @DeleteMapping("/{id}")

@@ -18,7 +18,8 @@
       <!-- 核心数据表格 -->
       <el-table :data="knowledgeList" stripe v-loading="loading" style="width: 100%">
         <el-table-column prop="name" label="资源名称" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="courseName" label="关联课程" width="150" />
+        <el-table-column prop="taskName" label="关联实训任务" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="courseName" label="所属课程" width="150" show-overflow-tooltip />
         <el-table-column label="解析状态" width="120">
           <template #default="{ row }">
             <el-tag :type="getKnowledgeStatusType(row.parseStatus)" size="small" effect="plain">
@@ -58,9 +59,14 @@
     <!-- 上传对话框 -->
     <el-dialog v-model="showUploadDialog" title="上传实训知识资源" width="560px" destroy-on-close>
       <el-form label-position="top">
-        <el-form-item label="关联课程" required>
-          <el-select v-model="uploadForm.courseId" placeholder="请选择课程" style="width: 100%">
-            <el-option v-for="c in courses" :key="c.id" :label="c.name" :value="c.id" />
+        <el-form-item label="关联实训任务" required>
+          <el-select v-model="uploadForm.taskId" filterable placeholder="请选择实训任务" style="width: 100%">
+            <el-option
+              v-for="task in tasks"
+              :key="task.id"
+              :label="`${task.title}${task.courseName ? ' / ' + task.courseName : ''}`"
+              :value="task.id"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="资源文件" required>
@@ -98,10 +104,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Upload, UploadFilled, CircleCheck, Loading } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
 import { getKnowledgeList, deleteKnowledge, uploadKnowledge, type KnowledgeDocument } from '@/api/knowledge'
-import { getCourseList } from '@/api/course'
+import { getTaskList } from '@/api/task'
 import { getKnowledgeStatusType } from '@/utils/status'
 import { formatDate } from '@/utils/date'
-import type { Course } from '@/types'
+import type { TrainingTask } from '@/types'
 
 const loading = ref(false)
 const showUploadDialog = ref(false)
@@ -109,11 +115,11 @@ const searchKeyword = ref('')
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
-const courses = ref<Course[]>([])
+const tasks = ref<TrainingTask[]>([])
 const selectedFile = ref<File | null>(null)
 
 const uploadForm = ref({
-  courseId: ''
+  taskId: ''
 })
 
 const knowledgeList = ref<KnowledgeDocument[]>([])
@@ -153,8 +159,8 @@ const handleFileChange = (_: UploadFile[], fileList: UploadFile[]) => {
 }
 
 const handleUpload = async () => {
-  if (!uploadForm.value.courseId) {
-    ElMessage.warning('请选择关联课程')
+  if (!uploadForm.value.taskId) {
+    ElMessage.warning('请选择关联实训任务')
     return
   }
   if (!selectedFile.value) {
@@ -162,28 +168,28 @@ const handleUpload = async () => {
     return
   }
   try {
-    await uploadKnowledge(selectedFile.value, Number(uploadForm.value.courseId))
+    await uploadKnowledge(selectedFile.value, { taskId: Number(uploadForm.value.taskId) })
     ElMessage.success('资源上传成功，系统正在后台解析...')
     showUploadDialog.value = false
     selectedFile.value = null
-    uploadForm.value.courseId = ''
+    uploadForm.value.taskId = ''
     loadData()
   } catch (e) {
     ElMessage.error('上传失败')
   }
 }
 
-async function loadCourses() {
+async function loadTasks() {
   try {
-    const res = await getCourseList({ size: 100 })
-    courses.value = res.data.items
+    const res = await getTaskList({ size: 100 })
+    tasks.value = res.data.items
   } catch (e) {
   }
 }
 
 onMounted(() => {
   loadData()
-  loadCourses()
+  loadTasks()
 })
 </script>
 

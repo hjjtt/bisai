@@ -10,7 +10,8 @@
 
       <el-table :data="documents" stripe v-loading="loading">
         <el-table-column prop="name" label="文档名称" min-width="200" />
-        <el-table-column prop="courseName" label="适用课程" width="150" />
+        <el-table-column prop="taskName" label="关联实训任务" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="courseName" label="所属课程" width="150" show-overflow-tooltip />
         <el-table-column label="解析状态" width="120">
           <template #default="{ row }">
             <el-tag :type="getKnowledgeStatusType(row.parseStatus)" size="small">{{ row.parseStatus }}</el-tag>
@@ -40,13 +41,27 @@
 
     <!-- 上传对话框 -->
     <el-dialog v-model="showUploadDialog" title="上传知识库文档" width="500px">
-      <el-upload drag multiple :auto-upload="false" :on-change="handleFileChange">
-        <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
-        <div class="el-upload__text">拖拽或点击上传</div>
-        <template #tip>
-          <div class="el-upload__tip">支持上传实训指导书、评分标准、课程知识点等文档</div>
-        </template>
-      </el-upload>
+      <el-form label-position="top" class="upload-form">
+        <el-form-item label="关联实训任务" required>
+          <el-select v-model="uploadTaskId" filterable placeholder="请选择要服务的实训任务" style="width: 100%">
+            <el-option
+              v-for="task in tasks"
+              :key="task.id"
+              :label="`${task.title}${task.courseName ? ' / ' + task.courseName : ''}`"
+              :value="task.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="知识库文件" required>
+          <el-upload drag multiple :auto-upload="false" :on-change="handleFileChange">
+            <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+            <div class="el-upload__text">拖拽或点击上传</div>
+            <template #tip>
+              <div class="el-upload__tip">支持上传实训指导书、评分标准、课程知识点等文档</div>
+            </template>
+          </el-upload>
+        </el-form-item>
+      </el-form>
       <template #footer>
         <el-button @click="showUploadDialog = false">取消</el-button>
         <el-button type="primary" :loading="uploading" @click="handleUpload">确认上传</el-button>
@@ -60,13 +75,17 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { getKnowledgeList, deleteKnowledge, uploadKnowledge, toggleKnowledgeStatus, type KnowledgeDocument } from '@/api/knowledge'
+import { getTaskList } from '@/api/task'
 import { getKnowledgeStatusType } from '@/utils/status'
+import type { TrainingTask } from '@/types'
 
 const loading = ref(false)
 const uploading = ref(false)
 const showUploadDialog = ref(false)
 const documents = ref<KnowledgeDocument[]>([])
 const selectedFiles = ref<File[]>([])
+const tasks = ref<TrainingTask[]>([])
+const uploadTaskId = ref<number | undefined>()
 const polling = ref<number | null>(null)
 
 function handleFileChange(_file: unknown, fileList: { raw: File }[]) {
@@ -94,6 +113,10 @@ async function handleDelete(id: number) {
 }
 
 async function handleUpload() {
+  if (!uploadTaskId.value) {
+    ElMessage.warning('请选择关联实训任务')
+    return
+  }
   if (selectedFiles.value.length === 0) {
     ElMessage.warning('请选择文件')
     return
@@ -101,9 +124,10 @@ async function handleUpload() {
   uploading.value = true
   try {
     for (const file of selectedFiles.value) {
-      await uploadKnowledge(file)
+      await uploadKnowledge(file, { taskId: uploadTaskId.value })
     }
     selectedFiles.value = []
+    uploadTaskId.value = undefined
     showUploadDialog.value = false
     ElMessage.success('上传成功，正在解析和向量化')
     await loadDocuments()
@@ -112,6 +136,15 @@ async function handleUpload() {
     ElMessage.error('上传失败')
   } finally {
     uploading.value = false
+  }
+}
+
+async function loadTasks() {
+  try {
+    const res = await getTaskList({ page: 1, size: 100 })
+    tasks.value = res.data.items || []
+  } catch {
+    ElMessage.error('加载实训任务失败')
   }
 }
 
@@ -147,6 +180,7 @@ function stopPolling() {
 }
 
 onMounted(() => {
+  loadTasks()
   loadDocuments().then(() => {
     if (hasRunningDocument()) startPolling()
   })
