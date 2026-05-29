@@ -241,6 +241,26 @@ public class KnowledgeService {
         return Result.ok();
     }
 
+    public Result<KnowledgeDocument> updateDocument(Long id, String newName, Long newTaskId) {
+        KnowledgeDocument doc = documentMapper.selectById(id);
+        if (doc == null) {
+            return Result.error("文档不存在");
+        }
+
+        if (newName != null && !newName.trim().isEmpty()) {
+            doc.setOriginalName(newName);
+        }
+        
+        if (newTaskId != null) {
+            KnowledgeBase kb = resolveKnowledgeBase(null, newTaskId);
+            doc.setKnowledgeBaseId(kb.getId());
+        }
+        
+        doc.setUpdatedAt(LocalDateTime.now());
+        documentMapper.updateById(doc);
+        return Result.ok(doc);
+    }
+
     public void processKnowledgeDocument(Long documentId) {
         KnowledgeDocument doc = documentMapper.selectById(documentId);
         if (doc == null) return;

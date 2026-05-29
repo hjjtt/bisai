@@ -100,6 +100,7 @@ export function getKnowledgeStatusLabel(status: string): string {
     case 'PROCESSING':
     case 'PARSING': return '解析中'
     case 'FAILED': return '失败'
+    case 'PENDING': return '等待中'
     default: return status
   }
 }
