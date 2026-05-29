@@ -89,7 +89,7 @@
             <el-table-column prop="originalName" label="文件名" min-width="120" show-overflow-tooltip />
             <el-table-column label="操作" width="80">
               <template #default>
-                <el-button type="primary" link @click="$router.push(`/teacher/submissions/${submissionId}/preview`)">预览</el-button>
+                <el-button type="primary" size="small" @click="$router.push(`/teacher/submissions/${submissionId}/preview`)">预览</el-button>
               </template>
             </el-table-column>
           </el-table>

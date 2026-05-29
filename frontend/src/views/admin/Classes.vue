@@ -12,22 +12,26 @@
         <!-- 班级管理 -->
         <el-tab-pane label="班级管理" name="class">
           <el-table :data="classes" stripe v-loading="classLoading">
-            <el-table-column prop="name" label="班级名称" width="180" />
-            <el-table-column prop="grade" label="年级" width="100" />
-            <el-table-column prop="major" label="专业" width="150" />
-            <el-table-column label="学生数" width="80">
+            <el-table-column prop="name" label="班级名称" width="180" align="center" />
+            <el-table-column prop="grade" label="年级" width="100" align="center" />
+            <el-table-column prop="major" label="专业" min-width="150" align="center" />
+            <el-table-column label="学生数" width="80" align="center">
               <template #default="{ row }">{{ row.studentCount ?? 0 }}</template>
             </el-table-column>
-            <el-table-column label="状态" width="80">
+            <el-table-column label="状态" width="80" align="center">
               <template #default="{ row }">
                 <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
                   {{ row.status === 'ENABLED' ? '启用' : '禁用' }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="150" fixed="right">
+            <el-table-column label="操作" width="140" align="center" fixed="right">
               <template #default="{ row }">
-                <el-button type="primary" link @click="showClassDialog(row)">编辑</el-button>
+                <div class="table-actions">
+                  <el-button class="action-btn" type="primary" plain :icon="EditPen" @click="showClassDialog(row)">
+                    编辑
+                  </el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -39,19 +43,23 @@
             <el-button type="primary" @click="showCourseDialog()">新增课程</el-button>
           </div>
           <el-table :data="courses" stripe v-loading="courseLoading">
-            <el-table-column prop="name" label="课程名称" min-width="180" />
-            <el-table-column prop="teacherName" label="授课教师" width="120" />
-            <el-table-column prop="className" label="授课班级" width="120" />
-            <el-table-column label="状态" width="80">
+            <el-table-column prop="name" label="课程名称" min-width="180" align="center" />
+            <el-table-column prop="teacherName" label="授课教师" width="120" align="center" />
+            <el-table-column prop="className" label="授课班级" width="120" align="center" />
+            <el-table-column label="状态" width="80" align="center">
               <template #default="{ row }">
                 <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
                   {{ row.status === 'ENABLED' ? '启用' : '停用' }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="120" fixed="right">
+            <el-table-column label="操作" width="140" align="center" fixed="right">
               <template #default="{ row }">
-                <el-button type="primary" link @click="showCourseDialog(row)">编辑</el-button>
+                <div class="table-actions">
+                  <el-button class="action-btn" type="primary" plain :icon="EditPen" @click="showCourseDialog(row)">
+                    编辑
+                  </el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -99,6 +107,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
+import { EditPen } from '@element-plus/icons-vue'
 import { getClassList, createClass, updateClass, getCourseList, createCourse, updateCourse } from '@/api/course'
 import { getUserList } from '@/api/user'
 import type { ClassInfo, Course, UserInfo } from '@/types'
@@ -216,5 +225,36 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.table-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+:deep(.table-actions .el-button) {
+  margin-left: 0;
+}
+
+:deep(.action-btn) {
+  min-width: 76px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 7px;
+  font-weight: 600;
+}
+
+:deep(.action-btn.el-button--primary.is-plain) {
+  color: #1d4ed8 !important;
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+
+:deep(.action-btn.el-button--primary.is-plain:hover) {
+  color: #ffffff !important;
+  background-color: #2563eb !important;
+  border-color: #2563eb !important;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
 }
 </style>

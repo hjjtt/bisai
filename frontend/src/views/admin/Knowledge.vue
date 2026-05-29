@@ -17,27 +17,29 @@
 
       <!-- 核心数据表格 -->
       <el-table :data="knowledgeList" stripe v-loading="loading" style="width: 100%">
-        <el-table-column prop="name" label="资源名称" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="courseName" label="关联课程" width="150" />
-        <el-table-column label="解析状态" width="120">
+        <el-table-column prop="name" label="资源名称" min-width="200" align="center" show-overflow-tooltip />
+        <el-table-column prop="taskName" label="关联实训任务" min-width="180" align="center" show-overflow-tooltip />
+        <el-table-column prop="courseName" label="所属课程" min-width="150" align="center" show-overflow-tooltip />
+        <el-table-column label="解析状态" min-width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="getKnowledgeStatusType(row.parseStatus)" size="small" effect="plain">
-              {{ row.parseStatus }}
+              {{ getKnowledgeStatusLabel(row.parseStatus) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="向量化" width="100" align="center">
+        <el-table-column label="向量化" min-width="100" align="center">
           <template #default="{ row }">
             <el-icon v-if="row.vectorized" color="#10b981"><CircleCheck /></el-icon>
             <el-icon v-else color="#94a3b8"><Loading /></el-icon>
           </template>
         </el-table-column>
-        <el-table-column label="最后更新" width="180">
+        <el-table-column label="最后更新" min-width="180" align="center">
           <template #default="{ row }">{{ formatDate(row.updateTime) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" min-width="120" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" size="small" @click="openEditDialog(row)">编辑</el-button>
+            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -58,9 +60,14 @@
     <!-- 上传对话框 -->
     <el-dialog v-model="showUploadDialog" title="上传实训知识资源" width="560px" destroy-on-close>
       <el-form label-position="top">
-        <el-form-item label="关联课程" required>
-          <el-select v-model="uploadForm.courseId" placeholder="请选择课程" style="width: 100%">
-            <el-option v-for="c in courses" :key="c.id" :label="c.name" :value="c.id" />
+        <el-form-item label="关联实训任务" required>
+          <el-select v-model="uploadForm.taskId" filterable placeholder="请选择实训任务" style="width: 100%">
+            <el-option
+              v-for="task in tasks"
+              :key="task.id"
+              :label="`${task.title}${task.courseName ? ' / ' + task.courseName : ''}`"
+              :value="task.id"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="资源文件" required>
@@ -89,6 +96,29 @@
         <el-button type="primary" @click="handleUpload">开始上传</el-button>
       </template>
     </el-dialog>
+
+    <!-- 编辑对话框 -->
+    <el-dialog v-model="showEditDialog" title="编辑实训知识资源" width="560px" destroy-on-close>
+      <el-form label-position="top">
+        <el-form-item label="文档名称" required>
+          <el-input v-model="editForm.name" placeholder="请输入文档名称" />
+        </el-form-item>
+        <el-form-item label="关联实训任务" required>
+          <el-select v-model="editForm.taskId" filterable placeholder="请选择实训任务" style="width: 100%">
+            <el-option
+              v-for="task in tasks"
+              :key="task.id"
+              :label="`${task.title}${task.courseName ? ' / ' + task.courseName : ''}`"
+              :value="task.id"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditDialog = false">取消</el-button>
+        <el-button type="primary" :loading="editing" @click="handleEditSubmit">确认修改</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -97,11 +127,11 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Upload, UploadFilled, CircleCheck, Loading } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
-import { getKnowledgeList, deleteKnowledge, uploadKnowledge, type KnowledgeDocument } from '@/api/knowledge'
-import { getCourseList } from '@/api/course'
-import { getKnowledgeStatusType } from '@/utils/status'
+import { getKnowledgeList, deleteKnowledge, uploadKnowledge, updateKnowledge, type KnowledgeDocument } from '@/api/knowledge'
+import { getTaskList } from '@/api/task'
+import { getKnowledgeStatusType, getKnowledgeStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
-import type { Course } from '@/types'
+import type { TrainingTask } from '@/types'
 
 const loading = ref(false)
 const showUploadDialog = ref(false)
@@ -109,11 +139,19 @@ const searchKeyword = ref('')
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
-const courses = ref<Course[]>([])
+const tasks = ref<TrainingTask[]>([])
 const selectedFile = ref<File | null>(null)
 
 const uploadForm = ref({
-  courseId: ''
+  taskId: ''
+})
+
+const showEditDialog = ref(false)
+const editing = ref(false)
+const editForm = ref({
+  id: 0,
+  name: '',
+  taskId: undefined as number | undefined
 })
 
 const knowledgeList = ref<KnowledgeDocument[]>([])
@@ -148,13 +186,47 @@ const handleDelete = async (row: KnowledgeDocument) => {
   }
 }
 
+const openEditDialog = (row: KnowledgeDocument) => {
+  editForm.value = {
+    id: row.id,
+    name: row.name,
+    taskId: row.taskId
+  }
+  showEditDialog.value = true
+}
+
+const handleEditSubmit = async () => {
+  if (!editForm.value.name) {
+    ElMessage.warning('请输入文档名称')
+    return
+  }
+  if (!editForm.value.taskId) {
+    ElMessage.warning('请选择关联实训任务')
+    return
+  }
+  editing.value = true
+  try {
+    await updateKnowledge(editForm.value.id, {
+      name: editForm.value.name,
+      taskId: editForm.value.taskId
+    })
+    ElMessage.success('修改成功')
+    showEditDialog.value = false
+    loadData()
+  } catch (e) {
+    ElMessage.error('修改失败')
+  } finally {
+    editing.value = false
+  }
+}
+
 const handleFileChange = (_: UploadFile[], fileList: UploadFile[]) => {
   selectedFile.value = fileList.length > 0 ? fileList[0].raw ?? null : null
 }
 
 const handleUpload = async () => {
-  if (!uploadForm.value.courseId) {
-    ElMessage.warning('请选择关联课程')
+  if (!uploadForm.value.taskId) {
+    ElMessage.warning('请选择关联实训任务')
     return
   }
   if (!selectedFile.value) {
@@ -162,28 +234,28 @@ const handleUpload = async () => {
     return
   }
   try {
-    await uploadKnowledge(selectedFile.value, Number(uploadForm.value.courseId))
+    await uploadKnowledge(selectedFile.value, { taskId: Number(uploadForm.value.taskId) })
     ElMessage.success('资源上传成功，系统正在后台解析...')
     showUploadDialog.value = false
     selectedFile.value = null
-    uploadForm.value.courseId = ''
+    uploadForm.value.taskId = ''
     loadData()
   } catch (e) {
     ElMessage.error('上传失败')
   }
 }
 
-async function loadCourses() {
+async function loadTasks() {
   try {
-    const res = await getCourseList({ size: 100 })
-    courses.value = res.data.items
+    const res = await getTaskList({ size: 100 })
+    tasks.value = res.data.items
   } catch (e) {
   }
 }
 
 onMounted(() => {
   loadData()
-  loadCourses()
+  loadTasks()
 })
 </script>
 

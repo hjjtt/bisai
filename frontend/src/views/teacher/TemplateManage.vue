@@ -21,29 +21,29 @@
       </template>
 
       <el-table :data="templates" stripe v-loading="loading">
-        <el-table-column prop="name" label="模板名称" min-width="160" />
-        <el-table-column label="状态" width="100">
+        <el-table-column prop="name" label="模板名称" min-width="160" align="center" />
+        <el-table-column label="状态" min-width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 'ENABLED' ? 'success' : 'info'">
               {{ row.status === 'ENABLED' ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-        <el-table-column label="总分" width="80" align="center">
+        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip align="center" />
+        <el-table-column label="总分" min-width="80" align="center">
           <template #default="{ row }">
             {{ row.totalScore }}
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="180">
+        <el-table-column prop="createdAt" label="创建时间" min-width="180" align="center">
           <template #default="{ row }">
             {{ formatDate(row.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" min-width="180" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -110,7 +110,7 @@
             </el-table-column>
             <el-table-column label="操作" width="80" align="center">
               <template #default="{ $index }">
-                <el-button type="danger" link size="small" @click="removeIndicator($index)">删除</el-button>
+                <el-button type="danger" size="small" @click="removeIndicator($index)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>

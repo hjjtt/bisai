@@ -9,21 +9,21 @@
       </template>
 
       <el-table :data="tasks" stripe v-loading="loading">
-        <el-table-column prop="title" label="任务名称" min-width="180" />
-        <el-table-column prop="courseName" label="所属课程" width="150" />
-        <el-table-column prop="templateName" label="评价模板" width="150" />
-        <el-table-column prop="startTime" label="开始时间" width="170" />
-        <el-table-column prop="endTime" label="截止时间" width="170" />
-        <el-table-column label="状态" width="100">
+        <el-table-column prop="title" label="任务名称" min-width="200" align="center" show-overflow-tooltip />
+        <el-table-column prop="courseName" label="所属课程" min-width="150" align="center" show-overflow-tooltip />
+        <el-table-column prop="templateName" label="评价模板" min-width="150" align="center" show-overflow-tooltip />
+        <el-table-column prop="startTime" label="开始时间" min-width="170" align="center" />
+        <el-table-column prop="endTime" label="截止时间" min-width="170" align="center" />
+        <el-table-column label="状态" min-width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="操作" min-width="160" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link @click="$router.push(`/teacher/tasks/${row.id}/edit`)">编辑</el-button>
-            <el-button type="success" link v-if="row.status === 'DRAFT'" @click="handlePublish(row.id)">发布</el-button>
-            <el-button type="warning" link v-if="row.status === 'PUBLISHED'" @click="handleClose(row.id)">关闭</el-button>
+            <el-button type="primary" size="small" @click="$router.push(`/teacher/tasks/${row.id}/edit`)">编辑</el-button>
+            <el-button type="success" size="small" v-if="row.status === 'DRAFT'" @click="handlePublish(row.id)">发布</el-button>
+            <el-button type="warning" size="small" v-if="row.status === 'PUBLISHED'" @click="handleClose(row.id)">关闭</el-button>
           </template>
         </el-table-column>
       </el-table>

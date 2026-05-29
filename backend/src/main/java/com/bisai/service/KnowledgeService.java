@@ -11,12 +11,14 @@ import com.bisai.entity.FileEntity;
 import com.bisai.entity.DocumentChunk;
 import com.bisai.entity.ParseResult;
 import com.bisai.entity.Course;
+import com.bisai.entity.TrainingTask;
 import com.bisai.mapper.DocumentChunkMapper;
 import com.bisai.mapper.FileMapper;
 import com.bisai.mapper.KnowledgeBaseMapper;
 import com.bisai.mapper.KnowledgeDocumentMapper;
 import com.bisai.mapper.ParseResultMapper;
 import com.bisai.mapper.CourseMapper;
+import com.bisai.mapper.TrainingTaskMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +53,7 @@ public class KnowledgeService {
     private final ObjectMapper objectMapper;
     private final Executor aiTaskExecutor;
     private final CourseMapper courseMapper;
+    private final TrainingTaskMapper taskMapper;
 
     @Value("${file.upload-path:./data/files}")
     private String uploadPath;
@@ -70,7 +73,8 @@ public class KnowledgeService {
                             ModelScopeClient aiClient,
                             ObjectMapper objectMapper,
                             @Qualifier("aiTaskExecutor") Executor aiTaskExecutor,
-                            CourseMapper courseMapper) {
+                            CourseMapper courseMapper,
+                            TrainingTaskMapper taskMapper) {
         this.documentMapper = documentMapper;
         this.knowledgeBaseMapper = knowledgeBaseMapper;
         this.fileMapper = fileMapper;
@@ -81,14 +85,20 @@ public class KnowledgeService {
         this.objectMapper = objectMapper;
         this.aiTaskExecutor = aiTaskExecutor;
         this.courseMapper = courseMapper;
+        this.taskMapper = taskMapper;
     }
 
     public boolean isOwner(Long documentId, Long userId) {
         KnowledgeDocument doc = documentMapper.selectById(documentId);
         if (doc == null || doc.getKnowledgeBaseId() == null) return false;
         KnowledgeBase kb = knowledgeBaseMapper.selectById(doc.getKnowledgeBaseId());
-        if (kb == null || kb.getCourseId() == null) return false;
-        Course course = courseMapper.selectById(kb.getCourseId());
+        Long courseId = kb.getCourseId();
+        if (courseId == null && kb.getTaskId() != null) {
+            TrainingTask task = taskMapper.selectById(kb.getTaskId());
+            courseId = task != null ? task.getCourseId() : null;
+        }
+        if (courseId == null) return false;
+        Course course = courseMapper.selectById(courseId);
         return course != null && userId.equals(course.getTeacherId());
     }
 
@@ -115,12 +125,32 @@ public class KnowledgeService {
                     .forEach(kb -> kbMap.put(kb.getId(), kb));
         }
 
+        Set<Long> courseIds = kbMap.values().stream()
+                .map(KnowledgeBase::getCourseId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<Long, Course> courseMap = new java.util.HashMap<>();
+        if (!courseIds.isEmpty()) {
+            courseMapper.selectList(new LambdaQueryWrapper<Course>().in(Course::getId, courseIds))
+                    .forEach(course -> courseMap.put(course.getId(), course));
+        }
+
+        Set<Long> taskIds = kbMap.values().stream()
+                .map(KnowledgeBase::getTaskId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<Long, TrainingTask> taskMap = new java.util.HashMap<>();
+        if (!taskIds.isEmpty()) {
+            taskMapper.selectList(new LambdaQueryWrapper<TrainingTask>().in(TrainingTask::getId, taskIds))
+                    .forEach(task -> taskMap.put(task.getId(), task));
+        }
+
         result.getRecords().forEach(doc -> {
             doc.setVectorized("SUCCESS".equals(doc.getVectorStatus()));
             doc.setUpdateTime(doc.getUpdatedAt());
             doc.setName(doc.getOriginalName());
             KnowledgeBase kb = kbMap.get(doc.getKnowledgeBaseId());
-            doc.setCourseName(kb != null && kb.getCourseId() != null ? "课程 #" + kb.getCourseId() : "知识库 #" + doc.getKnowledgeBaseId());
+            fillDisplayFields(doc, kb, courseMap, taskMap);
         });
 
         return Result.ok(new PageResult<>(result.getRecords(), result.getCurrent(), result.getSize(), result.getTotal()));
@@ -130,7 +160,7 @@ public class KnowledgeService {
      * 上传知识库文档（MVP 阶段模拟实现）
      */
     @Transactional(rollbackFor = Exception.class)
-    public Result<KnowledgeDocument> uploadDocument(MultipartFile file, Long courseId) {
+    public Result<KnowledgeDocument> uploadDocument(MultipartFile file, Long courseId, Long taskId) {
         try {
             String originalName = file.getOriginalFilename();
             if (originalName == null || originalName.isBlank()) {
@@ -148,6 +178,8 @@ public class KnowledgeService {
                 return Result.error("文件大小不能超过 50MB");
             }
 
+            KnowledgeBase kb = resolveKnowledgeBase(courseId, taskId);
+
             String storedExt = originalName.substring(originalName.lastIndexOf("."));
             String storedName = UUID.randomUUID().toString() + storedExt;
             Path baseDir = Paths.get(uploadPath).toAbsolutePath().normalize();
@@ -155,8 +187,6 @@ public class KnowledgeService {
             Files.createDirectories(dir);
             Path filePath = dir.resolve(storedName);
             Files.copy(file.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-
-            KnowledgeBase kb = resolveKnowledgeBase(courseId);
 
             // 创建文档记录
             KnowledgeDocument doc = new KnowledgeDocument();
@@ -185,9 +215,11 @@ public class KnowledgeService {
 
             // 设置前端需要的字段
             doc.setName(originalName);
-            doc.setCourseName(resolveCourseName(doc));
+            fillDisplayFields(doc, kb, Map.of(), Map.of());
 
             return Result.ok(doc);
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
         } catch (IOException e) {
             return Result.error("文件上传失败: " + e.getMessage());
         }
@@ -207,6 +239,26 @@ public class KnowledgeService {
         doc.setUpdatedAt(LocalDateTime.now());
         documentMapper.updateById(doc);
         return Result.ok();
+    }
+
+    public Result<KnowledgeDocument> updateDocument(Long id, String newName, Long newTaskId) {
+        KnowledgeDocument doc = documentMapper.selectById(id);
+        if (doc == null) {
+            return Result.error("文档不存在");
+        }
+
+        if (newName != null && !newName.trim().isEmpty()) {
+            doc.setOriginalName(newName);
+        }
+        
+        if (newTaskId != null) {
+            KnowledgeBase kb = resolveKnowledgeBase(null, newTaskId);
+            doc.setKnowledgeBaseId(kb.getId());
+        }
+        
+        doc.setUpdatedAt(LocalDateTime.now());
+        documentMapper.updateById(doc);
+        return Result.ok(doc);
     }
 
     public void processKnowledgeDocument(Long documentId) {
@@ -273,19 +325,39 @@ public class KnowledgeService {
         }
     }
 
-    private KnowledgeBase resolveKnowledgeBase(Long courseId) {
+    private KnowledgeBase resolveKnowledgeBase(Long courseId, Long taskId) {
+        TrainingTask task = null;
+        Long resolvedCourseId = courseId;
+        if (taskId != null) {
+            task = taskMapper.selectById(taskId);
+            if (task == null) {
+                throw new IllegalArgumentException("实训任务不存在");
+            }
+            resolvedCourseId = task.getCourseId();
+        }
+
         LambdaQueryWrapper<KnowledgeBase> wrapper = new LambdaQueryWrapper<>();
-        if (courseId != null) {
-            wrapper.eq(KnowledgeBase::getCourseId, courseId);
+        if (resolvedCourseId != null) {
+            wrapper.eq(KnowledgeBase::getCourseId, resolvedCourseId);
         } else {
             wrapper.isNull(KnowledgeBase::getCourseId);
+        }
+        if (taskId != null) {
+            wrapper.eq(KnowledgeBase::getTaskId, taskId);
+        } else {
+            wrapper.isNull(KnowledgeBase::getTaskId);
         }
         KnowledgeBase kb = knowledgeBaseMapper.selectOne(wrapper);
         if (kb != null) return kb;
 
         kb = new KnowledgeBase();
-        kb.setName(courseId == null ? "通用知识库" : "课程知识库-" + courseId);
-        kb.setCourseId(courseId);
+        if (task != null) {
+            kb.setName("任务知识库-" + task.getTitle());
+        } else {
+            kb.setName(resolvedCourseId == null ? "通用知识库" : "课程知识库-" + resolvedCourseId);
+        }
+        kb.setCourseId(resolvedCourseId);
+        kb.setTaskId(taskId);
         kb.setStatus("ENABLED");
         kb.setCreatedAt(LocalDateTime.now());
         kb.setUpdatedAt(LocalDateTime.now());
@@ -353,16 +425,35 @@ public class KnowledgeService {
         return content.substring(0, maxLength) + "...";
     }
 
-    /**
-     * 解析文档关联的课程名称
-     */
-    private String resolveCourseName(KnowledgeDocument doc) {
-        if (doc.getKnowledgeBaseId() != null) {
-            KnowledgeBase kb = knowledgeBaseMapper.selectById(doc.getKnowledgeBaseId());
-            if (kb != null && kb.getCourseId() != null) {
-                return "课程 #" + kb.getCourseId();
-            }
+    private void fillDisplayFields(KnowledgeDocument doc,
+                                   KnowledgeBase kb,
+                                   Map<Long, Course> courseMap,
+                                   Map<Long, TrainingTask> taskMap) {
+        if (kb == null) {
+            doc.setCourseName("知识库 #" + doc.getKnowledgeBaseId());
+            return;
         }
-        return "知识库 #" + doc.getKnowledgeBaseId();
+
+        doc.setTaskId(kb.getTaskId());
+
+        if (kb.getCourseId() != null) {
+            Course course = courseMap.get(kb.getCourseId());
+            if (course == null) {
+                course = courseMapper.selectById(kb.getCourseId());
+            }
+            doc.setCourseName(course != null ? course.getName() : "课程 #" + kb.getCourseId());
+        } else {
+            doc.setCourseName("通用资料");
+        }
+
+        if (kb.getTaskId() != null) {
+            TrainingTask task = taskMap.get(kb.getTaskId());
+            if (task == null) {
+                task = taskMapper.selectById(kb.getTaskId());
+            }
+            doc.setTaskName(task != null ? task.getTitle() : "任务 #" + kb.getTaskId());
+        } else {
+            doc.setTaskName("课程通用知识库");
+        }
     }
 }

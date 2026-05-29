@@ -9,8 +9,10 @@ import com.bisai.entity.Submission;
 import com.bisai.entity.TrainingTask;
 import com.bisai.mapper.AsyncTaskMapper;
 import com.bisai.mapper.CourseMapper;
+import com.bisai.mapper.EvaluationTemplateMapper;
 import com.bisai.mapper.SubmissionMapper;
 import com.bisai.mapper.TrainingTaskMapper;
+import com.bisai.entity.EvaluationTemplate;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,7 @@ public class TaskService {
     private final AsyncTaskMapper asyncTaskMapper;
     private final PermissionService permissionService;
     private final CourseMapper courseMapper;
+    private final EvaluationTemplateMapper evaluationTemplateMapper;
 
     private static final Map<Long, BatchJob> activeJobs = new ConcurrentHashMap<>();
 
@@ -65,6 +68,7 @@ public class TaskService {
         Page<TrainingTask> result = taskMapper.selectPage(page, wrapper);
         List<TrainingTask> tasks = result.getRecords();
         fillCourseName(tasks);
+        fillTemplateName(tasks);
         return Result.ok(new PageResult<>(tasks, result.getCurrent(), result.getSize(), result.getTotal()));
     }
 
@@ -79,6 +83,7 @@ public class TaskService {
             }
         }
         fillCourseName(List.of(task));
+        fillTemplateName(List.of(task));
         return Result.ok(task);
     }
 
@@ -381,6 +386,18 @@ public class TaskService {
         courseMapper.selectList(new LambdaQueryWrapper<Course>().in(Course::getId, courseIds))
                 .forEach(c -> courseNameMap.put(c.getId(), c.getName()));
         tasks.forEach(t -> t.setCourseName(courseNameMap.getOrDefault(t.getCourseId(), "")));
+    }
+
+    private void fillTemplateName(List<TrainingTask> tasks) {
+        Set<Long> templateIds = tasks.stream()
+                .map(TrainingTask::getTemplateId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (templateIds.isEmpty()) return;
+        Map<Long, String> templateNameMap = new HashMap<>();
+        evaluationTemplateMapper.selectList(new LambdaQueryWrapper<EvaluationTemplate>().in(EvaluationTemplate::getId, templateIds))
+                .forEach(t -> templateNameMap.put(t.getId(), t.getName()));
+        tasks.forEach(t -> t.setTemplateName(templateNameMap.getOrDefault(t.getTemplateId(), "")));
     }
 
     private static class BatchJob {

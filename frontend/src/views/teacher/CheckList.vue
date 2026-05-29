@@ -14,21 +14,21 @@
       </template>
 
       <el-table :data="submissions" stripe v-loading="loading" @row-click="handleRowClick">
-        <el-table-column prop="studentName" label="学生" width="100" />
-        <el-table-column prop="title" label="任务名称" min-width="180" />
-        <el-table-column prop="version" label="版本" width="70" />
-        <el-table-column label="提交时间" width="170">
+        <el-table-column prop="studentName" label="学生" min-width="100" align="center" />
+        <el-table-column prop="taskTitle" label="任务名称" min-width="180" align="center" show-overflow-tooltip />
+        <el-table-column prop="version" label="版本" min-width="70" align="center" />
+        <el-table-column label="提交时间" min-width="170" align="center">
           <template #default="{ row }">{{ formatDate(row.submitTime) }}</template>
         </el-table-column>
-        <el-table-column label="核查状态" width="110">
+        <el-table-column label="核查状态" min-width="110" align="center">
           <template #default="{ row }">
             <el-tag :type="getCheckStatusType(row.checkStatus)" size="small">{{ getCheckStatusLabel(row.checkStatus) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" min-width="150" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link @click.stop="$router.push(`/teacher/submissions/${row.id}/check`)">核查详情</el-button>
-            <el-button type="info" link @click.stop="handleCheck(row.id)" :loading="aiLoading[row.id]">重新核查</el-button>
+            <el-button type="primary" size="small" @click.stop="$router.push(`/teacher/submissions/${row.id}/check`)">核查详情</el-button>
+            <el-button type="info" size="small" @click.stop="handleCheck(row.id)" :loading="aiLoading[row.id]">重新核查</el-button>
           </template>
         </el-table-column>
       </el-table>

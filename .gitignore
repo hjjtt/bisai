@@ -22,6 +22,7 @@ Thumbs.db
 
 # 上传文件目录
 data/files/
+backend/data/files/
 
 # 环境配置（敏感信息）
 # application-prod.yml

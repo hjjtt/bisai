@@ -17,28 +17,40 @@
       </template>
 
       <el-table :data="users" stripe v-loading="loading">
-        <el-table-column prop="username" label="用户名" width="120" />
-        <el-table-column prop="realName" label="姓名" width="100" />
-        <el-table-column label="角色" width="100">
+        <el-table-column prop="username" label="用户名" min-width="120" align="center" />
+        <el-table-column prop="realName" label="姓名" min-width="120" align="center" />
+        <el-table-column label="角色" min-width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getRoleType(row.role)">{{ getRoleLabel(row.role) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="className" label="班级" width="120" />
-        <el-table-column label="状态" width="80">
+        <el-table-column prop="className" label="班级" min-width="120" align="center" />
+        <el-table-column label="状态" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
               {{ row.status === 'ENABLED' ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="260" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button type="primary" link @click="showDialog(row)">编辑</el-button>
-            <el-button :type="row.status === 'ENABLED' ? 'warning' : 'success'" link @click="toggleStatus(row)">
-              {{ row.status === 'ENABLED' ? '禁用' : '启用' }}
-            </el-button>
-            <el-button type="info" link @click="resetPwd(row)">重置密码</el-button>
+            <div class="table-actions">
+              <el-button class="action-btn" type="primary" plain :icon="EditPen" @click="showDialog(row)">
+                编辑
+              </el-button>
+              <el-button
+                class="action-btn"
+                :type="row.status === 'ENABLED' ? 'warning' : 'success'"
+                plain
+                :icon="row.status === 'ENABLED' ? Lock : Unlock"
+                @click="toggleStatus(row)"
+              >
+                {{ row.status === 'ENABLED' ? '禁用' : '启用' }}
+              </el-button>
+              <el-button class="action-btn reset-btn" type="info" plain :icon="RefreshLeft" @click="resetPwd(row)">
+                重置密码
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -91,7 +103,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
+import { EditPen, Lock, RefreshLeft, Search, Unlock } from '@element-plus/icons-vue'
 import { getUserList, createUser, updateUser, resetPassword, toggleUserStatus } from '@/api/user'
 import { getClassList } from '@/api/course'
 import { getRoleLabel, getRoleType, ROLE_OPTIONS } from '@/utils/status'
@@ -245,5 +257,77 @@ onMounted(() => {
 :deep(.el-form-item__label) {
   font-weight: 500;
   color: #475569;
+}
+
+.table-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+:deep(.table-actions .el-button) {
+  margin-left: 0;
+}
+
+:deep(.action-btn) {
+  min-width: 70px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-weight: 600;
+}
+
+:deep(.reset-btn) {
+  min-width: 96px;
+}
+
+:deep(.action-btn.el-button--primary.is-plain) {
+  color: #1d4ed8 !important;
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+
+:deep(.action-btn.el-button--warning.is-plain) {
+  color: #b45309 !important;
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+}
+
+:deep(.action-btn.el-button--success.is-plain) {
+  color: #047857 !important;
+  background-color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+}
+
+:deep(.action-btn.el-button--info.is-plain) {
+  color: #475569 !important;
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+:deep(.action-btn.is-plain:hover) {
+  color: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
+}
+
+:deep(.action-btn.el-button--primary.is-plain:hover) {
+  background-color: #2563eb !important;
+  border-color: #2563eb !important;
+}
+
+:deep(.action-btn.el-button--warning.is-plain:hover) {
+  background-color: #d97706 !important;
+  border-color: #d97706 !important;
+}
+
+:deep(.action-btn.el-button--success.is-plain:hover) {
+  background-color: #059669 !important;
+  border-color: #059669 !important;
+}
+
+:deep(.action-btn.el-button--info.is-plain:hover) {
+  background-color: #64748b !important;
+  border-color: #64748b !important;
 }
 </style>

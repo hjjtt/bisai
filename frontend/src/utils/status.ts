@@ -94,6 +94,17 @@ export function getKnowledgeStatusType(status: string): string {
   }
 }
 
+export function getKnowledgeStatusLabel(status: string): string {
+  switch (status) {
+    case 'SUCCESS': return '已完成'
+    case 'PROCESSING':
+    case 'PARSING': return '解析中'
+    case 'FAILED': return '失败'
+    case 'PENDING': return '等待中'
+    default: return status
+  }
+}
+
 export function getResultType(result: string): string {
   const map: Record<string, string> = {
     PASS: 'success', WARNING: 'warning', FAIL: 'danger',
@@ -138,16 +149,24 @@ export function getAsyncTaskStatusLabel(status: string): string {
 
 export function getMessageTypeType(type: string): string {
   const map: Record<string, string> = {
-    SUBMIT: 'success', RESUBMIT: 'warning', SCORE_COMPLETE: 'primary',
-    SCORE_PUBLISH: 'success', BATCH_FAIL: 'danger', QUOTA_WARNING: 'warning',
+    SUBMISSION: 'info',
+    AI_PARSE: 'primary',
+    AI_CHECK: 'warning',
+    AI_SCORE: 'success',
+    SCORE_PUBLISHED: 'success',
+    SCORE_CORRECTED: 'warning',
   }
   return map[type] || 'info'
 }
 
 export function getMessageTypeLabel(type: string): string {
   const map: Record<string, string> = {
-    SUBMIT: '提交通知', RESUBMIT: '重提通知', SCORE_COMPLETE: '评分完成',
-    SCORE_PUBLISH: '成绩发布', BATCH_FAIL: '批量失败', QUOTA_WARNING: '配额警告',
+    SUBMISSION: '提交通知',
+    AI_PARSE: '解析完成',
+    AI_CHECK: '核查完成',
+    AI_SCORE: '评分完成',
+    SCORE_PUBLISHED: '成绩发布',
+    SCORE_CORRECTED: '成绩修正',
   }
   return map[type] || type
 }

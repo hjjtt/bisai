@@ -58,14 +58,18 @@ public class KnowledgeRetrievalService {
             return "";
         }
         try {
-            KnowledgeBase kb = knowledgeBaseMapper.selectOne(
-                    new LambdaQueryWrapper<KnowledgeBase>().eq(KnowledgeBase::getCourseId, task.getCourseId())
+            List<KnowledgeBase> knowledgeBases = knowledgeBaseMapper.selectList(
+                    new LambdaQueryWrapper<KnowledgeBase>()
+                            .eq(KnowledgeBase::getCourseId, task.getCourseId())
+                            .eq(KnowledgeBase::getStatus, "ENABLED")
+                            .and(w -> w.eq(KnowledgeBase::getTaskId, task.getId()).or().isNull(KnowledgeBase::getTaskId))
             );
-            if (kb == null) return "";
+            if (knowledgeBases.isEmpty()) return "";
+            List<Long> knowledgeBaseIds = knowledgeBases.stream().map(KnowledgeBase::getId).toList();
 
             List<Long> documentIds = knowledgeDocumentMapper.selectList(
                     new LambdaQueryWrapper<KnowledgeDocument>()
-                            .eq(KnowledgeDocument::getKnowledgeBaseId, kb.getId())
+                            .in(KnowledgeDocument::getKnowledgeBaseId, knowledgeBaseIds)
                             .eq(KnowledgeDocument::getEnabled, true)
                             .eq(KnowledgeDocument::getVectorStatus, "SUCCESS")
             ).stream().map(KnowledgeDocument::getId).toList();
