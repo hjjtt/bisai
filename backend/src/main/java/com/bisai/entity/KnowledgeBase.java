@@ -12,6 +12,7 @@ public class KnowledgeBase {
     private Long id;
     private String name;
     private Long courseId;
+    private Long taskId;
     private String description;
     private String status;
 

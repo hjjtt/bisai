@@ -57,7 +57,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getSystemConfig, updateSystemConfig, testModelConnection } from '@/api/system'
+import { getSystemConfig, updateSystemConfig, testModelConnection, type SystemConfigMap } from '@/api/system'
 
 interface SystemConfigData {
   textModelApiUrl?: string
@@ -119,8 +119,14 @@ async function handleTest() {
 async function handleSave() {
   saving.value = true
   try {
-    const payload = { ...form }
-    if (!payload.model) payload.model = 'Qwen/Qwen3.5-35B-A3B'
+    const payload: Partial<SystemConfigMap> = {
+      textModelApiUrl: form.textModelApiUrl,
+      textModelApiKey: form.textModelApiKey,
+      model: form.model || 'Qwen/Qwen3.5-35B-A3B',
+      timeout: String(form.timeout),
+      temperature: String(form.temperature),
+      maxTokens: String(form.maxTokens),
+    }
     await updateSystemConfig(payload)
     ElMessage.success('保存成功')
   } catch {

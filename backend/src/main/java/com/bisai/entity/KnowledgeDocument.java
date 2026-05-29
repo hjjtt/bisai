@@ -28,6 +28,10 @@ public class KnowledgeDocument {
     @TableField(exist = false)
     private String courseName;
     @TableField(exist = false)
+    private Long taskId;
+    @TableField(exist = false)
+    private String taskName;
+    @TableField(exist = false)
     private Boolean vectorized;
     @TableField(exist = false)
     private LocalDateTime updateTime;

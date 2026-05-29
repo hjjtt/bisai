@@ -15,35 +15,35 @@
       </template>
 
       <el-table :data="submissions" stripe v-loading="loading">
-        <el-table-column prop="studentName" label="学生" width="100" />
-        <el-table-column prop="title" label="任务名称" min-width="180" />
-        <el-table-column prop="version" label="版本" width="70" />
-        <el-table-column label="提交时间" width="170">
+        <el-table-column prop="studentName" label="学生" min-width="100" align="center" />
+        <el-table-column prop="taskTitle" label="任务名称" min-width="180" align="center" show-overflow-tooltip />
+        <el-table-column prop="version" label="版本" min-width="70" align="center" />
+        <el-table-column label="提交时间" min-width="170" align="center">
           <template #default="{ row }">{{ formatDate(row.submitTime) }}</template>
         </el-table-column>
-        <el-table-column label="解析状态" width="110">
+        <el-table-column label="解析状态" min-width="110" align="center">
           <template #default="{ row }">
             <el-tag :type="getParseStatusType(row.parseStatus)" size="small">{{ getParseStatusLabel(row.parseStatus) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="核查状态" width="110">
+        <el-table-column label="核查状态" min-width="110" align="center">
           <template #default="{ row }">
             <el-tag :type="getCheckStatusType(row.checkStatus)" size="small">{{ getCheckStatusLabel(row.checkStatus) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="评分状态" width="130">
+        <el-table-column label="评分状态" min-width="110" align="center">
           <template #default="{ row }">
             <el-tag :type="getScoreStatusType(row.scoreStatus)" size="small">{{ getScoreStatusLabel(row.scoreStatus) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="totalScore" label="总分" width="80" />
-        <el-table-column label="操作" width="340" fixed="right">
+        <el-table-column prop="totalScore" label="总分" min-width="80" align="center" />
+        <el-table-column label="操作" min-width="260" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link @click="$router.push(`/teacher/submissions/${row.id}/preview`)">预览</el-button>
-            <el-button type="info" link @click="$router.push(`/teacher/submissions/${row.id}/parse`)">解析</el-button>
-            <el-button type="success" link @click="$router.push(`/teacher/submissions/${row.id}/check`)">核查</el-button>
-            <el-button type="warning" link @click="$router.push(`/teacher/submissions/${row.id}/score`)">评分</el-button>
-            <el-button type="danger" link @click="handleReturn(row.id)">退回</el-button>
+            <el-button type="primary" size="small" @click="$router.push(`/teacher/submissions/${row.id}/preview`)">预览</el-button>
+            <el-button type="info" size="small" @click="$router.push(`/teacher/submissions/${row.id}/parse`)">解析</el-button>
+            <el-button type="success" size="small" @click="$router.push(`/teacher/submissions/${row.id}/check`)">核查</el-button>
+            <el-button type="warning" size="small" @click="$router.push(`/teacher/submissions/${row.id}/score`)">评分</el-button>
+            <el-button type="danger" size="small" @click="handleReturn(row.id)">退回</el-button>
           </template>
         </el-table-column>
       </el-table>

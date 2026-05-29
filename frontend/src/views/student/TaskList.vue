@@ -71,10 +71,10 @@
         </el-table-column>
         <el-table-column label="操作" width="190" fixed="right" align="right">
           <template #default="{ row }">
-            <el-button text type="primary" :icon="ArrowRight" @click="router.push(`/student/tasks/${row.id}`)">详情</el-button>
+            <el-button size="small" type="primary" :icon="ArrowRight" @click="router.push(`/student/tasks/${row.id}`)">详情</el-button>
             <el-button
               v-if="row.status === 'PUBLISHED'"
-              text
+              size="small"
               type="success"
               :icon="UploadFilled"
               @click="router.push(`/student/submit/${row.id}`)"

@@ -120,6 +120,7 @@ public class AsyncTaskService {
                     case "SCORE" -> submission.setScoreStatus("AI_SCORED");
                 }
                 submissionMapper.updateById(submission);
+                triggerAutoPipelineNextTask(fresh, submission);
             }
 
             // 检查批量任务是否完成
@@ -172,6 +173,60 @@ public class AsyncTaskService {
     /**
      * 查询任务状态
      */
+    private void triggerAutoPipelineNextTask(AsyncTask finishedTask, Submission submission) {
+        if (finishedTask == null || submission == null) {
+            return;
+        }
+        switch (finishedTask.getTaskType()) {
+            case "PARSE" -> triggerAutoCheckTask(submission);
+            case "CHECK" -> triggerAutoScoreTask(submission);
+            default -> {
+            }
+        }
+    }
+
+    private void triggerAutoCheckTask(Submission submission) {
+        String checkStatus = submission.getCheckStatus();
+        if ("SUCCESS".equals(checkStatus) || "CHECKING".equals(checkStatus)) {
+            return;
+        }
+        if (hasActiveTask("CHECK", submission.getId())) {
+            return;
+        }
+        submission.setCheckStatus("CHECKING");
+        submissionMapper.updateById(submission);
+        createTask("CHECK", submission.getId());
+    }
+
+    private void triggerAutoScoreTask(Submission submission) {
+        String scoreStatus = submission.getScoreStatus();
+        if ("PUBLISHED".equals(scoreStatus)
+                || "TEACHER_CONFIRMED".equals(scoreStatus)
+                || "AI_SCORED".equals(scoreStatus)
+                || "SCORING".equals(scoreStatus)) {
+            return;
+        }
+        if (hasActiveTask("SCORE", submission.getId())) {
+            return;
+        }
+        submission.setScoreStatus("SCORING");
+        submissionMapper.updateById(submission);
+        createTask("SCORE", submission.getId());
+    }
+
+    private boolean hasActiveTask(String taskType, Long bizId) {
+        if (taskType == null || bizId == null) {
+            return false;
+        }
+        Long count = asyncTaskMapper.selectCount(
+                new LambdaQueryWrapper<AsyncTask>()
+                        .eq(AsyncTask::getTaskType, taskType)
+                        .eq(AsyncTask::getBizId, bizId)
+                        .in(AsyncTask::getStatus, "PENDING", "RUNNING", "RETRYING")
+        );
+        return count != null && count > 0;
+    }
+
     public AsyncTask getTaskStatus(Long taskId) {
         return asyncTaskMapper.selectById(taskId);
     }

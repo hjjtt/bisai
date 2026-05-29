@@ -8,8 +8,16 @@ export interface SystemConfigMap {
   'ai.rerank-model'?: string
   'ai.api-url'?: string
   'ai.max-tokens'?: string
+  'ai.temperature'?: string
+  'ai.timeout'?: string
   'ai.daily-token-limit'?: string
   'ai.daily-call-limit'?: string
+  textModelApiUrl?: string
+  textModelApiKey?: string
+  model?: string
+  maxTokens?: string
+  temperature?: string
+  timeout?: string
   [key: string]: string | undefined
 }
 
@@ -23,7 +31,7 @@ export function updateSystemConfig(data: Partial<SystemConfigMap>) {
 }
 
 // 测试模型连通性
-export function testModelConnection(data: { apiUrl: string; apiKey: string }) {
+export function testModelConnection(data: { apiUrl: string; apiKey: string; model?: string }) {
   return post<{ success: boolean; message: string }>('/system/test-model', data)
 }
 

@@ -69,7 +69,7 @@
             <h3>近期实训任务</h3>
             <p>按截止时间关注提交状态与成绩反馈。</p>
           </div>
-          <el-button type="primary" link :icon="ArrowRight" @click="router.push('/student/tasks')">全部任务</el-button>
+          <el-button type="primary" size="small" :icon="ArrowRight" @click="router.push('/student/tasks')">全部任务</el-button>
         </div>
 
         <div class="task-table" v-loading="loading">
@@ -104,7 +104,7 @@
             </el-table-column>
             <el-table-column label="" width="110" align="right">
               <template #default="{ row }">
-                <el-button text type="primary" :icon="ArrowRight" @click="openTask(row)">
+                <el-button size="small" type="primary" :icon="ArrowRight" @click="openTask(row)">
                   {{ getTaskActionLabel(row) }}
                 </el-button>
               </template>

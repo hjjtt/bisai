@@ -33,11 +33,27 @@ public class KnowledgeController {
     @PostMapping("/upload")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<KnowledgeDocument> upload(@RequestParam("file") MultipartFile file,
-                                             @RequestParam(value = "courseId", required = false) Long courseId) {
+                                             @RequestParam(value = "courseId", required = false) Long courseId,
+                                             @RequestParam(value = "taskId", required = false) Long taskId,
+                                             Authentication auth) {
         if (file.isEmpty()) {
             return Result.error("上传文件不能为空");
         }
-        return knowledgeService.uploadDocument(file, courseId);
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream().findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("");
+        if (!permissionService.isAdmin(role)) {
+            if (taskId != null && !permissionService.isTeacherOwnerOfTask(taskId, userId)) {
+                return Result.error(40301, "无权为该实训任务上传知识库文档");
+            }
+            if (taskId == null && courseId != null && !permissionService.isTeacherOwnerOfCourse(courseId, userId)) {
+                return Result.error(40301, "无权为该课程上传知识库文档");
+            }
+            if (taskId == null && courseId == null) {
+                return Result.error(40001, "请选择关联实训任务");
+            }
+        }
+        return knowledgeService.uploadDocument(file, courseId, taskId);
     }
 
     @DeleteMapping("/{id}")
@@ -66,5 +82,22 @@ public class KnowledgeController {
         }
         Boolean enabled = body.get("enabled");
         return knowledgeService.toggleDocumentStatus(id, enabled);
+    }
+
+    /**
+     * 编辑知识库文档信息（名称、关联任务）
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<KnowledgeDocument> update(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream().findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("");
+        if (!permissionService.isAdmin(role) && !knowledgeService.isOwner(id, userId)) {
+            return Result.error(40301, "无权操作该文档");
+        }
+        String newName = (String) body.get("name");
+        Long newTaskId = body.get("taskId") != null ? Long.valueOf(body.get("taskId").toString()) : null;
+        return knowledgeService.updateDocument(id, newName, newTaskId);
     }
 }

@@ -42,6 +42,7 @@ public class SubmissionService {
     private final CourseMapper courseMapper;
     private final UserMapper userMapper;
     private final MessageService messageService;
+    private final AsyncTaskService asyncTaskService;
 
     @Value("${file.upload-path}")
     private String uploadPath;
@@ -316,6 +317,7 @@ public class SubmissionService {
             log.warn("发送提交通知消息失败: {}", e.getMessage());
         }
 
+        asyncTaskService.createTask("PARSE", submission.getId());
         return Result.ok();
     }
 
