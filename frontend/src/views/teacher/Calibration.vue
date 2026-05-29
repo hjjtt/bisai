@@ -14,30 +14,30 @@
       </template>
 
       <el-table :data="calibrations" stripe v-loading="loading">
-        <el-table-column prop="submissionId" label="提交ID" width="100" />
-        <el-table-column prop="indicatorName" label="评价指标" min-width="160">
+        <el-table-column prop="submissionId" label="提交ID" min-width="100" align="center" />
+        <el-table-column prop="indicatorName" label="评价指标" min-width="160" align="center">
           <template #default="{ row }">
             {{ row.indicatorName || '指标 #' + row.indicatorId }}
           </template>
         </el-table-column>
-        <el-table-column prop="calibrationScore" label="校准分数" width="100">
+        <el-table-column prop="calibrationScore" label="校准分数" min-width="100" align="center">
           <template #default="{ row }">
             <span class="calibration-score">{{ row.calibrationScore ?? '--' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="calibrationReason" label="校准理由" min-width="200">
+        <el-table-column prop="calibrationReason" label="校准理由" min-width="200" align="center">
           <template #default="{ row }">
             <el-text type="info" size="small" class="text-ellipsis">{{ row.calibrationReason || '--' }}</el-text>
           </template>
         </el-table-column>
-        <el-table-column label="确认时间" width="170">
+        <el-table-column label="确认时间" min-width="170" align="center">
           <template #default="{ row }">
             {{ row.confirmedAt ? formatDate(row.confirmedAt) : '--' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" min-width="120" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link @click="showEditDialog(row)">编辑</el-button>
+            <el-button type="primary" size="small" @click="showEditDialog(row)">编辑</el-button>
           </template>
         </el-table-column>
       </el-table>

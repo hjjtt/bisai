@@ -9,29 +9,29 @@
       </template>
 
       <el-table :data="documents" stripe v-loading="loading">
-        <el-table-column prop="name" label="文档名称" min-width="200" />
-        <el-table-column prop="taskName" label="关联实训任务" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="courseName" label="所属课程" width="150" show-overflow-tooltip />
-        <el-table-column label="解析状态" width="120">
+        <el-table-column prop="name" label="文档名称" min-width="200" align="center" />
+        <el-table-column prop="taskName" label="关联实训任务" min-width="180" align="center" show-overflow-tooltip />
+        <el-table-column prop="courseName" label="所属课程" min-width="150" align="center" show-overflow-tooltip />
+        <el-table-column label="解析状态" min-width="120" align="center">
           <template #default="{ row }">
-            <el-tag :type="getKnowledgeStatusType(row.parseStatus)" size="small">{{ row.parseStatus }}</el-tag>
+            <el-tag :type="getKnowledgeStatusType(row.parseStatus)" size="small">{{ getKnowledgeStatusLabel(row.parseStatus) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="向量化状态" width="120">
+        <el-table-column label="向量化状态" min-width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="row.vectorStatus === 'SUCCESS' ? 'success' : row.vectorStatus === 'FAILED' ? 'danger' : 'warning'" size="small">
-              {{ row.vectorStatus }}
+              {{ row.vectorStatus === 'SUCCESS' ? '已完成' : row.vectorStatus === 'FAILED' ? '失败' : (row.vectorStatus === 'PROCESSING' ? '处理中' : row.vectorStatus) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="启用状态" width="100">
+        <el-table-column label="启用状态" min-width="100" align="center">
           <template #default="{ row }">
             <el-switch v-model="row.enabled" @change="handleToggle(row)" />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" min-width="120" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="danger" link @click="handleDelete(row.id)">删除</el-button>
+            <el-button type="danger" size="small" @click="handleDelete(row.id)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -76,7 +76,7 @@ import { ElMessage } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { getKnowledgeList, deleteKnowledge, uploadKnowledge, toggleKnowledgeStatus, type KnowledgeDocument } from '@/api/knowledge'
 import { getTaskList } from '@/api/task'
-import { getKnowledgeStatusType } from '@/utils/status'
+import { getKnowledgeStatusType, getKnowledgeStatusLabel } from '@/utils/status'
 import type { TrainingTask } from '@/types'
 
 const loading = ref(false)

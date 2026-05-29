@@ -49,16 +49,16 @@
       <!-- 历史版本 -->
       <el-divider v-if="submissions.length > 0">历史提交版本</el-divider>
       <el-table v-if="submissions.length > 0" :data="submissions" stripe size="small">
-        <el-table-column prop="version" label="版本" width="80" />
-        <el-table-column label="提交时间" width="180">
+        <el-table-column prop="version" label="版本" width="80" align="center" />
+        <el-table-column label="提交时间" min-width="180" align="center">
           <template #default="{ row }">{{ formatDate(row.submitTime) }}</template>
         </el-table-column>
-        <el-table-column label="解析状态" width="120">
+        <el-table-column label="解析状态" width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="getParseStatusType(row.parseStatus)" size="small">{{ getParseStatusLabel(row.parseStatus) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="评分状态" width="120">
+        <el-table-column label="评分状态" width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="getScoreStatusType(row.scoreStatus)" size="small">{{ getScoreStatusLabel(row.scoreStatus) }}</el-tag>
           </template>

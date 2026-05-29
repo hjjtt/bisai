@@ -12,20 +12,20 @@
         <!-- 班级管理 -->
         <el-tab-pane label="班级管理" name="class">
           <el-table :data="classes" stripe v-loading="classLoading">
-            <el-table-column prop="name" label="班级名称" width="180" />
-            <el-table-column prop="grade" label="年级" width="100" />
-            <el-table-column prop="major" label="专业" width="150" />
-            <el-table-column label="学生数" width="80">
+            <el-table-column prop="name" label="班级名称" width="180" align="center" />
+            <el-table-column prop="grade" label="年级" width="100" align="center" />
+            <el-table-column prop="major" label="专业" min-width="150" align="center" />
+            <el-table-column label="学生数" width="80" align="center">
               <template #default="{ row }">{{ row.studentCount ?? 0 }}</template>
             </el-table-column>
-            <el-table-column label="状态" width="80">
+            <el-table-column label="状态" width="80" align="center">
               <template #default="{ row }">
                 <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
                   {{ row.status === 'ENABLED' ? '启用' : '禁用' }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="140" fixed="right" align="center">
+            <el-table-column label="操作" width="140" align="center" fixed="right">
               <template #default="{ row }">
                 <div class="table-actions">
                   <el-button class="action-btn" type="primary" plain :icon="EditPen" @click="showClassDialog(row)">
@@ -43,17 +43,17 @@
             <el-button type="primary" @click="showCourseDialog()">新增课程</el-button>
           </div>
           <el-table :data="courses" stripe v-loading="courseLoading">
-            <el-table-column prop="name" label="课程名称" min-width="180" />
-            <el-table-column prop="teacherName" label="授课教师" width="120" />
-            <el-table-column prop="className" label="授课班级" width="120" />
-            <el-table-column label="状态" width="80">
+            <el-table-column prop="name" label="课程名称" min-width="180" align="center" />
+            <el-table-column prop="teacherName" label="授课教师" width="120" align="center" />
+            <el-table-column prop="className" label="授课班级" width="120" align="center" />
+            <el-table-column label="状态" width="80" align="center">
               <template #default="{ row }">
                 <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
                   {{ row.status === 'ENABLED' ? '启用' : '停用' }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="140" fixed="right" align="center">
+            <el-table-column label="操作" width="140" align="center" fixed="right">
               <template #default="{ row }">
                 <div class="table-actions">
                   <el-button class="action-btn" type="primary" plain :icon="EditPen" @click="showCourseDialog(row)">

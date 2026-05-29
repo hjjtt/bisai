@@ -29,35 +29,35 @@
 
       <!-- 消息列表 -->
       <el-table :data="messages" stripe v-loading="loading" row-class-name="message-row">
-        <el-table-column label="类型" width="120">
+        <el-table-column label="类型" min-width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="getMessageTypeType(row.type)" size="small">{{ getMessageTypeLabel(row.type) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip>
+        <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip align="center">
           <template #default="{ row }">
             <span :class="{ 'unread-title': !row.isRead }">{{ row.title }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="content" label="内容" min-width="280" show-overflow-tooltip>
+        <el-table-column prop="content" label="内容" min-width="280" show-overflow-tooltip align="center">
           <template #default="{ row }">
             <span :class="{ 'unread-content': !row.isRead }">{{ row.content }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="时间" width="170">
+        <el-table-column label="时间" min-width="170" align="center">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="状态" width="90" align="center">
+        <el-table-column label="状态" min-width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="row.isRead ? 'info' : 'danger'" size="small">
               {{ row.isRead ? '已读' : '未读' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" min-width="160" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.relatedId" type="primary" link @click="handleViewDetail(row)">查看详情</el-button>
-            <el-button v-else-if="!row.isRead" type="primary" link @click="handleMarkRead(row.id)">标记已读</el-button>
+            <el-button v-if="row.relatedId" type="primary" size="small" @click="handleViewDetail(row)">查看详情</el-button>
+            <el-button v-else-if="!row.isRead" type="success" size="small" @click="handleMarkRead(row.id)">标记已读</el-button>
             <span v-else class="read-hint">已读</span>
           </template>
         </el-table-column>

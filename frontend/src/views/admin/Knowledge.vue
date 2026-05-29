@@ -17,28 +17,28 @@
 
       <!-- 核心数据表格 -->
       <el-table :data="knowledgeList" stripe v-loading="loading" style="width: 100%">
-        <el-table-column prop="name" label="资源名称" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="taskName" label="关联实训任务" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="courseName" label="所属课程" width="150" show-overflow-tooltip />
-        <el-table-column label="解析状态" width="120">
+        <el-table-column prop="name" label="资源名称" min-width="200" align="center" show-overflow-tooltip />
+        <el-table-column prop="taskName" label="关联实训任务" min-width="180" align="center" show-overflow-tooltip />
+        <el-table-column prop="courseName" label="所属课程" min-width="150" align="center" show-overflow-tooltip />
+        <el-table-column label="解析状态" min-width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="getKnowledgeStatusType(row.parseStatus)" size="small" effect="plain">
-              {{ row.parseStatus }}
+              {{ getKnowledgeStatusLabel(row.parseStatus) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="向量化" width="100" align="center">
+        <el-table-column label="向量化" min-width="100" align="center">
           <template #default="{ row }">
             <el-icon v-if="row.vectorized" color="#10b981"><CircleCheck /></el-icon>
             <el-icon v-else color="#94a3b8"><Loading /></el-icon>
           </template>
         </el-table-column>
-        <el-table-column label="最后更新" width="180">
+        <el-table-column label="最后更新" min-width="180" align="center">
           <template #default="{ row }">{{ formatDate(row.updateTime) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" min-width="100" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -105,7 +105,7 @@ import { Search, Upload, UploadFilled, CircleCheck, Loading } from '@element-plu
 import type { UploadFile } from 'element-plus'
 import { getKnowledgeList, deleteKnowledge, uploadKnowledge, type KnowledgeDocument } from '@/api/knowledge'
 import { getTaskList } from '@/api/task'
-import { getKnowledgeStatusType } from '@/utils/status'
+import { getKnowledgeStatusType, getKnowledgeStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
 import type { TrainingTask } from '@/types'
 

@@ -17,22 +17,22 @@
       </template>
 
       <el-table :data="users" stripe v-loading="loading">
-        <el-table-column prop="username" label="用户名" width="120" />
-        <el-table-column prop="realName" label="姓名" width="100" />
-        <el-table-column label="角色" width="100">
+        <el-table-column prop="username" label="用户名" min-width="120" align="center" />
+        <el-table-column prop="realName" label="姓名" min-width="120" align="center" />
+        <el-table-column label="角色" min-width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getRoleType(row.role)">{{ getRoleLabel(row.role) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="className" label="班级" width="120" />
-        <el-table-column label="状态" width="80">
+        <el-table-column prop="className" label="班级" min-width="120" align="center" />
+        <el-table-column label="状态" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
               {{ row.status === 'ENABLED' ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="310" fixed="right" align="center">
+        <el-table-column label="操作" width="260" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-actions">
               <el-button class="action-btn" type="primary" plain :icon="EditPen" @click="showDialog(row)">

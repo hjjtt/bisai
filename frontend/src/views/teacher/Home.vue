@@ -25,8 +25,7 @@
         <strong>{{ focusTitle }}</strong>
         <p>{{ focusDescription }}</p>
         <el-button
-          type="primary"
-          plain
+          :type="stats.highRisk > 0 ? 'danger' : 'primary'"
           :icon="ArrowRight"
           @click="router.push(stats.highRisk > 0 ? '/teacher/check' : '/teacher/submissions')"
         >
@@ -55,7 +54,7 @@
             <h3>待复核成果</h3>
             <p>AI 评分完成后，教师在这里完成最终确认。</p>
           </div>
-          <el-button type="primary" link :icon="ArrowRight" @click="router.push('/teacher/submissions')">全部提交</el-button>
+          <el-button type="primary" size="small" :icon="ArrowRight" @click="router.push('/teacher/submissions')">全部提交</el-button>
         </div>
 
         <el-table :data="pendingReviews">
@@ -73,7 +72,7 @@
           </el-table-column>
           <el-table-column label="操作" width="130" align="right">
             <template #default="{ row }">
-              <el-button type="primary" text :icon="ArrowRight" @click="router.push(`/teacher/submissions/${row.id}/score`)">
+              <el-button type="primary" size="small" :icon="ArrowRight" @click="router.push(`/teacher/submissions/${row.id}/score`)">
                 去复核
               </el-button>
             </template>
@@ -88,7 +87,7 @@
             <h3>高风险成果</h3>
             <p>核查异常、疑似不完整或风险较高的提交。</p>
           </div>
-          <el-button type="danger" link :icon="Warning" @click="router.push('/teacher/check')">风险列表</el-button>
+          <el-button type="danger" size="small" :icon="Warning" @click="router.push('/teacher/check')">风险列表</el-button>
         </div>
 
         <el-table :data="highRiskSubmissions">
@@ -103,7 +102,7 @@
           </el-table-column>
           <el-table-column label="操作" width="130" align="right">
             <template #default="{ row }">
-              <el-button type="danger" text :icon="ArrowRight" @click="router.push(`/teacher/submissions/${row.id}/check`)">
+              <el-button type="danger" size="small" :icon="ArrowRight" @click="router.push(`/teacher/submissions/${row.id}/check`)">
                 查看详情
               </el-button>
             </template>
