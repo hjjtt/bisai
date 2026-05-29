@@ -56,10 +56,10 @@
         </el-table-column>
         <el-table-column label="操作" width="210" fixed="right" align="right">
           <template #default="{ row }">
-            <el-button text type="primary" :icon="Document" @click="router.push(`/student/tasks/${row.taskId}`)">任务</el-button>
+            <el-button size="small" type="primary" :icon="Document" @click="router.push(`/student/tasks/${row.taskId}`)">任务</el-button>
             <el-button
               v-if="row.scoreStatus === 'PUBLISHED'"
-              text
+              size="small"
               type="success"
               :icon="Medal"
               @click="router.push(`/student/result/${row.id}`)"
@@ -68,7 +68,7 @@
             </el-button>
             <el-button
               v-else-if="row.scoreStatus !== 'NOT_SCORED'"
-              text
+              size="small"
               type="warning"
               :icon="Clock"
               @click="router.push(`/student/result/${row.id}`)"
