@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
@@ -49,8 +50,14 @@ public class TaskService {
 
         // 教师只能看自己课程下的任务
         if ("TEACHER".equals(role)) {
-            wrapper.inSql(TrainingTask::getCourseId,
-                    "SELECT id FROM course WHERE teacher_id = " + userId + " AND deleted = 0");
+            List<Long> courseIds = courseMapper.selectList(
+                    new LambdaQueryWrapper<Course>().eq(Course::getTeacherId, userId)
+            ).stream().map(Course::getId).collect(Collectors.toList());
+            if (courseIds.isEmpty()) {
+                wrapper.eq(TrainingTask::getCourseId, -1L); // 无课程则返回空
+            } else {
+                wrapper.in(TrainingTask::getCourseId, courseIds);
+            }
         }
         // 学生只能看已发布的任务
         if ("STUDENT".equals(role)) {
@@ -154,6 +161,7 @@ public class TaskService {
     /**
      * 批量解析 - 使用异步任务队列，控制并发，DB 级去重
      */
+    @Transactional
     public Result<Map<String, Object>> batchParse(Long taskId, Long userId, String role) {
         if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(taskId, userId)) {
             return Result.error(40301, "无权操作该任务");
@@ -206,6 +214,7 @@ public class TaskService {
     /**
      * 批量评分 - 使用异步任务队列，控制并发，DB 级去重
      */
+    @Transactional
     public Result<Map<String, Object>> batchScore(Long taskId, Long userId, String role) {
         if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(taskId, userId)) {
             return Result.error(40301, "无权操作该任务");
@@ -257,6 +266,7 @@ public class TaskService {
     /**
      * 批量核查 - 使用异步任务队列，控制并发，DB 级去重
      */
+    @Transactional
     public Result<Map<String, Object>> batchCheck(Long taskId, Long userId, String role) {
         if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(taskId, userId)) {
             return Result.error(40301, "无权操作该任务");

@@ -223,6 +223,8 @@ function startProgressPolling() {
         loadSubmissions()
       }
     } catch (e) {
+      // 轮询失败不弹提示，避免刷屏，但保留日志
+      console.warn('[Submit] 轮询异步任务状态失败:', e)
     }
   }, 2000) // 每 2 秒查询一次
 }
@@ -281,6 +283,7 @@ async function loadSubmissions() {
     const res = await getSubmissions({ taskId: taskId.value, size: 5, sort: 'version', order: 'desc' })
     submissions.value = res.data.items
   } catch (e) {
+    console.error('[Submit] 加载提交列表失败:', e)
   }
 }
 

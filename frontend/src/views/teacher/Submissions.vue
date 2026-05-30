@@ -121,6 +121,7 @@ async function loadTasks() {
     const res = await getTaskList({ size: 100 })
     tasks.value = res.data.items
   } catch (e) {
+    console.error('[Submissions] 加载任务列表失败:', e)
   }
 }
 
@@ -181,13 +182,4 @@ onBeforeUnmount(stopPolling)
 </script>
 
 <style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
 </style>

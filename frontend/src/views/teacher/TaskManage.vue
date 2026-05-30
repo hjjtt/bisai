@@ -16,7 +16,7 @@
         <el-table-column prop="endTime" label="截止时间" min-width="170" align="center" />
         <el-table-column label="状态" min-width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
+            <el-tag :type="getTaskStatusType(row.status)">{{ getTaskStatusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" min-width="160" align="center" fixed="right">
@@ -45,21 +45,12 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTaskList, publishTask, closeTask } from '@/api/task'
+import { getTaskStatusLabel, getTaskStatusType } from '@/utils/status'
 import type { TrainingTask } from '@/types'
 
 const loading = ref(false)
 const tasks = ref<TrainingTask[]>([])
 const pagination = reactive({ page: 1, size: 20, total: 0 })
-
-function getStatusLabel(status: string) {
-  const map: Record<string, string> = { DRAFT: '草稿', PUBLISHED: '已发布', CLOSED: '已关闭', ARCHIVED: '已归档' }
-  return map[status] || status
-}
-
-function getStatusType(status: string) {
-  const map: Record<string, string> = { DRAFT: 'info', PUBLISHED: 'success', CLOSED: 'warning', ARCHIVED: '' }
-  return map[status] || ''
-}
 
 async function loadTasks() {
   loading.value = true
@@ -89,10 +80,3 @@ async function handleClose(id: number) {
 onMounted(loadTasks)
 </script>
 
-<style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-</style>

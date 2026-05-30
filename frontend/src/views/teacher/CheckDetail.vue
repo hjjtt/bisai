@@ -176,11 +176,6 @@ onBeforeUnmount(stopPolling)
 </script>
 
 <style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
 .risk-card {
   text-align: center;
 }

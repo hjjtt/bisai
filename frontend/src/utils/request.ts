@@ -31,7 +31,9 @@ service.interceptors.response.use(
 
     const { code, message } = response.data
     if (code === 0) {
-      return response.data as unknown as AxiosResponse
+      // 成功时直接返回 ApiResponse（即 { code, message, data }），
+      // 让调用方通过 res.data 获取业务数据
+      return response.data as any
     }
 
     // 认证错误

@@ -344,11 +344,6 @@ onBeforeUnmount(stopScorePolling)
 </script>
 
 <style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
 .auto-score {
   color: #409eff;
   font-weight: bold;
