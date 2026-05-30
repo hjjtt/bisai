@@ -11,6 +11,10 @@ export interface UserInfo {
   role: UserRole
   realName: string
   classId?: number
+  className?: string
+  teachingClassNames?: string
+  teachingCourseNames?: string
+  teachingCourseBindings?: string
   status: UserStatus
 }
 

@@ -3,7 +3,7 @@
     <el-card shadow="never">
       <template #header>
         <div class="card-header">
-          <span class="header-title">知识库资源管理</span>
+          <span class="header-title">实训参考资料管理</span>
           <div class="header-actions">
             <el-input v-model="searchKeyword" placeholder="搜索文档或课程..." style="width: 240px">
               <template #prefix><el-icon><Search /></el-icon></template>
@@ -17,7 +17,7 @@
 
       <!-- 核心数据表格 -->
       <el-table :data="knowledgeList" stripe v-loading="loading" style="width: 100%">
-        <el-table-column prop="name" label="资源名称" min-width="200" align="center" show-overflow-tooltip />
+        <el-table-column prop="name" label="参考资料名称" min-width="200" align="center" show-overflow-tooltip />
         <el-table-column prop="taskName" label="关联实训任务" min-width="180" align="center" show-overflow-tooltip />
         <el-table-column prop="courseName" label="所属课程" min-width="150" align="center" show-overflow-tooltip />
         <el-table-column label="解析状态" min-width="120" align="center">
@@ -44,7 +44,7 @@
         </el-table-column>
       </el-table>
 
-      <el-empty v-if="!loading && knowledgeList.length === 0" description="暂无知识库资源" />
+      <el-empty v-if="!loading && knowledgeList.length === 0" description="暂无实训参考资料" />
 
       <div class="pagination-box">
         <el-pagination
@@ -58,7 +58,7 @@
     </el-card>
 
     <!-- 上传对话框 -->
-    <el-dialog v-model="showUploadDialog" title="上传实训知识资源" width="560px" destroy-on-close>
+    <el-dialog v-model="showUploadDialog" title="上传实训参考资料" width="560px" destroy-on-close>
       <el-form label-position="top">
         <el-form-item label="关联实训任务" required>
           <el-select v-model="uploadForm.taskId" filterable placeholder="请选择实训任务" style="width: 100%">
@@ -98,7 +98,7 @@
     </el-dialog>
 
     <!-- 编辑对话框 -->
-    <el-dialog v-model="showEditDialog" title="编辑实训知识资源" width="560px" destroy-on-close>
+    <el-dialog v-model="showEditDialog" title="编辑实训参考资料" width="560px" destroy-on-close>
       <el-form label-position="top">
         <el-form-item label="文档名称" required>
           <el-input v-model="editForm.name" placeholder="请输入文档名称" />
@@ -167,7 +167,7 @@ const loadData = async () => {
     knowledgeList.value = res.data.items
     total.value = res.data.total
   } catch (e) {
-    ElMessage.error('加载知识库列表失败')
+    ElMessage.error('加载参考资料列表失败')
   } finally {
     loading.value = false
   }
