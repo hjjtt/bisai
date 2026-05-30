@@ -41,6 +41,42 @@ public class AsyncTaskService {
     }
 
     /**
+     * 创建延迟异步任务
+     */
+    public Long createDelayedTask(String taskType, Long bizId, int delaySeconds) {
+        AsyncTask task = new AsyncTask();
+        task.setTaskType(taskType);
+        task.setBizId(bizId);
+        task.setStatus("PENDING");
+        task.setRetryCount(0);
+        task.setMaxRetry(3);
+        task.setNextRunAt(LocalDateTime.now().plusSeconds(delaySeconds));
+        asyncTaskMapper.insert(task);
+        log.info("创建延迟异步任务: type={}, bizId={}, delaySeconds={}", taskType, bizId, delaySeconds);
+        return task.getId();
+    }
+
+    /**
+     * 创建任务前按任务类型和业务ID去重，避免自动链路和手动触发重复排队。
+     */
+    public Long createTaskIfAbsent(String taskType, Long bizId) {
+        AsyncTask existing = asyncTaskMapper.selectOne(
+                new LambdaQueryWrapper<AsyncTask>()
+                        .eq(AsyncTask::getTaskType, taskType)
+                        .eq(AsyncTask::getBizId, bizId)
+                        .in(AsyncTask::getStatus, "PENDING", "RUNNING", "RETRYING", "SUCCESS")
+                        .orderByDesc(AsyncTask::getCreatedAt)
+                        .last("LIMIT 1")
+        );
+        if (existing != null) {
+            log.info("跳过重复异步任务: type={}, bizId={}, existingId={}, status={}",
+                    taskType, bizId, existing.getId(), existing.getStatus());
+            return existing.getId();
+        }
+        return createTask(taskType, bizId);
+    }
+
+    /**
      * 定时轮询执行待处理任务
      */
     @Scheduled(fixedDelay = 5000)
@@ -98,6 +134,7 @@ public class AsyncTaskService {
 
         try {
             switch (fresh.getTaskType()) {
+                case "PRECHECK" -> aiService.doPrecheck(fresh.getBizId(), fresh.getId());
                 case "PARSE" -> aiService.doParse(fresh.getBizId(), fresh.getId());
                 case "CHECK" -> aiService.doCheck(fresh.getBizId(), fresh.getId());
                 case "SCORE" -> aiService.doScore(fresh.getBizId(), fresh.getId());
@@ -111,17 +148,7 @@ public class AsyncTaskService {
             asyncTaskMapper.updateById(fresh);
             log.info("异步任务执行成功: id={}, type={}", fresh.getId(), fresh.getTaskType());
 
-            // 同步更新 submission 表的状态
-            Submission submission = submissionMapper.selectById(fresh.getBizId());
-            if (submission != null) {
-                switch (fresh.getTaskType()) {
-                    case "PARSE" -> submission.setParseStatus("SUCCESS");
-                    case "CHECK" -> submission.setCheckStatus("SUCCESS");
-                    case "SCORE" -> submission.setScoreStatus("AI_SCORED");
-                }
-                submissionMapper.updateById(submission);
-                triggerAutoPipelineNextTask(fresh, submission);
-            }
+            handleTaskSuccess(fresh);
 
             // 检查批量任务是否完成
             checkBatchJobCompletion(fresh.getBizId());
@@ -160,13 +187,49 @@ public class AsyncTaskService {
     private void updateSubmissionStatusOnFailure(AsyncTask task) {
         Submission submission = submissionMapper.selectById(task.getBizId());
         if (submission != null) {
-            String statusSuffix = "RETRYING".equals(task.getStatus()) ? " (待重试)" : "";
             switch (task.getTaskType()) {
-                case "PARSE" -> submission.setParseStatus("FAILED" + statusSuffix);
-                case "CHECK" -> submission.setCheckStatus("CHECK_FAILED" + statusSuffix);
-                case "SCORE" -> submission.setScoreStatus("SCORE_FAILED" + statusSuffix);
+                case "PRECHECK" -> submission.setParseStatus("RETRYING".equals(task.getStatus()) ? "PENDING" : "FAILED");
+                case "PARSE" -> submission.setParseStatus("RETRYING".equals(task.getStatus()) ? "PARSING" : "FAILED");
+                case "CHECK" -> submission.setCheckStatus("RETRYING".equals(task.getStatus()) ? "CHECKING" : "CHECK_FAILED");
+                case "SCORE" -> submission.setScoreStatus("RETRYING".equals(task.getStatus()) ? "SCORING" : "SCORE_FAILED");
             }
             submissionMapper.updateById(submission);
+        }
+    }
+
+    /**
+     * 单个 AI 阶段成功后推进下一阶段
+     */
+    private void handleTaskSuccess(AsyncTask task) {
+        Submission submission = submissionMapper.selectById(task.getBizId());
+        if (submission == null) {
+            return;
+        }
+
+        switch (task.getTaskType()) {
+            case "PRECHECK" -> {
+                // 门禁通过，进入解析阶段
+                submission.setParseStatus("PARSING");
+                submissionMapper.updateById(submission);
+                createTaskIfAbsent("PARSE", task.getBizId());
+            }
+            case "PARSE" -> {
+                submission.setParseStatus("SUCCESS");
+                submission.setCheckStatus("CHECKING");
+                submissionMapper.updateById(submission);
+                createTaskIfAbsent("CHECK", task.getBizId());
+            }
+            case "CHECK" -> {
+                submission.setCheckStatus("SUCCESS");
+                submission.setScoreStatus("SCORING");
+                submissionMapper.updateById(submission);
+                createTaskIfAbsent("SCORE", task.getBizId());
+            }
+            case "SCORE" -> {
+                submission.setScoreStatus("AI_SCORED");
+                submissionMapper.updateById(submission);
+            }
+            default -> log.warn("未知任务类型，无法推进链路: {}", task.getTaskType());
         }
     }
 
@@ -269,6 +332,7 @@ public class AsyncTaskService {
         Submission submission = submissionMapper.selectById(task.getBizId());
         if (submission != null) {
             switch (task.getTaskType()) {
+                case "PRECHECK" -> submission.setParseStatus("CANCELLED");
                 case "PARSE" -> submission.setParseStatus("CANCELLED");
                 case "CHECK" -> submission.setCheckStatus("CANCELLED");
                 case "SCORE" -> submission.setScoreStatus("CANCELLED");
@@ -290,6 +354,17 @@ public class AsyncTaskService {
         task.setRetryCount(0);
         task.setNextRunAt(LocalDateTime.now());
         asyncTaskMapper.updateById(task);
+
+        Submission submission = submissionMapper.selectById(task.getBizId());
+        if (submission != null) {
+            switch (task.getTaskType()) {
+                case "PRECHECK" -> submission.setParseStatus("PENDING");
+                case "PARSE" -> submission.setParseStatus("PARSING");
+                case "CHECK" -> submission.setCheckStatus("CHECKING");
+                case "SCORE" -> submission.setScoreStatus("SCORING");
+            }
+            submissionMapper.updateById(submission);
+        }
 
         // 显式清空 error_message（updateById 默认忽略 null）
         com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<AsyncTask> updateWrapper =

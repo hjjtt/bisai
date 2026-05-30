@@ -54,15 +54,15 @@ public class ScoreService {
             return Result.error(40401, "提交记录不存在");
         }
         
-        // 检查是否已有任务在运行
-        if (isTaskRunning("PARSE", submissionId)) {
-            return Result.error("解析任务正在处理中，请勿重复操作");
+        // 检查是否已有同类任务在运行或已完成
+        if (isTaskLocked("PARSE", submissionId)) {
+            return Result.error("解析任务已存在，请勿重复操作");
         }
 
         try {
             submission.setParseStatus("PARSING");
             submissionMapper.updateById(submission);
-            asyncTaskService.createTask("PARSE", submissionId);
+            asyncTaskService.createTaskIfAbsent("PARSE", submissionId);
             return Result.ok();
         } catch (Exception e) {
             log.error("触发解析失败: {}", e.getMessage());
@@ -82,15 +82,19 @@ public class ScoreService {
             return Result.error(40401, "提交记录不存在");
         }
 
-        // 检查是否已有任务在运行
-        if (isTaskRunning("CHECK", submissionId)) {
-            return Result.error("核查任务正在处理中，请勿重复操作");
+        if (!"SUCCESS".equals(submission.getParseStatus())) {
+            return Result.error("前置解析未完成或未通过，无法执行核查");
+        }
+
+        // 检查是否已有同类任务在运行或已完成
+        if (isTaskLocked("CHECK", submissionId)) {
+            return Result.error("核查任务已存在，请勿重复操作");
         }
 
         try {
             submission.setCheckStatus("CHECKING");
             submissionMapper.updateById(submission);
-            asyncTaskService.createTask("CHECK", submissionId);
+            asyncTaskService.createTaskIfAbsent("CHECK", submissionId);
             return Result.ok();
         } catch (Exception e) {
             log.error("触发核查失败: {}", e.getMessage());
@@ -110,15 +114,19 @@ public class ScoreService {
             return Result.error(40401, "提交记录不存在");
         }
 
-        // 检查是否已有任务在运行
-        if (isTaskRunning("SCORE", submissionId)) {
-            return Result.error("评分任务正在处理中，请勿重复操作");
+        if (!"SUCCESS".equals(submission.getCheckStatus())) {
+            return Result.error("前置核查未完成或未通过，无法执行评分");
+        }
+
+        // 检查是否已有同类任务在运行或已完成
+        if (isTaskLocked("SCORE", submissionId)) {
+            return Result.error("评分任务已存在，请勿重复操作");
         }
 
         try {
             submission.setScoreStatus("SCORING");
             submissionMapper.updateById(submission);
-            asyncTaskService.createTask("SCORE", submissionId);
+            asyncTaskService.createTaskIfAbsent("SCORE", submissionId);
             return Result.ok();
         } catch (Exception e) {
             log.error("触发评分失败: {}", e.getMessage());
@@ -129,11 +137,12 @@ public class ScoreService {
     /**
      * 检查任务是否正在运行
      */
-    private boolean isTaskRunning(String taskType, Long bizId) {
+    private boolean isTaskLocked(String taskType, Long bizId) {
         List<AsyncTask> tasks = asyncTaskService.getTasksByBizId(bizId);
         return tasks.stream().anyMatch(t -> 
             taskType.equals(t.getTaskType()) && 
-            ( "PENDING".equals(t.getStatus()) || "RUNNING".equals(t.getStatus()) || "RETRYING".equals(t.getStatus()) )
+            ( "PENDING".equals(t.getStatus()) || "RUNNING".equals(t.getStatus())
+                    || "RETRYING".equals(t.getStatus()) || "SUCCESS".equals(t.getStatus()) )
         );
     }
 
@@ -240,6 +249,27 @@ public class ScoreService {
 
         return Result.ok(results);
     }
+
+    /**
+     * 学生查看自己提交的核查结果
+     */
+    public Result<List<CheckResult>> getStudentCheckResults(Long submissionId, Long userId) {
+        Submission submission = submissionMapper.selectById(submissionId);
+        if (submission == null) {
+            return Result.error(40401, "提交记录不存在");
+        }
+        if (!submission.getStudentId().equals(userId)) {
+            return Result.error(40301, "无权访问该提交");
+        }
+        if (!"SUCCESS".equals(submission.getCheckStatus())) {
+            return Result.ok(List.of());
+        }
+        List<CheckResult> results = checkResultMapper.selectList(
+                new LambdaQueryWrapper<CheckResult>().eq(CheckResult::getSubmissionId, submissionId)
+        );
+        return Result.ok(results);
+    }
+
     public Result<Void> saveTeacherScores(Long submissionId, List<ScoreResult> scores, String comment, String expectedUpdatedAt, Long userId, String role) {
         Result<Void> accessCheck = checkTeacherAccess(submissionId, userId, role);
         if (accessCheck.getCode() != 0) return accessCheck;
@@ -341,6 +371,9 @@ public class ScoreService {
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) {
             return Result.error(40401, "提交记录不存在");
+        }
+        if (!"TEACHER_CONFIRMED".equals(submission.getScoreStatus())) {
+            return Result.error(40901, "请先完成教师复核确认后再发布成绩");
         }
         submission.setScoreStatus("PUBLISHED");
         submissionMapper.updateById(submission);

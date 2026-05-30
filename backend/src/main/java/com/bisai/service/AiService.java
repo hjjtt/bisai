@@ -36,6 +36,131 @@ public class AiService {
     private final MessageService messageService;
     private final ObjectMapper objectMapper;
     private final AsyncTaskMapper asyncTaskMapper;
+    private final UserMapper userMapper;
+
+    // ==================== AI门禁预检 ====================
+
+    /**
+     * AI门禁预检
+     */
+    public void doPrecheck(Long submissionId, Long asyncTaskId) {
+        Submission submission = submissionMapper.selectById(submissionId);
+        if (submission == null) return;
+
+        updateTaskProgress(asyncTaskId, 10, "正在准备门禁校验数据...");
+
+        try {
+            // 获取任务信息
+            TrainingTask task = taskMapper.selectById(submission.getTaskId());
+            String taskTitle = task != null ? task.getTitle() : "";
+            String taskRequirements = task != null ? task.getRequirements() : "";
+
+            // 获取提交学生信息
+            User student = userMapper.selectById(submission.getStudentId());
+            String studentName = student != null ? student.getRealName() : "";
+            String studentUsername = student != null ? student.getUsername() : "";
+
+            // 获取提交文件内容（只提取前2000个字符用于门禁）
+            List<FileEntity> files = fileMapper.selectList(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<FileEntity>()
+                            .eq(FileEntity::getSubmissionId, submissionId)
+            );
+
+            if (files.isEmpty()) {
+                handlePrecheckFail(submission, asyncTaskId, "学生未提交任何文件");
+                return;
+            }
+
+            StringBuilder fileContent = new StringBuilder();
+            for (FileEntity file : files) {
+                fileContent.append("【").append(file.getOriginalName()).append("】\n");
+                String content = documentTextExtractor.extract(file).content();
+                if (documentTextExtractor.isImage(file)) {
+                    String vision = analyzeImage(file);
+                    if (vision != null && !vision.isBlank()) {
+                        content = content + "\n图片分析:\n" + vision;
+                    }
+                }
+                if (content != null) {
+                    if (content.length() > 2000) content = content.substring(0, 2000);
+                    fileContent.append(content).append("\n\n");
+                }
+            }
+
+            updateTaskProgress(asyncTaskId, 40, "正在进行 AI 门禁校验...");
+
+            // 构建 PRECHECK 提示词
+            String systemPrompt = "你是一个实训报告的门禁校验系统。请校验学生提交的实训成果，判断以下四项指标：\n" +
+                    "1. 文档中是否包含（或高度疑似提及）该学生的姓名？\n" +
+                    "2. 文档中是否包含该学生的学号/账号？\n" +
+                    "3. 报告内容是否与本实训任务的标题和要求相关（不能完全无关或交错）？\n" +
+                    "4. 成果是否有实质性内容（不能是一个仅包含标题的空文档或模板）？\n\n" +
+                    "请以 JSON 格式返回判定结果：\n" +
+                    "{\n" +
+                    "  \"passed\": true/false, \n" +
+                    "  \"reason\": \"通过或未通过的具体原因说明。如果未通过，必须详细列出是哪项不符合（例如：未检测到姓名或学号、提交的成果与任务内容无关等）\",\n" +
+                    "  \"details\": {\n" +
+                    "    \"nameMatched\": true/false,\n" +
+                    "    \"studentIdMatched\": true/false,\n" +
+                    "    \"titleMatched\": true/false,\n" +
+                    "    \"contentValid\": true/false\n" +
+                    "  }\n" +
+                    "}\n" +
+                    "只返回 JSON，不要其他内容。";
+
+            String userMessage = "## 任务与学生信息\n" +
+                    "任务标题：" + taskTitle + "\n" +
+                    "任务要求：" + taskRequirements + "\n" +
+                    "期望匹配的学生姓名：" + studentName + "\n" +
+                    "期望匹配的学生学号/账号：" + studentUsername + "\n\n" +
+                    "## 学生提交成果提取片段\n" + fileContent;
+
+            JsonNode result = aiClient.chatAsJson(systemPrompt, userMessage);
+            boolean passed = result.path("passed").asBoolean(false);
+            String reason = result.path("reason").asText("AI 门禁校验未通过");
+
+            if (!passed) {
+                // 门禁判定不通过 -> 自动打回
+                handlePrecheckFail(submission, asyncTaskId, reason);
+            } else {
+                // 门禁判定通过
+                updateTaskProgress(asyncTaskId, 100, "门禁校验通过");
+                log.info("Submission {} 门禁校验通过", submissionId);
+            }
+
+        } catch (Exception e) {
+            log.error("AI 门禁预检执行失败, submissionId={}: {}", submissionId, e.getMessage(), e);
+            updateTaskProgress(asyncTaskId, -1, "门禁预检系统异常: " + e.getMessage());
+            throw new RuntimeException("AI 门禁预检执行失败: " + e.getMessage(), e);
+        }
+    }
+
+    private void handlePrecheckFail(Submission submission, Long asyncTaskId, String reason) {
+        log.warn("Submission {} 未通过门禁校验: {}", submission.getId(), reason);
+
+        // 1. 更新 submission 状态：退回 (RETURNED) 与 FAILED
+        submission.setScoreStatus("RETURNED");
+        submission.setParseStatus("FAILED");
+        submission.setTeacherComment("【AI自动退回】" + reason);
+        submissionMapper.updateById(submission);
+
+        // 2. 发送消息通知学生
+        try {
+            messageService.sendMessage(
+                    submission.getStudentId(),
+                    "SUBMISSION_RETURNED",
+                    "您的实训提交已被自动退回",
+                    String.format("您的实训提交（提交ID:%d）未通过 AI 门禁校验，原因：%s。请按规范要求修改后重新提交。", 
+                            submission.getId(), reason),
+                    submission.getId()
+            );
+        } catch (Exception e) {
+            log.warn("发送门禁打回通知消息失败: {}", e.getMessage());
+        }
+
+        // 3. 更新任务步骤描述
+        updateTaskProgress(asyncTaskId, 100, "门禁校验未通过，已执行自动打回");
+    }
 
     // ==================== 智能解析 ====================
 

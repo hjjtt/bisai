@@ -118,6 +118,13 @@ public class SubmissionController {
         return scoreService.getCheckResults(id, userId, role);
     }
 
+    // 学生查看自己的核查结果
+    @GetMapping("/{id}/student-check-results")
+    public Result<List<com.bisai.entity.CheckResult>> getStudentCheckResults(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        return scoreService.getStudentCheckResults(id, userId);
+    }
+
     // 智能评分结果
     @GetMapping("/{id}/scores")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")

@@ -30,13 +30,18 @@
       <el-progress v-if="uploading" :percentage="uploadProgress" :stroke-width="20" :text-inside="true" style="margin-top: 16px" />
 
       <!-- AI 处理进度 -->
-      <el-card v-if="aiTaskProgress" style="margin-top: 16px" shadow="never">
+      <el-card v-if="aiTasks.length > 0" style="margin-top: 16px" shadow="never">
         <template #header>
           <div style="display: flex; justify-content: space-between; align-items: center">
             <span>AI 处理进度</span>
             <el-tag :type="getAsyncTaskStatusType(aiTaskStatus)">{{ getAsyncTaskStatusLabel(aiTaskStatus) }}</el-tag>
           </div>
         </template>
+        <el-steps :active="activeAiStep" finish-status="success" process-status="process" simple style="margin-bottom: 16px">
+          <el-step title="解析" :status="getStepStatus('PARSE')" />
+          <el-step title="核查" :status="getStepStatus('CHECK')" />
+          <el-step title="评分" :status="getStepStatus('SCORE')" />
+        </el-steps>
         <el-progress :percentage="aiTaskProgress" :status="aiTaskProgress === 100 ? 'success' : undefined" :stroke-width="16" />
         <p style="margin-top: 8px; color: #666; font-size: 14px">{{ aiTaskCurrentStep }}</p>
       </el-card>
@@ -79,7 +84,7 @@ import { UploadFilled } from '@element-plus/icons-vue'
 import { getTask, getSubmissions, uploadFiles, getAsyncTasksByBizId } from '@/api/task'
 import { getParseStatusType, getParseStatusLabel, getScoreStatusType, getScoreStatusLabel, getAsyncTaskStatusType, getAsyncTaskStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
-import type { TrainingTask, Submission } from '@/types'
+import type { AsyncTask, TrainingTask, Submission } from '@/types'
 
 const route = useRoute()
 const uploading = ref(false)
@@ -93,6 +98,7 @@ const submissions = ref<Submission[]>([])
 const aiTaskProgress = ref<number>(0)
 const aiTaskCurrentStep = ref<string>('')
 const aiTaskStatus = ref<string>('')
+const aiTasks = ref<AsyncTask[]>([])
 let progressTimer: ReturnType<typeof setInterval> | null = null
 
 const taskId = computed(() => Number(route.params.taskId) || 0)
@@ -188,23 +194,30 @@ function startProgressPolling() {
       const tasksRes = await getAsyncTasksByBizId(latestSubmission.id)
 
       if (tasksRes.data.length === 0) return
+      aiTasks.value = tasksRes.data
 
-      // 获取最新的任务（PARSE 任务）
-      const parseTask = tasksRes.data[0]
-      if (!parseTask) return
+      const currentTask = getCurrentAiTask(tasksRes.data)
+      if (!currentTask) return
 
-      aiTaskProgress.value = parseTask.progress || 0
-      aiTaskCurrentStep.value = parseTask.currentStep || ''
-      aiTaskStatus.value = parseTask.status || ''
+      aiTaskProgress.value = currentTask.progress || 0
+      aiTaskCurrentStep.value = `${getTaskTypeLabel(currentTask.taskType)}：${currentTask.currentStep || getAsyncTaskStatusLabel(currentTask.status)}`
+      aiTaskStatus.value = currentTask.status || ''
 
-      // 如果任务完成或失败，停止轮询
-      if (parseTask.status === 'SUCCESS' || parseTask.status === 'FAILED') {
+      const failedTask = tasksRes.data.find(task => task.status === 'FAILED' || task.status === 'CANCELLED')
+      const scoreTask = findLatestTask(tasksRes.data, 'SCORE')
+      // 如果链路完成或失败，停止轮询
+      if ((scoreTask && scoreTask.status === 'SUCCESS') || failedTask) {
         clearInterval(progressTimer!)
         progressTimer = null
-        if (parseTask.status === 'SUCCESS') {
+        if (scoreTask && scoreTask.status === 'SUCCESS') {
+          aiTaskProgress.value = 100
+          aiTaskStatus.value = 'SUCCESS'
+          aiTaskCurrentStep.value = '评分：AI 处理完成，等待教师复核'
           ElMessage.success('AI 处理完成！')
         } else {
-          ElMessage.error('AI 处理失败: ' + parseTask.currentStep)
+          aiTaskStatus.value = failedTask?.status || 'FAILED'
+          aiTaskCurrentStep.value = `${getTaskTypeLabel(failedTask?.taskType || '')}：${failedTask?.currentStep || failedTask?.errorMessage || '处理失败'}`
+          ElMessage.error('AI 处理失败: ' + (failedTask?.currentStep || failedTask?.errorMessage || '请联系教师处理'))
         }
         // 刷新提交列表
         loadSubmissions()
@@ -212,6 +225,37 @@ function startProgressPolling() {
     } catch (e) {
     }
   }, 2000) // 每 2 秒查询一次
+}
+
+function findLatestTask(tasks: AsyncTask[], taskType: string) {
+  return tasks.find(task => task.taskType === taskType)
+}
+
+function getCurrentAiTask(tasks: AsyncTask[]) {
+  return tasks.find(task => ['RUNNING', 'RETRYING', 'PENDING'].includes(task.status))
+    || findLatestTask(tasks, 'SCORE')
+    || findLatestTask(tasks, 'CHECK')
+    || findLatestTask(tasks, 'PARSE')
+}
+
+function getTaskTypeLabel(taskType: string) {
+  const map: Record<string, string> = { PARSE: '解析', CHECK: '核查', SCORE: '评分' }
+  return map[taskType] || '处理'
+}
+
+const activeAiStep = computed(() => {
+  const current = getCurrentAiTask(aiTasks.value)
+  if (!current) return 0
+  const map: Record<string, number> = { PARSE: 0, CHECK: 1, SCORE: 2 }
+  return map[current.taskType] ?? 0
+})
+
+function getStepStatus(taskType: string) {
+  const task = findLatestTask(aiTasks.value, taskType)
+  if (!task) return 'wait'
+  if (task.status === 'SUCCESS') return 'success'
+  if (task.status === 'FAILED' || task.status === 'CANCELLED') return 'error'
+  return 'process'
 }
 
 onUnmounted(() => {

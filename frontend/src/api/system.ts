@@ -12,13 +12,7 @@ export interface SystemConfigMap {
   'ai.timeout'?: string
   'ai.daily-token-limit'?: string
   'ai.daily-call-limit'?: string
-  textModelApiUrl?: string
-  textModelApiKey?: string
-  model?: string
-  maxTokens?: string
-  temperature?: string
-  timeout?: string
-  [key: string]: string | undefined
+  [key: string]: string | number | undefined
 }
 
 // 系统配置

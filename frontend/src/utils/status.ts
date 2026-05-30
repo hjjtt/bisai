@@ -35,7 +35,7 @@ export function getCheckStatusLabel(status?: string): string {
 export function getScoreStatusType(status: string): string {
   const map: Record<string, string> = {
     NOT_SCORED: 'info', SCORING: 'warning', AI_SCORED: 'primary', TEACHER_CONFIRMED: 'success',
-    PUBLISHED: 'success', SCORE_FAILED: 'danger', RETURNED: 'warning',
+    PUBLISHED: 'success', SCORE_FAILED: 'danger', RETURNED: 'warning', CANCELLED: 'info',
   }
   return map[status] || 'info'
 }
@@ -43,7 +43,7 @@ export function getScoreStatusType(status: string): string {
 export function getScoreStatusLabel(status: string): string {
   const map: Record<string, string> = {
     NOT_SCORED: '未评分', SCORING: '评分中', AI_SCORED: 'AI已评分', TEACHER_CONFIRMED: '教师已确认',
-    PUBLISHED: '已发布', SCORE_FAILED: '评分失败', RETURNED: '已退回',
+    PUBLISHED: '已发布', SCORE_FAILED: '评分失败', RETURNED: '已退回', CANCELLED: '已取消',
   }
   return map[status] || status
 }
