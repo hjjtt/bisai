@@ -38,14 +38,16 @@ public class AsyncTaskController {
     }
 
     @GetMapping("/biz/{bizId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
     public Result<List<AsyncTask>> getTasksByBizId(@PathVariable Long bizId, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
         String role = auth.getAuthorities().stream()
                 .findFirst()
                 .map(a -> a.getAuthority().replace("ROLE_", ""))
                 .orElse("");
-        if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfSubmission(bizId, userId)) {
+        if (!permissionService.isAdmin(role)
+                && !permissionService.isTeacherOwnerOfSubmission(bizId, userId)
+                && !permissionService.isStudentOwnerOfSubmission(bizId, userId)) {
             return Result.error(40301, "无权访问该任务");
         }
         return Result.ok(asyncTaskService.getTasksByBizId(bizId));

@@ -342,8 +342,8 @@ public class SubmissionService {
             }
         }
 
-        // 上传成功后自动进入延时 AI 处理链路：PRECHECK (延迟300秒，即5分钟)
-        asyncTaskService.createDelayedTask("PRECHECK", submission.getId(), 300);
+        // 上传成功后自动进入延时 AI 处理链路：PRECHECK (延迟10秒，防止误操作重复提交)
+        asyncTaskService.createDelayedTask("PRECHECK", submission.getId(), 10);
         return Result.ok();
     }
 

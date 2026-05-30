@@ -53,11 +53,15 @@ service.interceptors.response.use(
   },
   (error) => {
     const status = error.response?.status
-    if (status === 401 || status === 403) {
+    if (status === 401) {
       removeToken()
       router.push('/login')
+      ElMessage.error('登录已过期，请重新登录')
+    } else if (status === 403) {
+      ElMessage.error('权限不足')
+    } else {
+      ElMessage.error(error.message || '网络错误')
     }
-    ElMessage.error(error.message || '网络错误')
     return Promise.reject(error)
   },
 )
