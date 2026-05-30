@@ -3,18 +3,34 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>用户管理</span>
+          <div class="title-area">
+            <span class="title">用户管理</span>
+            <span class="subtitle">按角色查看与维护账户信息</span>
+          </div>
           <div class="header-actions">
-            <el-input v-model="keyword" placeholder="搜索用户名/姓名" style="width: 200px" clearable @clear="loadUsers" @keyup.enter="loadUsers">
-              <template #prefix><el-icon><Search /></el-icon></template>
+            <el-input
+              v-model="keyword"
+              placeholder="搜索用户名/姓名"
+              style="width: 220px"
+              clearable
+              @keyup.enter="handleSearch"
+              @clear="handleSearch"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
             </el-input>
-            <el-select v-model="roleFilter" placeholder="角色筛选" clearable @change="loadUsers" style="width: 120px">
-              <el-option v-for="role in ROLE_OPTIONS" :key="role.value" :label="role.label" :value="role.value" />
-            </el-select>
             <el-button type="primary" @click="showDialog()">新增用户</el-button>
           </div>
         </div>
       </template>
+
+      <el-tabs v-model="activeRole" class="role-tabs" @tab-change="handleRoleTabChange">
+        <el-tab-pane label="全部" name="" />
+        <el-tab-pane label="学生" name="STUDENT" />
+        <el-tab-pane label="教师" name="TEACHER" />
+        <el-tab-pane label="管理员" name="ADMIN" />
+      </el-tabs>
 
       <el-table :data="users" stripe v-loading="loading">
         <el-table-column prop="username" label="用户名" min-width="120" align="center" />
@@ -24,32 +40,55 @@
             <el-tag :type="getRoleType(row.role)">{{ getRoleLabel(row.role) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="className" label="班级" min-width="120" align="center" />
-        <el-table-column label="状态" min-width="80" align="center">
+        <el-table-column
+          v-if="showClassColumn"
+          label="班级"
+          min-width="150"
+          align="center"
+          show-overflow-tooltip
+        >
+          <template #default="{ row }">
+            {{ getClassDisplay(row) }}
+          </template>
+        </el-table-column>
+        <el-table-column
+          v-if="showCourseColumn"
+          label="授课课程"
+          min-width="220"
+          align="center"
+          show-overflow-tooltip
+        >
+          <template #default="{ row }">
+            {{ getCourseDisplay(row) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" min-width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
               {{ row.status === 'ENABLED' ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right" align="center">
+        <el-table-column label="操作" width="180" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-actions">
-              <el-button class="action-btn" type="primary" plain :icon="EditPen" @click="showDialog(row)">
+              <el-button class="edit-btn" type="primary" plain :icon="EditPen" @click="showDialog(row)">
                 编辑
               </el-button>
-              <el-button
-                class="action-btn"
-                :type="row.status === 'ENABLED' ? 'warning' : 'success'"
-                plain
-                :icon="row.status === 'ENABLED' ? Lock : Unlock"
-                @click="toggleStatus(row)"
-              >
-                {{ row.status === 'ENABLED' ? '禁用' : '启用' }}
-              </el-button>
-              <el-button class="action-btn reset-btn" type="info" plain :icon="RefreshLeft" @click="resetPwd(row)">
-                重置密码
-              </el-button>
+              <el-dropdown trigger="click" @command="(command) => handleMoreCommand(command, row)">
+                <el-button class="more-btn" plain>
+                  更多
+                  <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="toggle">
+                      {{ row.status === 'ENABLED' ? '禁用账号' : '启用账号' }}
+                    </el-dropdown-item>
+                    <el-dropdown-item command="reset">重置密码</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </div>
           </template>
         </el-table-column>
@@ -64,11 +103,9 @@
         layout="total, sizes, prev, pager, next"
         :page-sizes="[10, 20, 50]"
         @change="loadUsers"
-        style="margin-top: 16px; justify-content: flex-end"
       />
     </el-card>
 
-    <!-- 新增/编辑对话框 -->
     <el-dialog v-model="dialogVisible" :title="editingUser ? '编辑用户' : '新增用户'" width="500px">
       <el-form ref="formRef" :model="userForm" :rules="formRules" label-width="80px">
         <el-form-item label="用户名" prop="username">
@@ -84,7 +121,7 @@
         </el-form-item>
         <el-form-item label="班级" v-if="userForm.role === 'STUDENT'" prop="classId">
           <el-select v-model="userForm.classId" placeholder="请选择班级" style="width: 100%">
-            <el-option v-for="c in classes" :key="c.id" :label="c.name" :value="c.id" />
+            <el-option v-for="item in classes" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="密码" prop="password" v-if="!editingUser">
@@ -100,25 +137,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { EditPen, Lock, RefreshLeft, Search, Unlock } from '@element-plus/icons-vue'
-import { getUserList, createUser, updateUser, resetPassword, toggleUserStatus } from '@/api/user'
+import { ArrowDown, EditPen, Search } from '@element-plus/icons-vue'
+import { createUser, getUserList, resetPassword, toggleUserStatus, updateUser } from '@/api/user'
 import { getClassList } from '@/api/course'
 import { getRoleLabel, getRoleType, ROLE_OPTIONS } from '@/utils/status'
-import type { UserInfo, ClassInfo, UserRole } from '@/types'
+import type { ClassInfo, UserInfo, UserRole } from '@/types'
+
+type RoleTab = '' | UserRole
+type MoreCommand = 'toggle' | 'reset'
 
 const loading = ref(false)
 const saving = ref(false)
 const keyword = ref('')
-const roleFilter = ref('')
+const activeRole = ref<RoleTab>('')
 const dialogVisible = ref(false)
 const editingUser = ref<UserInfo | null>(null)
 const users = ref<UserInfo[]>([])
 const classes = ref<ClassInfo[]>([])
 const formRef = ref<FormInstance>()
 const pagination = reactive({ page: 1, size: 20, total: 0 })
+
+const showClassColumn = computed(() => activeRole.value === '' || activeRole.value === 'STUDENT')
+const showCourseColumn = computed(() => activeRole.value === '' || activeRole.value === 'TEACHER')
 
 const userForm = reactive({
   username: '',
@@ -132,16 +175,42 @@ const formRules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   realName: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
   role: [{ required: true, message: '请选择角色', trigger: 'change' }],
+  classId: [
+    {
+      validator: (_rule: unknown, value: number | undefined, callback: (error?: Error) => void) => {
+        if (userForm.role === 'STUDENT' && !value) {
+          callback(new Error('学生必须绑定班级'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change',
+    },
+  ],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
 }
+
+watch(
+  () => userForm.role,
+  (role) => {
+    if (role !== 'STUDENT') {
+      userForm.classId = undefined
+    }
+  },
+)
 
 async function loadUsers() {
   loading.value = true
   try {
-    const res = await getUserList({ page: pagination.page, size: pagination.size, keyword: keyword.value, role: roleFilter.value })
+    const res = await getUserList({
+      page: pagination.page,
+      size: pagination.size,
+      keyword: keyword.value,
+      role: activeRole.value,
+    })
     users.value = res.data.items
     pagination.total = res.data.total
-  } catch (e) {
+  } catch (error) {
     ElMessage.error('加载用户列表失败')
   } finally {
     loading.value = false
@@ -152,16 +221,39 @@ async function loadClasses() {
   try {
     const res = await getClassList({ size: 100 })
     classes.value = res.data.items
-  } catch (e) {
+  } catch (error) {
+    ElMessage.error('加载班级列表失败')
   }
+}
+
+function handleSearch() {
+  pagination.page = 1
+  loadUsers()
+}
+
+function handleRoleTabChange() {
+  pagination.page = 1
+  loadUsers()
 }
 
 function showDialog(user?: UserInfo) {
   editingUser.value = user || null
   if (user) {
-    Object.assign(userForm, { username: user.username, realName: user.realName, role: user.role, classId: user.classId, password: '' })
+    Object.assign(userForm, {
+      username: user.username,
+      realName: user.realName,
+      role: user.role,
+      classId: user.classId,
+      password: '',
+    })
   } else {
-    Object.assign(userForm, { username: '', realName: '', role: 'STUDENT', classId: undefined, password: '' })
+    Object.assign(userForm, {
+      username: '',
+      realName: '',
+      role: 'STUDENT',
+      classId: undefined,
+      password: '',
+    })
   }
   dialogVisible.value = true
 }
@@ -172,16 +264,20 @@ async function handleSaveUser() {
 
   saving.value = true
   try {
+    const payload = {
+      ...userForm,
+      classId: userForm.role === 'STUDENT' ? userForm.classId : undefined,
+    }
     if (editingUser.value) {
-      await updateUser(editingUser.value.id, userForm)
+      await updateUser(editingUser.value.id, payload)
       ElMessage.success('更新成功')
     } else {
-      await createUser(userForm)
+      await createUser(payload)
       ElMessage.success('创建成功')
     }
     dialogVisible.value = false
     loadUsers()
-  } catch (e) {
+  } catch (error) {
     ElMessage.error('操作失败')
   } finally {
     saving.value = false
@@ -192,9 +288,10 @@ async function toggleStatus(user: UserInfo) {
   try {
     const newStatus = user.status === 'ENABLED' ? 'DISABLED' : 'ENABLED'
     await toggleUserStatus(user.id, newStatus)
-    ElMessage.success('操作成功')
+    ElMessage.success('状态更新成功')
     loadUsers()
-  } catch (e) {
+  } catch (error) {
+    ElMessage.error('状态更新失败')
   }
 }
 
@@ -203,9 +300,34 @@ async function resetPwd(user: UserInfo) {
     await ElMessageBox.confirm(`确定重置用户 ${user.realName} 的密码？`, '重置密码')
     await resetPassword(user.id)
     ElMessage.success('密码已重置')
-  } catch {
+  } catch (error) {
     // 用户取消
   }
+}
+
+function handleMoreCommand(command: string | number | object, user: UserInfo) {
+  const typedCommand = command as MoreCommand
+  if (typedCommand === 'toggle') {
+    toggleStatus(user)
+    return
+  }
+  if (typedCommand === 'reset') {
+    resetPwd(user)
+  }
+}
+
+function getClassDisplay(row: UserInfo) {
+  if (row.role === 'STUDENT') {
+    return row.className || '未分配班级'
+  }
+  return '-'
+}
+
+function getCourseDisplay(row: UserInfo) {
+  if (row.role === 'TEACHER') {
+    return row.teachingCourseNames || '未关联课程'
+  }
+  return '-'
 }
 
 onMounted(() => {
@@ -224,110 +346,79 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 20px;
+}
 
-  .header-actions {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-  }
+.title-area {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+:deep(.role-tabs .el-tabs__header) {
+  margin: 4px 0 12px;
+}
+
+:deep(.role-tabs .el-tabs__item) {
+  font-weight: 600;
 }
 
 :deep(.el-table) {
-  margin-top: 8px;
-
   th.el-table__cell {
     background-color: #f8fafc;
     color: #64748b;
     font-weight: 600;
     font-size: 13px;
-    padding: 12px 0;
   }
 
   td.el-table__cell {
-    padding: 12px 0;
     color: #334155;
   }
 }
 
-.el-pagination {
-  padding: 24px 0 8px;
-  justify-content: flex-end;
-}
-
-:deep(.el-form-item__label) {
-  font-weight: 500;
-  color: #475569;
-}
-
 .table-actions {
-  display: flex;
-  justify-content: center;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-:deep(.table-actions .el-button) {
-  margin-left: 0;
-}
-
-:deep(.action-btn) {
-  min-width: 70px;
+:deep(.edit-btn),
+:deep(.more-btn) {
+  min-width: 72px;
   height: 32px;
-  padding: 0 12px;
-  border-radius: 7px;
-  font-weight: 600;
+  border-radius: 8px;
 }
 
-:deep(.reset-btn) {
-  min-width: 96px;
-}
-
-:deep(.action-btn.el-button--primary.is-plain) {
-  color: #1d4ed8 !important;
-  background-color: #eff6ff !important;
-  border-color: #bfdbfe !important;
-}
-
-:deep(.action-btn.el-button--warning.is-plain) {
-  color: #b45309 !important;
-  background-color: #fffbeb !important;
-  border-color: #fde68a !important;
-}
-
-:deep(.action-btn.el-button--success.is-plain) {
-  color: #047857 !important;
-  background-color: #ecfdf5 !important;
-  border-color: #a7f3d0 !important;
-}
-
-:deep(.action-btn.el-button--info.is-plain) {
+:deep(.more-btn) {
   color: #475569 !important;
   background-color: #f8fafc !important;
   border-color: #cbd5e1 !important;
 }
 
-:deep(.action-btn.is-plain:hover) {
-  color: #ffffff !important;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
+:deep(.more-btn:hover) {
+  color: #0f172a !important;
+  background-color: #eef2f7 !important;
 }
 
-:deep(.action-btn.el-button--primary.is-plain:hover) {
-  background-color: #2563eb !important;
-  border-color: #2563eb !important;
-}
-
-:deep(.action-btn.el-button--warning.is-plain:hover) {
-  background-color: #d97706 !important;
-  border-color: #d97706 !important;
-}
-
-:deep(.action-btn.el-button--success.is-plain:hover) {
-  background-color: #059669 !important;
-  border-color: #059669 !important;
-}
-
-:deep(.action-btn.el-button--info.is-plain:hover) {
-  background-color: #64748b !important;
-  border-color: #64748b !important;
+:deep(.el-pagination) {
+  margin-top: 16px;
+  justify-content: flex-end;
 }
 </style>

@@ -15,6 +15,9 @@ public class ClassEntity {
     private String major;
     private String status;
 
+    @TableField(exist = false)
+    private Integer studentCount;
+
     @TableLogic
     private Integer deleted;
     private LocalDateTime createdAt;
