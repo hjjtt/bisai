@@ -87,9 +87,11 @@ import { getMessages, markMessageRead, markAllMessagesRead, getUnreadCount } fro
 import { getMessageTypeType, getMessageTypeLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
 import { useAppStore } from '@/store/app'
+import { useUserStore } from '@/store/user'
 import type { Message } from '@/types'
 
 const appStore = useAppStore()
+const userStore = useUserStore()
 const router = useRouter()
 const loading = ref(false)
 const messages = ref<Message[]>([])
@@ -151,6 +153,13 @@ function handleViewDetail(row: Message) {
   const submissionId = row.relatedId
   if (!submissionId) return
 
+  // 学生角色：跳转到学生端评价结果页
+  if (userStore.isStudent) {
+    router.push(`/student/result/${submissionId}`)
+    return
+  }
+
+  // 教师/管理员角色：跳转到教师端对应详情页
   if (row.type === 'AI_PARSE') {
     router.push(`/teacher/submissions/${submissionId}/parse`)
   } else if (row.type === 'AI_CHECK') {
