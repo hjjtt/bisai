@@ -1,0 +1,15 @@
+/* 公共布局样式 — 所有页面通用 */
+
+/* 卡片头部 flex 布局（原 15 个文件中重复定义） */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 头部操作按钮组 */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}

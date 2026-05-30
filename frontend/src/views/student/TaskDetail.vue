@@ -93,6 +93,7 @@ async function loadMySubmission() {
       mySubmission.value = items[0]
     }
   } catch (e) {
+    console.error('[TaskDetail] 加载我的提交失败:', e)
   }
 }
 

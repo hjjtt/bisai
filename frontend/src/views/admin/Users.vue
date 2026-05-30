@@ -285,6 +285,16 @@ async function handleSaveUser() {
 }
 
 async function toggleStatus(user: UserInfo) {
+  const action = user.status === 'ENABLED' ? '禁用' : '启用'
+  try {
+    await ElMessageBox.confirm(`确定要${action}用户「${user.realName}」吗？`, '状态变更确认', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return // 用户取消
+  }
   try {
     const newStatus = user.status === 'ENABLED' ? 'DISABLED' : 'ENABLED'
     await toggleUserStatus(user.id, newStatus)

@@ -207,11 +207,6 @@ onBeforeUnmount(stopPolling)
 </script>
 
 <style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
 .info-section {
   margin-bottom: 24px;
 }

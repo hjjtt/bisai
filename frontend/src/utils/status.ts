@@ -96,10 +96,13 @@ export function getKnowledgeStatusType(status: string): string {
 
 export function getKnowledgeStatusLabel(status: string): string {
   switch (status) {
-    case 'SUCCESS': return '已完成'
+    case 'SUCCESS':
+    case '已完成': return '已完成'
     case 'PROCESSING':
-    case 'PARSING': return '解析中'
-    case 'FAILED': return '失败'
+    case 'PARSING':
+    case '解析中': return '解析中'
+    case 'FAILED':
+    case '失败': return '失败'
     case 'PENDING': return '等待中'
     default: return status
   }

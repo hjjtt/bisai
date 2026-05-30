@@ -114,6 +114,7 @@ async function loadMessages() {
     messages.value = res.data.items
     pagination.total = res.data.total
   } catch (e) {
+    console.error('[Messages] 加载消息列表失败:', e)
   } finally {
     loading.value = false
   }
@@ -124,6 +125,7 @@ async function loadUnreadCount() {
     const res = await getUnreadCount()
     appStore.unreadMessageCount = res.data
   } catch (e) {
+    console.error('[Messages] 加载未读数失败:', e)
   }
 }
 
@@ -135,6 +137,7 @@ async function handleMarkRead(id: number) {
     if (msg) msg.isRead = true
     appStore.unreadMessageCount = Math.max(0, appStore.unreadMessageCount - 1)
   } catch (e) {
+    console.error('[Messages] 标记已读失败:', e)
   }
 }
 
@@ -145,6 +148,7 @@ async function handleMarkAllRead() {
     messages.value.forEach(m => m.isRead = true)
     appStore.unreadMessageCount = 0
   } catch (e) {
+    console.error('[Messages] 全部标记已读失败:', e)
   }
 }
 
@@ -164,9 +168,9 @@ function handleViewDetail(row: Message) {
     router.push(`/teacher/submissions/${submissionId}/parse`)
   } else if (row.type === 'AI_CHECK') {
     router.push(`/teacher/submissions/${submissionId}/check`)
-  } else if (row.type === 'AI_SCORE' || row.type === 'SCORE_COMPLETE') {
+  } else if (row.type === 'AI_SCORE') {
     router.push(`/teacher/submissions/${submissionId}/score`)
-  } else if (row.type === 'SUBMISSION' || row.type === 'RESUBMIT') {
+  } else if (row.type === 'SUBMISSION') {
     router.push(`/teacher/submissions/${submissionId}/preview`)
   } else if (row.type === 'SCORE_PUBLISHED' || row.type === 'SCORE_CORRECTED') {
     router.push(`/teacher/submissions/${submissionId}/score`)
@@ -182,18 +186,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
 .unread-stat :deep(.el-statistic__head) {
   font-size: 12px;
   color: var(--el-text-color-secondary);
