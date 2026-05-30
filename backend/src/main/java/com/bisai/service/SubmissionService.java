@@ -289,13 +289,16 @@ public class SubmissionService {
             Path filePath = dir.resolve(storedName);
             Files.copy(file.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
+            // 从已写入的文件计算 MD5，避免 InputStream 已消费导致哈希为空
+            String fileHash = cn.hutool.crypto.digest.DigestUtil.md5Hex(filePath.toFile());
+
             FileEntity fileEntity = new FileEntity();
             fileEntity.setSubmissionId(submission.getId());
             fileEntity.setOriginalName(originalName);
             fileEntity.setFilePath(filePath.toString());
             fileEntity.setFileType(extUpper);
             fileEntity.setFileSize(file.getSize());
-            fileEntity.setFileHash(cn.hutool.crypto.digest.DigestUtil.md5Hex(file.getInputStream()));
+            fileEntity.setFileHash(fileHash);
             fileEntity.setVersion(version);
             fileMapper.insert(fileEntity);
         }

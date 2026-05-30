@@ -36,7 +36,7 @@ export function deleteKnowledge(id: number) {
 }
 
 export function toggleKnowledgeStatus(id: number, enabled: boolean) {
-  return put(`/knowledge/${id}/toggle`, { enabled })
+  return put<void>(`/knowledge/${id}/toggle`, { enabled })
 }
 
 export function updateKnowledge(id: number, data: { name?: string; taskId?: number }) {

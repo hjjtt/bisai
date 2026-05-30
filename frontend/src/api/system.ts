@@ -1,15 +1,17 @@
 import { get, put, post, del } from '@/utils/request'
 import service from '@/utils/request'
 
+// 系统配置（字段名与 SystemService.FRONTEND_TO_DB_KEY 对应）
 export interface SystemConfigMap {
-  'ai.api-key'?: string
-  'ai.chat-model'?: string
+  textModelApiUrl?: string
+  textModelApiKey?: string
+  model?: string
+  maxTokens?: string
+  temperature?: string
+  timeout?: string
+  // 以下字段使用 DB key 原名（无前端映射）
   'ai.embedding-model'?: string
   'ai.rerank-model'?: string
-  'ai.api-url'?: string
-  'ai.max-tokens'?: string
-  'ai.temperature'?: string
-  'ai.timeout'?: string
   'ai.daily-token-limit'?: string
   'ai.daily-call-limit'?: string
   [key: string]: string | number | undefined
