@@ -78,6 +78,7 @@ ai:
   vision-model: Qwen/Qwen3.5-35B-A3B
   max-tokens: 2048
   temperature: 0.3
-  daily-token-limit: 200000
-  daily-call-limit: 1000
+  daily-token-limit: ${AI_DAILY_TOKEN_LIMIT:500000}
+  daily-call-limit: ${AI_DAILY_CALL_LIMIT:2000}
+  use-agent-score: true
   rerank-model:
