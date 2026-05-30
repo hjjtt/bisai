@@ -19,4 +19,6 @@ public class AiConfig {
     private int dailyCallLimit = 1000;
     /** API 调用超时（秒） */
     private int timeout = 60;
+    /** 是否使用 Agent 模式评分（false 则走传统单次调用） */
+    private boolean useAgentScore = false;
 }

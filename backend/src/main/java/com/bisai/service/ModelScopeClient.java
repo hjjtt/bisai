@@ -95,6 +95,46 @@ public class ModelScopeClient {
         }
     }
 
+    /**
+     * 调用 Chat Completion API，并支持传入 Tool (Function Calling)
+     */
+    public String chatWithTools(String systemPrompt, String userMessage, java.util.List<String> toolNames) {
+        int estimatedInputTokens = estimateTokens(systemPrompt) + estimateTokens(userMessage);
+        aiUsageService.checkQuota(estimatedInputTokens);
+        try {
+            List<Message> messages = new ArrayList<>();
+            if (systemPrompt != null && !systemPrompt.isEmpty()) {
+                messages.add(new SystemMessage(systemPrompt));
+            }
+            messages.add(new UserMessage(java.util.Objects.requireNonNull(userMessage, "userMessage cannot be null")));
+
+            log.info("调用 Agentic API (带有工具), model={}, 工具={}", aiConfig.getModel(), toolNames);
+            
+            OpenAiChatOptions.Builder optionsBuilder = OpenAiChatOptions.builder()
+                    .model(aiConfig.getModel())
+                    .maxTokens(aiConfig.getMaxTokens())
+                    .temperature(aiConfig.getTemperature());
+            
+            if (toolNames != null && !toolNames.isEmpty()) {
+                optionsBuilder.toolNames(new java.util.HashSet<>(toolNames));
+            }
+
+            ChatResponse response = chatModel.call(new Prompt(messages, optionsBuilder.build()));
+            
+            if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+                log.warn("AI (带有工具) 返回空响应");
+                throw new RuntimeException("AI 服务返回空响应，请重试");
+            }
+            
+            // 工具调用的 Tokens 使用量通常由底层记录
+            return response.getResult().getOutput().getText();
+
+        } catch (Exception e) {
+            log.error("调用 Agentic API 异常: {}", e.getMessage(), e);
+            throw new RuntimeException("Agent 服务调用异常: " + e.getMessage());
+        }
+    }
+
     public List<Double> embedding(String input) {
         int estimatedInputTokens = estimateTokens(input);
         aiUsageService.checkQuota(estimatedInputTokens);

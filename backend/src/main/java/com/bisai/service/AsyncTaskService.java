@@ -1,5 +1,6 @@
 package com.bisai.service;
 
+import com.bisai.config.AiConfig;
 import com.bisai.entity.AsyncTask;
 import com.bisai.entity.Submission;
 import com.bisai.mapper.AsyncTaskMapper;
@@ -23,6 +24,7 @@ public class AsyncTaskService {
     private final SubmissionMapper submissionMapper;
     private final AiService aiService;
     private final ApplicationEventPublisher eventPublisher;
+    private final AiConfig aiConfig;
 
     /**
      * 创建异步任务
@@ -98,19 +100,35 @@ public class AsyncTaskService {
     }
 
     /**
-     * 清理并重置长时间卡在 RUNNING 状态的任务
+     * 清理并重置长时间卡在 RUNNING 状态的任务（双阈值策略）
      */
     private void cleanupStuckTasks() {
-        LocalDateTime threshold = LocalDateTime.now().minusMinutes(10);
-        List<AsyncTask> stuckTasks = asyncTaskMapper.selectList(
+        // 普通任务 10 分钟，Agent 任务 30 分钟
+        LocalDateTime normalThreshold = LocalDateTime.now().minusMinutes(10);
+        LocalDateTime agentThreshold = LocalDateTime.now().minusMinutes(30);
+
+        // 先清理普通任务僵尸
+        List<AsyncTask> stuckNormal = asyncTaskMapper.selectList(
                 new LambdaQueryWrapper<AsyncTask>()
                         .eq(AsyncTask::getStatus, "RUNNING")
-                        .lt(AsyncTask::getUpdatedAt, threshold)
+                        .in(AsyncTask::getTaskType, "PRECHECK", "PARSE", "CHECK", "SCORE")
+                        .lt(AsyncTask::getUpdatedAt, normalThreshold)
         );
-
-        for (AsyncTask task : stuckTasks) {
-            log.warn("检测到僵尸任务，执行重置: id={}, type={}, bizId={}", task.getId(), task.getTaskType(), task.getBizId());
+        for (AsyncTask task : stuckNormal) {
+            log.warn("检测到僵尸任务（普通），执行重置: id={}, type={}, bizId={}", task.getId(), task.getTaskType(), task.getBizId());
             handleTaskFailure(task, "任务执行超时或意外中断（僵尸任务清理）");
+        }
+
+        // 再清理 Agent 任务僵尸（更长阈值）
+        List<AsyncTask> stuckAgent = asyncTaskMapper.selectList(
+                new LambdaQueryWrapper<AsyncTask>()
+                        .eq(AsyncTask::getStatus, "RUNNING")
+                        .eq(AsyncTask::getTaskType, "SCORE_AGENT")
+                        .lt(AsyncTask::getUpdatedAt, agentThreshold)
+        );
+        for (AsyncTask task : stuckAgent) {
+            log.warn("检测到僵尸任务（Agent），执行重置: id={}, type={}, bizId={}", task.getId(), task.getTaskType(), task.getBizId());
+            handleTaskFailure(task, "Agent 评分执行超时（僵尸任务清理，阈值30分钟）");
         }
     }
 
@@ -138,6 +156,7 @@ public class AsyncTaskService {
                 case "PARSE" -> aiService.doParse(fresh.getBizId(), fresh.getId());
                 case "CHECK" -> aiService.doCheck(fresh.getBizId(), fresh.getId());
                 case "SCORE" -> aiService.doScore(fresh.getBizId(), fresh.getId());
+                case "SCORE_AGENT" -> aiService.doScoreAgentic(fresh.getBizId(), fresh.getId());
                 default -> log.warn("未知任务类型: {}", fresh.getTaskType());
             }
 
@@ -191,7 +210,7 @@ public class AsyncTaskService {
                 case "PRECHECK" -> submission.setParseStatus("RETRYING".equals(task.getStatus()) ? "PENDING" : "FAILED");
                 case "PARSE" -> submission.setParseStatus("RETRYING".equals(task.getStatus()) ? "PARSING" : "FAILED");
                 case "CHECK" -> submission.setCheckStatus("RETRYING".equals(task.getStatus()) ? "CHECKING" : "CHECK_FAILED");
-                case "SCORE" -> submission.setScoreStatus("RETRYING".equals(task.getStatus()) ? "SCORING" : "SCORE_FAILED");
+                case "SCORE", "SCORE_AGENT" -> submission.setScoreStatus("RETRYING".equals(task.getStatus()) ? "SCORING" : "SCORE_FAILED");
             }
             submissionMapper.updateById(submission);
         }
@@ -208,7 +227,11 @@ public class AsyncTaskService {
 
         switch (task.getTaskType()) {
             case "PRECHECK" -> {
-                // 门禁通过，进入解析阶段
+                // 门禁通过才进入解析阶段，防止门禁打回后状态被级联覆盖
+                if ("RETURNED".equals(submission.getScoreStatus())) {
+                    log.info("门禁未通过（scoreStatus=RETURNED），跳过级联, submissionId={}", submission.getId());
+                    return;
+                }
                 submission.setParseStatus("PARSING");
                 submissionMapper.updateById(submission);
                 createTaskIfAbsent("PARSE", task.getBizId());
@@ -223,9 +246,11 @@ public class AsyncTaskService {
                 submission.setCheckStatus("SUCCESS");
                 submission.setScoreStatus("SCORING");
                 submissionMapper.updateById(submission);
-                createTaskIfAbsent("SCORE", task.getBizId());
+                // 根据配置决定走传统评分还是 Agent 评分
+                String scoreTaskType = aiConfig.isUseAgentScore() ? "SCORE_AGENT" : "SCORE";
+                createTaskIfAbsent(scoreTaskType, task.getBizId());
             }
-            case "SCORE" -> {
+            case "SCORE", "SCORE_AGENT" -> {
                 submission.setScoreStatus("AI_SCORED");
                 submissionMapper.updateById(submission);
             }
@@ -269,12 +294,14 @@ public class AsyncTaskService {
                 || "SCORING".equals(scoreStatus)) {
             return;
         }
-        if (hasActiveTask("SCORE", submission.getId())) {
+        // 检查两种评分任务类型是否已有活跃任务
+        String scoreTaskType = aiConfig.isUseAgentScore() ? "SCORE_AGENT" : "SCORE";
+        if (hasActiveTask(scoreTaskType, submission.getId())) {
             return;
         }
         submission.setScoreStatus("SCORING");
         submissionMapper.updateById(submission);
-        createTask("SCORE", submission.getId());
+        createTask(scoreTaskType, submission.getId());
     }
 
     private boolean hasActiveTask(String taskType, Long bizId) {
@@ -335,7 +362,7 @@ public class AsyncTaskService {
                 case "PRECHECK" -> submission.setParseStatus("CANCELLED");
                 case "PARSE" -> submission.setParseStatus("CANCELLED");
                 case "CHECK" -> submission.setCheckStatus("CANCELLED");
-                case "SCORE" -> submission.setScoreStatus("CANCELLED");
+                case "SCORE", "SCORE_AGENT" -> submission.setScoreStatus("CANCELLED");
             }
             submissionMapper.updateById(submission);
         }
@@ -361,7 +388,7 @@ public class AsyncTaskService {
                 case "PRECHECK" -> submission.setParseStatus("PENDING");
                 case "PARSE" -> submission.setParseStatus("PARSING");
                 case "CHECK" -> submission.setCheckStatus("CHECKING");
-                case "SCORE" -> submission.setScoreStatus("SCORING");
+                case "SCORE", "SCORE_AGENT" -> submission.setScoreStatus("SCORING");
             }
             submissionMapper.updateById(submission);
         }
