@@ -96,7 +96,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { getKnowledgeList, deleteKnowledge, uploadKnowledge, toggleKnowledgeStatus, updateKnowledge, type KnowledgeDocument } from '@/api/knowledge'
 import { getTaskList } from '@/api/task'
@@ -135,6 +135,15 @@ async function handleToggle(row: KnowledgeDocument) {
 }
 
 async function handleDelete(id: number) {
+  try {
+    await ElMessageBox.confirm('确定要删除该参考资料吗？此操作不可撤销。', '删除确认', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return // 用户取消
+  }
   try {
     await deleteKnowledge(id)
     ElMessage.success('已删除')
@@ -254,10 +263,3 @@ onMounted(() => {
 onBeforeUnmount(stopPolling)
 </script>
 
-<style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-</style>
