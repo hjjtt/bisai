@@ -246,20 +246,27 @@ public class ModelScopeClient {
      */
     private JsonNode parseJsonResponse(String content) {
         try {
-            // 尝试直接解析
             return objectMapper.readTree(content);
         } catch (Exception e1) {
             try {
-                // 尝试提取 markdown 代码块中的 JSON
-                String json = content;
+                String json = content.trim();
+                // 剥离 markdown 代码块
                 if (json.contains("```json")) {
-                    json = json.substring(json.indexOf("```json") + 7);
-                    json = json.substring(0, json.indexOf("```"));
+                    int start = json.indexOf("```json") + 7;
+                    int end = json.indexOf("```", start);
+                    json = end > start ? json.substring(start, end) : json.substring(start);
                 } else if (json.contains("```")) {
-                    json = json.substring(json.indexOf("```") + 3);
-                    json = json.substring(0, json.indexOf("```"));
+                    int start = json.indexOf("```") + 3;
+                    int end = json.indexOf("```", start);
+                    json = end > start ? json.substring(start, end) : json.substring(start);
                 }
                 json = json.trim();
+                // 如果不是以 { 或 [ 开头，尝试提取首个 JSON 结构
+                if (!json.startsWith("{") && !json.startsWith("[")) {
+                    int start = json.indexOf('{');
+                    if (start < 0) start = json.indexOf('[');
+                    if (start >= 0) json = json.substring(start);
+                }
                 return objectMapper.readTree(json);
             } catch (Exception e2) {
                 log.warn("解析 AI JSON 响应失败: {}", content);

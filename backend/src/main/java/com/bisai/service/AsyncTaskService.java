@@ -244,6 +244,12 @@ public class AsyncTaskService {
             }
             case "CHECK" -> {
                 submission.setCheckStatus("SUCCESS");
+                // 检查是否被 doCheck 红线熔断（scoreStatus 已被设为 AI_SCORED）
+                if ("AI_SCORED".equals(submission.getScoreStatus())) {
+                    log.info("核查触发红线熔断，跳过自动评分, submissionId={}", submission.getId());
+                    submissionMapper.updateById(submission);
+                    return; // 不创建 SCORE 任务，流水线终止
+                }
                 submission.setScoreStatus("SCORING");
                 submissionMapper.updateById(submission);
                 // 根据配置决定走传统评分还是 Agent 评分
