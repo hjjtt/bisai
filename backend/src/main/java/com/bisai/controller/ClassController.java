@@ -17,6 +17,7 @@ public class ClassController {
     private final ClassService classService;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<PageResult<ClassEntity>> list(PageQuery query) {
         return classService.listClasses(query);
     }

@@ -28,13 +28,16 @@ export type FileType = 'DOC' | 'DOCX' | 'PDF' | 'JPG' | 'JPEG' | 'PNG' | 'XLS' |
 export type TaskStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED' | 'ARCHIVED'
 
 // 解析状态
-export type ParseStatus = 'PENDING' | 'PARSING' | 'SUCCESS' | 'FAILED'
+export type ParseStatus = 'PENDING' | 'PARSING' | 'SUCCESS' | 'FAILED' | 'CANCELLED'
 
 // 评分状态
-export type ScoreStatus = 'NOT_SCORED' | 'SCORING' | 'AI_SCORED' | 'TEACHER_CONFIRMED' | 'PUBLISHED' | 'SCORE_FAILED' | 'RETURNED'
+export type ScoreStatus = 'NOT_SCORED' | 'SCORING' | 'AI_SCORED' | 'TEACHER_CONFIRMED' | 'PUBLISHED' | 'SCORE_FAILED' | 'RETURNED' | 'CANCELLED'
 
 // 核查状态
-export type CheckStatus = 'NOT_CHECKED' | 'CHECKING' | 'SUCCESS' | 'CHECK_FAILED'
+export type CheckStatus = 'NOT_CHECKED' | 'CHECKING' | 'SUCCESS' | 'CHECK_FAILED' | 'CANCELLED'
+
+// 异步任务状态
+export type AsyncTaskStatus = 'PENDING' | 'RUNNING' | 'RETRYING' | 'SUCCESS' | 'FAILED' | 'CANCELLED'
 
 // 消息类型
 export type MessageType = 'SUBMIT' | 'RESUBMIT' | 'SCORE_COMPLETE' | 'SCORE_PUBLISH' | 'BATCH_FAIL' | 'QUOTA_WARNING'

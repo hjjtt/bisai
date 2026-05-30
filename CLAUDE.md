@@ -42,14 +42,14 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 - **后端**: Spring Boot 3.4.3 + Spring Security (JWT) + MyBatis-Plus 3.5.9 + Spring AI (ModelScope)
 - **前端**: Vue 3 + TypeScript + Vite 8 + Element Plus + Pinia + ECharts + Axios
 - **文档解析**: PDFBox 3.0.3, POI 5.3.0, docx4j 11.4.11, iText 8.0.4
-- **AI**: ModelScope 平台，Qwen3.5-35B-A3B 聊天模型 + 中文句向量模型，支持 RAG 知识库检索增强
+- **AI**: ModelScope 平台，默认 Qwen3.5-35B-A3B，管理后台可动态切换任意模型，支持 RAG 知识库检索增强
 
 ### 后端包结构 (`com.bisai`)
 - `controller/` — REST API（16个），使用 `@PreAuthorize` 做角色控制
 - `service/` — 业务逻辑层，核心：`AiService`（解析/核查/评分）、`KnowledgeService`（知识库管理）、`ScoreService`（评分流程）、`ModelScopeClient`（AI调用封装）
 - `entity/` — MyBatis-Plus 实体，核心业务表已启用 `@TableLogic` 逻辑删除
 - `mapper/` — MyBatis-Plus Mapper 接口
-- `config/` — `SecurityConfig`（CORS/JWT/权限）、`AsyncConfig`（AI任务线程池）
+- `config/` — `SecurityConfig`（CORS/JWT/权限）、`AsyncConfig`（AI任务线程池）、`JacksonConfig`（LocalDateTime 全局格式化）、`AiConfig`（AI模型参数，支持运行时刷新）
 - 工具库：Hutool 5.8（通用工具）、EasyExcel 3.3（Excel 导入导出）、JFreeChart 1.5（可视化报表图表）、Lombok（实体类注解）
 
 ### 前端结构
@@ -63,8 +63,14 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 - Spring Security URL 级：`/api/auth/**` 放行，其余需认证
 - 方法级：Controller 使用 `@PreAuthorize("hasRole('ADMIN')")` 等
 - 数据级：Service 层按 role 过滤查询（学生只看自己的数据，教师只看自己课程的数据）
-- 前端路由级：`meta.roles` 控制页面访问
 - 文件访问：`FileController.hasFileAccess` 通过 submissionId 关联验证权限，前端用 axios blob 下载（非 `window.open`）
+- 前端路由级：`meta.roles` 控制页面访问
+
+### 系统配置管理
+- `SystemService` 维护 `FRONTEND_TO_DB_KEY` / `DB_TO_FRONTEND_KEY` 映射表，解决前端字段名（如 `model`）与数据库 key（如 `ai.chat-model`）不一致的问题
+- `updateConfig()` 保存到数据库后调用 `refreshAiConfig()` 刷新 `AiConfig` Bean，使模型参数变更立即生效，无需重启
+- `JacksonConfig` 全局配置 `LocalDateTime` 序列化/反序列化格式为 `yyyy-MM-dd HH:mm:ss`，所有实体自动生效
+- 前端日期选择器 `value-format="YYYY-MM-DD HH:mm:ss"` 与后端格式匹配
 
 ### 异步任务
 `AsyncTaskService` 用 `@Scheduled(fixedDelay=5000)` 数据库轮询（非消息队列），处理 PARSE/CHECK/SCORE 任务，最多重试 3 次（递增延迟），僵尸任务 10 分钟自动清理。`TaskService` 管理批量操作并发控制。
@@ -94,7 +100,6 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 - 前端文件下载/预览必须通过 axios 带 token，禁止 `window.open` 直接访问 API
 - 热部署已禁用（devtools `restart.enabled: false`），修改 Java 代码后需手动重启
 - MyBatis 日志使用 `Slf4jImpl`（非 `StdOutImpl`），避免定时任务刷屏
-- `JsonUtil` 已注册 `JavaTimeModule`，反序列化含 `LocalDateTime` 的对象不会报错
 
 ## Pitfalls
 
@@ -104,6 +109,15 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 
 ### MyBatis-Plus 空值陷阱
 - `updateById()` 默认不更新 null 字段。需要清空字段时必须用 `UpdateWrapper.set("column", null)`
+
+### LocalDateTime 序列化
+- `JacksonConfig` 已全局配置 `yyyy-MM-dd HH:mm:ss` 格式，所有 `LocalDateTime` 字段自动生效
+- 前端日期选择器必须使用 `value-format="YYYY-MM-dd HH:mm:ss"` 以匹配后端格式
+- `spring.jackson.date-format` 只对 `java.util.Date` 生效，对 `LocalDateTime` 无效（由 `JacksonConfig` 处理）
+
+### 系统配置 key 映射
+- 前端表单字段名（如 `model`、`textModelApiUrl`）与数据库 key（如 `ai.chat-model`、`ai.api-url`）不同
+- `SystemService` 中有双向映射表 `FRONTEND_TO_DB_KEY` / `DB_TO_FRONTEND_KEY`，新增配置项时必须同步更新
 
 ### TypeScript 6.0.3
 - `tsconfig.app.json` 必须保留 `"ignoreDeprecations": "6.0"`，TS 6.0.3 的 `baseUrl` 已废弃，不加会报 TS5101
@@ -115,6 +129,15 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 
 ### 管理后台数据
 - 仪表盘不接受硬编码 0 或假数据，所有统计必须来自数据库查询
+
+### 课程权限
+- `CourseService.listCourses` 按角色过滤：教师只看到自己的课程，管理员看到所有
+- `TaskService.createTask` 通过 `isTeacherOwnerOfCourse` 验证教师只能在自己课程下创建任务
+- `PermissionService` 提供 `isStudentOwnerOfSubmission` 验证学生只能访问自己的提交
+
+### 文件路径
+- `ReportService` 生成报告文件时使用 `toAbsolutePath().normalize()` 存储绝对路径
+- `FileController` 对相对路径会拼接 `./data/files/` 基础路径，所以必须存绝对路径避免路径重复
 
 ## Agent skills
 

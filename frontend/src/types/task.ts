@@ -1,4 +1,4 @@
-import type { TaskStatus, ParseStatus, ScoreStatus, CheckStatus, FileType } from './common'
+import type { TaskStatus, ParseStatus, ScoreStatus, CheckStatus, FileType, AsyncTaskStatus } from './common'
 
 // 实训任务
 export interface TrainingTask {
@@ -85,7 +85,7 @@ export interface AsyncTask {
   bizType: string
   bizId: number
   taskType: string
-  status: string
+  status: AsyncTaskStatus
   progress: number
   currentStep: string
   result?: string

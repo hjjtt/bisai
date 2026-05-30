@@ -8,6 +8,7 @@ import com.bisai.entity.Submission;
 import com.bisai.entity.FileEntity;
 import com.bisai.entity.TrainingTask;
 import com.bisai.entity.User;
+import com.bisai.entity.AsyncTask;
 import com.bisai.mapper.CourseMapper;
 import com.bisai.mapper.FileMapper;
 import com.bisai.mapper.SubmissionMapper;
@@ -317,7 +318,32 @@ public class SubmissionService {
             log.warn("发送提交通知消息失败: {}", e.getMessage());
         }
 
-        asyncTaskService.createTask("PARSE", submission.getId());
+        // === 缓冲期覆盖检查 ===
+        List<Submission> previousSubmissions = submissionMapper.selectList(
+                new LambdaQueryWrapper<Submission>()
+                        .eq(Submission::getTaskId, taskId)
+                        .eq(Submission::getStudentId, studentId)
+                        .ne(Submission::getId, submission.getId())
+        );
+        for (Submission prevSub : previousSubmissions) {
+            List<AsyncTask> prevTasks = asyncTaskService.getTasksByBizId(prevSub.getId());
+            for (AsyncTask prevTask : prevTasks) {
+                if ("PRECHECK".equals(prevTask.getTaskType()) &&
+                        ("PENDING".equals(prevTask.getStatus()) || "RETRYING".equals(prevTask.getStatus()))) {
+                    // 取消该任务
+                    asyncTaskService.cancelTask(prevTask.getId());
+                    // 将前一版本的状态标记为 CANCELLED
+                    prevSub.setParseStatus("CANCELLED");
+                    prevSub.setCheckStatus("CANCELLED");
+                    prevSub.setScoreStatus("CANCELLED");
+                    submissionMapper.updateById(prevSub);
+                    log.info("缓冲期内重复上传，已取消并覆盖前次提交（提交ID: {}, 任务ID: {}）", prevSub.getId(), prevTask.getId());
+                }
+            }
+        }
+
+        // 上传成功后自动进入延时 AI 处理链路：PRECHECK (延迟300秒，即5分钟)
+        asyncTaskService.createDelayedTask("PRECHECK", submission.getId(), 300);
         return Result.ok();
     }
 

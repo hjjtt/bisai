@@ -192,7 +192,7 @@ public class TaskService {
         for (Submission sub : toProcess) {
             sub.setParseStatus("PARSING");
             submissionMapper.updateById(sub);
-            asyncTaskService.createTask("PARSE", sub.getId());
+            asyncTaskService.createTaskIfAbsent("PARSE", sub.getId());
             created++;
         }
 
@@ -243,7 +243,7 @@ public class TaskService {
         for (Submission sub : toProcess) {
             sub.setScoreStatus("SCORING");
             submissionMapper.updateById(sub);
-            asyncTaskService.createTask("SCORE", sub.getId());
+            asyncTaskService.createTaskIfAbsent("SCORE", sub.getId());
             created++;
         }
 
@@ -294,7 +294,7 @@ public class TaskService {
         for (Submission sub : toProcess) {
             sub.setCheckStatus("CHECKING");
             submissionMapper.updateById(sub);
-            asyncTaskService.createTask("CHECK", sub.getId());
+            asyncTaskService.createTaskIfAbsent("CHECK", sub.getId());
             created++;
         }
 

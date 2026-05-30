@@ -17,6 +17,11 @@
         <el-descriptions-item label="总分">
           <span style="font-weight: bold; color: #f56c6c">{{ submission.totalScore ?? '--' }}</span> 分
         </el-descriptions-item>
+        <el-descriptions-item label="评分状态">
+          <el-tag :type="getScoreStatusType(submission.scoreStatus)" size="small">
+            {{ getScoreStatusLabel(submission.scoreStatus) }}
+          </el-tag>
+        </el-descriptions-item>
       </el-descriptions>
       
       <div v-if="submission.parseSummary" style="margin-top: 12px">
@@ -33,7 +38,7 @@
             <div class="card-header">
               <span>评分详情</span>
               <div>
-                <el-button type="primary" :loading="aiScoring" @click="handleAiScore">
+                <el-button type="primary" :loading="aiScoring" :disabled="!canStartAiScore" @click="handleAiScore">
                   AI 智能评分
                 </el-button>
                 <el-button type="info" @click="$router.push(`/teacher/submissions/${submissionId}/preview`)">
@@ -85,18 +90,18 @@
           <el-button type="warning" :loading="objectiveLoading" @click="handleViewObjective" style="width: 100%">
             查看客观评分
           </el-button>
-          <el-button type="primary" @click="showCorrectDialog = true" style="width: 100%; margin-top: 8px">
+          <el-button v-if="isPublished" type="primary" @click="showCorrectDialog = true" style="width: 100%; margin-top: 8px">
             修正成绩
           </el-button>
           <el-divider />
-          <div class="score-actions">
-            <el-button type="success" :loading="saving" @click="handlePublish" style="width: 100%">
+          <div v-if="!isPublished" class="score-actions">
+            <el-button type="success" :loading="saving" :disabled="isScoring" @click="handlePublish" style="width: 100%">
               确认并发布成绩
             </el-button>
-            <el-button :loading="saving" @click="handleSave" style="width: 100%; margin-top: 8px">
+            <el-button :loading="saving" :disabled="isScoring" @click="handleSave" style="width: 100%; margin-top: 8px">
               暂存评分
             </el-button>
-            <el-button type="danger" @click="handleReturn" style="width: 100%; margin-top: 8px">
+            <el-button type="danger" :disabled="isScoring" @click="handleReturn" style="width: 100%; margin-top: 8px">
               退回学生
             </el-button>
           </div>
@@ -150,7 +155,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getScoreResults, saveTeacherScores, publishScore, returnSubmission, startScore, getSubmission, getObjectiveScore, correctScore } from '@/api/task'
-import { getParseStatusType, getParseStatusLabel } from '@/utils/status'
+import { getParseStatusType, getParseStatusLabel, getScoreStatusType, getScoreStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
 import type { ScoreResult, Submission } from '@/types'
 
@@ -164,6 +169,12 @@ const submission = ref<Submission | null>(null)
 const scores = ref<(ScoreResult & { maxScore?: number })[]>([])
 const submissionId = computed(() => Number(route.params.id) || 0)
 const polling = ref<number | null>(null)
+const isScoring = computed(() => submission.value?.scoreStatus === 'SCORING')
+const isPublished = computed(() => submission.value?.scoreStatus === 'PUBLISHED')
+const canStartAiScore = computed(() => {
+  const status = submission.value?.scoreStatus
+  return !aiScoring.value && ['NOT_SCORED', 'SCORE_FAILED', 'CANCELLED'].includes(status || '')
+})
 
 // 客观评分
 const showObjectiveDialog = ref(false)
