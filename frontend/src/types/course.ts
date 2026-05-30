@@ -4,6 +4,7 @@ export interface ClassInfo {
   name: string
   grade?: string
   major?: string
+  studentCount?: number
   status: string
 }
 

@@ -3,13 +3,13 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>知识库管理</span>
+          <span>实训参考资料</span>
           <el-button type="primary" @click="showUploadDialog = true">上传文档</el-button>
         </div>
       </template>
 
       <el-table :data="documents" stripe v-loading="loading">
-        <el-table-column prop="name" label="文档名称" min-width="200" align="center" />
+        <el-table-column prop="name" label="资料名称" min-width="200" align="center" />
         <el-table-column prop="taskName" label="关联实训任务" min-width="180" align="center" show-overflow-tooltip />
         <el-table-column prop="courseName" label="所属课程" min-width="150" align="center" show-overflow-tooltip />
         <el-table-column label="解析状态" min-width="120" align="center">
@@ -37,11 +37,11 @@
         </el-table-column>
       </el-table>
 
-      <el-empty v-if="!loading && documents.length === 0" description="暂无知识库文档" />
+      <el-empty v-if="!loading && documents.length === 0" description="暂无参考资料" />
     </el-card>
 
     <!-- 上传对话框 -->
-    <el-dialog v-model="showUploadDialog" title="上传知识库文档" width="500px">
+    <el-dialog v-model="showUploadDialog" title="上传参考资料" width="500px">
       <el-form label-position="top" class="upload-form">
         <el-form-item label="关联实训任务" required>
           <el-select v-model="uploadTaskId" filterable placeholder="请选择要服务的实训任务" style="width: 100%">
@@ -53,7 +53,7 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="知识库文件" required>
+        <el-form-item label="参考资料文件" required>
           <el-upload drag multiple :auto-upload="false" :on-change="handleFileChange">
             <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
             <div class="el-upload__text">拖拽或点击上传</div>
@@ -70,7 +70,7 @@
     </el-dialog>
 
     <!-- 编辑对话框 -->
-    <el-dialog v-model="showEditDialog" title="编辑知识库文档" width="500px">
+    <el-dialog v-model="showEditDialog" title="编辑参考资料" width="500px">
       <el-form label-position="top" class="upload-form">
         <el-form-item label="文档名称" required>
           <el-input v-model="editForm.name" placeholder="请输入文档名称" />
@@ -220,7 +220,7 @@ async function loadDocuments() {
     const res = await getKnowledgeList({ page: 1, size: 100 })
     documents.value = res.data.items || []
   } catch (e) {
-    ElMessage.error('加载知识库列表失败')
+    ElMessage.error('加载参考资料列表失败')
   } finally {
     loading.value = false
   }
