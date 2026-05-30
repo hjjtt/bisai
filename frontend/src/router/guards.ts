@@ -136,7 +136,7 @@ export const teacherRoutes: RouteRecordRaw[] = [
         path: 'knowledge',
         name: 'TeacherKnowledge',
         component: () => import('@/views/teacher/Knowledge.vue'),
-        meta: { title: '知识库管理', icon: 'Collection' },
+        meta: { title: '实训参考资料', icon: 'Collection' },
       },
       {
         path: 'calibration',
@@ -189,7 +189,7 @@ export const adminRoutes: RouteRecordRaw[] = [
         path: 'knowledge',
         name: 'AdminKnowledge',
         component: () => import('@/views/admin/Knowledge.vue'),
-        meta: { title: '知识库管理', icon: 'Collection' },
+        meta: { title: '实训参考资料', icon: 'Collection' },
       },
       {
         path: 'model-config',

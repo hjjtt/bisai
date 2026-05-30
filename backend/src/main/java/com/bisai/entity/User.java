@@ -27,4 +27,13 @@ public class User {
 
     @TableField(exist = false)
     private String className;
+
+    @TableField(exist = false)
+    private String teachingClassNames;
+
+    @TableField(exist = false)
+    private String teachingCourseNames;
+
+    @TableField(exist = false)
+    private String teachingCourseBindings;
 }

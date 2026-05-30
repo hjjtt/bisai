@@ -31,7 +31,11 @@ public class CourseController {
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Course> create(@RequestBody Course course, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        return courseService.createCourse(course, userId);
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return courseService.createCourse(course, userId, role);
     }
 
     @PutMapping("/{id}")
