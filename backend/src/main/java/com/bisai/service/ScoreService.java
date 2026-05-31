@@ -222,8 +222,9 @@ public class ScoreService {
             return Result.error(40301, "无权访问该提交");
         }
 
-        // 成绩必须已发布
-        if (!"PUBLISHED".equals(submission.getScoreStatus())) {
+        // 未评分状态才返回空；RETURNED/AI_SCORED/TEACHER_CONFIRMED/PUBLISHED 都返回已有数据
+        String status = submission.getScoreStatus();
+        if ("NOT_SCORED".equals(status) || "SCORING".equals(status) || "SCORE_FAILED".equals(status)) {
             return Result.ok(List.of());
         }
 

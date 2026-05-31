@@ -24,7 +24,7 @@ public class SystemService {
     private final ModelScopeClient modelScopeClient;
 
     private static final Set<String> ALLOWED_CONFIG_KEYS = Set.of(
-            "ai.api-key", "ai.chat-model", "ai.embedding-model", "ai.rerank-model",
+            "ai.api-key", "ai.chat-model", "ai.fallback-model", "ai.embedding-model", "ai.rerank-model",
             "ai.api-url", "ai.max-tokens", "ai.daily-token-limit", "ai.daily-call-limit",
             "ai.temperature", "ai.timeout"
     );
@@ -34,6 +34,7 @@ public class SystemService {
             "textModelApiUrl", "ai.api-url",
             "textModelApiKey", "ai.api-key",
             "model", "ai.chat-model",
+            "fallbackModel", "ai.fallback-model",
             "maxTokens", "ai.max-tokens",
             "temperature", "ai.temperature",
             "timeout", "ai.timeout"
@@ -44,6 +45,7 @@ public class SystemService {
             "ai.api-url", "textModelApiUrl",
             "ai.api-key", "textModelApiKey",
             "ai.chat-model", "model",
+            "ai.fallback-model", "fallbackModel",
             "ai.max-tokens", "maxTokens",
             "ai.temperature", "temperature",
             "ai.timeout", "timeout"
@@ -102,6 +104,7 @@ public class SystemService {
         updates.forEach((dbKey, value) -> {
             switch (dbKey) {
                 case "ai.chat-model" -> aiConfig.setModel(value);
+                case "ai.fallback-model" -> aiConfig.setFallbackModel(value);
                 case "ai.api-url" -> aiConfig.setBaseUrl(value);
                 case "ai.api-key" -> aiConfig.setApiKey(value);
                 case "ai.max-tokens" -> aiConfig.setMaxTokens(Integer.parseInt(value));

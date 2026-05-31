@@ -64,8 +64,8 @@
         </el-table-column>
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
-            <el-tag :type="getTaskStatusType(row.status)" effect="light">
-              {{ getTaskStatusLabel(row.status) }}
+            <el-tag :type="getTaskStatusType(row.status, row.endTime)" effect="light">
+              {{ getTaskStatusLabel(row.status, row.endTime) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -73,7 +73,7 @@
           <template #default="{ row }">
             <el-button size="small" type="primary" :icon="ArrowRight" @click="router.push(`/student/tasks/${row.id}`)">详情</el-button>
             <el-button
-              v-if="row.status === 'PUBLISHED'"
+              v-if="row.status === 'PUBLISHED' && (!row.endTime || new Date(row.endTime).getTime() > Date.now())"
               size="small"
               type="success"
               :icon="UploadFilled"

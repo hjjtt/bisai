@@ -10,7 +10,7 @@ export function getParseStatusType(status: string): string {
 
 export function getParseStatusLabel(status: string): string {
   const map: Record<string, string> = {
-    PENDING: '待解析', PARSING: '解析中', SUCCESS: '已完成', FAILED: '失败',
+    PENDING: '待解析', PARSING: '解析中', SUCCESS: '解析完成', FAILED: '解析失败',
     RETRYING: '重试中', CANCELLED: '已取消',
   }
   return map[status] || status
@@ -26,7 +26,7 @@ export function getCheckStatusType(status?: string): string {
 
 export function getCheckStatusLabel(status?: string): string {
   const map: Record<string, string> = {
-    NOT_CHECKED: '未核查', CHECKING: '核查中', SUCCESS: '已完成', CHECK_FAILED: '失败',
+    NOT_CHECKED: '未核查', CHECKING: '核查中', SUCCESS: '核查完成', CHECK_FAILED: '核查失败',
     RETRYING: '重试中', CANCELLED: '已取消',
   }
   return map[status || 'NOT_CHECKED'] || status || '未核查'
@@ -48,13 +48,20 @@ export function getScoreStatusLabel(status: string): string {
   return map[status] || status
 }
 
-export function getTaskStatusLabel(status: string): string {
+export function getTaskStatusLabel(status: string, endTime?: string | null): string {
   const map: Record<string, string> = { DRAFT: '草稿', PUBLISHED: '进行中', CLOSED: '已关闭', ARCHIVED: '已归档' }
+  // PUBLISHED 但已过截止时间 → 显示"已截止"
+  if (status === 'PUBLISHED' && endTime && new Date(endTime).getTime() < Date.now()) {
+    return '已截止'
+  }
   return map[status] || status
 }
 
-export function getTaskStatusType(status: string): string {
+export function getTaskStatusType(status: string, endTime?: string | null): string {
   const map: Record<string, string> = { DRAFT: 'info', PUBLISHED: 'success', CLOSED: 'warning', ARCHIVED: 'info' }
+  if (status === 'PUBLISHED' && endTime && new Date(endTime).getTime() < Date.now()) {
+    return 'danger'
+  }
   return map[status] || 'info'
 }
 
@@ -158,6 +165,9 @@ export function getMessageTypeType(type: string): string {
     AI_SCORE: 'success',
     SCORE_PUBLISHED: 'success',
     SCORE_CORRECTED: 'warning',
+    SUBMISSION_RETURNED: 'danger',
+    AI_CHECK_REDFLAG: 'danger',
+    AI_SCORE_AGENT: 'success',
   }
   return map[type] || 'info'
 }
@@ -170,6 +180,9 @@ export function getMessageTypeLabel(type: string): string {
     AI_SCORE: '评分完成',
     SCORE_PUBLISHED: '成绩发布',
     SCORE_CORRECTED: '成绩修正',
+    SUBMISSION_RETURNED: '退回通知',
+    AI_CHECK_REDFLAG: '红线熔断',
+    AI_SCORE_AGENT: 'Agent评分',
   }
   return map[type] || type
 }

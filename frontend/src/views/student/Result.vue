@@ -2,7 +2,7 @@
   <div class="student-result">
     <el-page-header @back="$router.back()" title="返回" content="评价结果" />
     <el-card style="margin-top: 16px" v-loading="loading">
-      <template v-if="scores.length > 0">
+      <template v-if="hasActualScores">
         <!-- 总分 -->
         <div class="score-summary">
           <span class="score-label">最终得分</span>
@@ -15,22 +15,24 @@
           <el-table-column prop="finalScore" label="得分" width="100" />
           <el-table-column prop="reason" label="评分理由" min-width="200" />
         </el-table>
+      </template>
 
-        <!-- 教师评语 -->
+      <!-- 退回/评语信息 -->
+      <template v-if="teacherComment">
         <el-divider />
-        <div v-if="teacherComment">
-          <h4>教师评语</h4>
+        <div :class="['comment-block', submission?.scoreStatus === 'RETURNED' ? 'returned' : '']">
+          <h4>{{ submission?.scoreStatus === 'RETURNED' ? '退回原因' : '教师评语' }}</h4>
           <p class="comment-text">{{ teacherComment }}</p>
-        </div>
-
-        <!-- 操作按钮 -->
-        <div style="margin-top: 20px; text-align: right">
-          <el-button type="primary" @click="downloadReport('PDF')">下载 PDF 报告</el-button>
-          <el-button @click="downloadReport('WORD')">下载 Word 报告</el-button>
         </div>
       </template>
 
-      <el-empty v-else description="暂无评价结果" />
+      <!-- 操作按钮（仅已发布时显示下载） -->
+      <div v-if="submission?.scoreStatus === 'PUBLISHED'" style="margin-top: 20px; text-align: right">
+        <el-button type="primary" @click="downloadReport('PDF')">下载 PDF 报告</el-button>
+        <el-button @click="downloadReport('WORD')">下载 Word 报告</el-button>
+      </div>
+
+      <el-empty v-if="!hasActualScores && !teacherComment" description="暂无评价结果" />
     </el-card>
   </div>
 </template>
@@ -52,6 +54,11 @@ const teacherComment = ref('')
 
 const submissionId = computed(() => Number(route.params.submissionId) || 0)
 
+// 是否有实际评分（至少一条记录有分数）
+const hasActualScores = computed(() =>
+  scores.value.some(s => s.finalScore != null || s.autoScore != null || s.teacherScore != null)
+)
+
 async function loadData() {
   if (!submissionId.value) return
   loading.value = true
@@ -62,6 +69,7 @@ async function loadData() {
     ])
     submission.value = subRes.data
     scores.value = scoreRes.data
+    teacherComment.value = subRes.data?.teacherComment || ''
   } catch (e) {
     ElMessage.error('加载评价结果失败')
   } finally {
@@ -96,6 +104,18 @@ onMounted(loadData)
     font-size: 48px;
     font-weight: bold;
     color: #409eff;
+  }
+}
+
+.comment-block {
+  &.returned {
+    h4 { color: #e6a23c; }
+    .comment-text {
+      padding: 12px 16px;
+      border-radius: 6px;
+      background: #fdf6ec;
+      border: 1px solid #faecd8;
+    }
   }
 }
 

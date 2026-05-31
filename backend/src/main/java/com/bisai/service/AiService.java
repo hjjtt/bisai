@@ -330,9 +330,22 @@ public class AiService {
                 fileContent.append("【").append(file.getOriginalName()).append("】\n");
                 String content = documentTextExtractor.extract(file).content();
                 if (documentTextExtractor.isImage(file)) {
-                    String vision = analyzeImage(file);
-                    if (vision != null && !vision.isBlank()) {
-                        content = content + "\n图片多模态分析:\n" + vision;
+                    // 优先复用 PARSE 阶段的 OCR 缓存，避免重复调用多模态 API
+                    ParseResult cachedVision = parseResultMapper.selectOne(
+                            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ParseResult>()
+                                    .eq(ParseResult::getFileId, file.getId())
+                                    .eq(ParseResult::getSubmissionId, submissionId)
+                                    .eq(ParseResult::getParserType, "VISION")
+                                    .last("LIMIT 1")
+                    );
+                    if (cachedVision != null && cachedVision.getContent() != null && !cachedVision.getContent().isEmpty()) {
+                        content = content + "\n图片多模态分析:\n" + cachedVision.getContent();
+                        log.info("CHECK 复用图片 OCR 缓存, fileId={}", file.getId());
+                    } else {
+                        String vision = analyzeImage(file);
+                        if (vision != null && !vision.isBlank()) {
+                            content = content + "\n图片多模态分析:\n" + vision;
+                        }
                     }
                 }
                 if (content != null) {
@@ -419,7 +432,7 @@ public class AiService {
                     cr.setCreatedAt(LocalDateTime.now());
                     checkResultMapper.insert(cr);
 
-                    // 优化4: 检测红线问题（FAIL + HIGH）
+                    // 检测红线问题（FAIL + HIGH）
                     if ("FAIL".equals(cr.getResult()) && "HIGH".equals(cr.getRiskLevel())) {
                         hasRedLineError = true;
                         if (redLineReason.length() > 0) redLineReason.append("；");
@@ -428,7 +441,16 @@ public class AiService {
                 }
             }
 
-            // 优化4: 红线熔断 — 存在严重问题时终止流水线，不进入评分阶段
+            // 红线熔断决策：PARSE 阶段已判定内容完整时，豁免红线熔断
+            String parseCompleteness = submission.getParseCompleteness();
+            boolean parseConfirmedComplete = "HIGH".equals(parseCompleteness) || "MEDIUM".equals(parseCompleteness);
+            if (hasRedLineError && parseConfirmedComplete) {
+                log.info("红线问题被 PARSE 完整度({})豁免, submissionId={}, 红线原因: {}",
+                        parseCompleteness, submissionId, redLineReason);
+                hasRedLineError = false;
+            }
+
+            // 红线熔断 — 存在严重问题时终止流水线，不进入评分阶段
             if (hasRedLineError) {
                 submission.setCheckStatus("SUCCESS");
                 submission.setScoreStatus("AI_SCORED");

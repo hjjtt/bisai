@@ -20,7 +20,9 @@ public class MessageService {
         Page<Message> page = new Page<>(query.getPage(), query.getSize());
         LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
 
-        wrapper.eq(Message::getUserId, userId);
+        if (userId != null) {
+            wrapper.eq(Message::getUserId, userId);
+        }
         if (type != null && !type.isEmpty()) {
             wrapper.eq(Message::getType, type);
         }

@@ -20,6 +20,9 @@
           <el-option label="评分完成" value="AI_SCORE" />
           <el-option label="成绩发布" value="SCORE_PUBLISHED" />
           <el-option label="成绩修正" value="SCORE_CORRECTED" />
+          <el-option label="退回通知" value="SUBMISSION_RETURNED" />
+          <el-option label="红线熔断" value="AI_CHECK_REDFLAG" />
+          <el-option label="Agent评分" value="AI_SCORE_AGENT" />
         </el-select>
         <el-select v-model="filter.isRead" placeholder="按已读状态筛选" clearable style="width: 160px" @change="loadMessages">
           <el-option label="未读" :value="false" />

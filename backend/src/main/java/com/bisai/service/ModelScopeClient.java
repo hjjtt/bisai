@@ -49,6 +49,29 @@ public class ModelScopeClient {
      * 调用 Chat Completion API（自定义温度）
      */
     public String chat(String systemPrompt, String userMessage, double temperature) {
+        try {
+            return doChat(systemPrompt, userMessage, temperature, aiConfig.getModel());
+        } catch (Exception primaryEx) {
+            String fallback = aiConfig.getFallbackModel();
+            if (fallback != null && !fallback.isEmpty() && !fallback.equals(aiConfig.getModel())) {
+                log.warn("主模型 {} 调用失败，切换备用模型 {}: {}", aiConfig.getModel(), fallback, primaryEx.getMessage());
+                try {
+                    String result = doChat(systemPrompt, userMessage, temperature, fallback);
+                    log.info("备用模型 {} 调用成功（fallback）", fallback);
+                    return result;
+                } catch (Exception fallbackEx) {
+                    log.error("备用模型 {} 也失败: {}", fallback, fallbackEx.getMessage());
+                    throw primaryEx;
+                }
+            }
+            throw primaryEx;
+        }
+    }
+
+    /**
+     * 实际调用 Chat Completion API（可指定模型）
+     */
+    private String doChat(String systemPrompt, String userMessage, double temperature, String model) {
         int estimatedInputTokens = estimateTokens(systemPrompt) + estimateTokens(userMessage);
         aiUsageService.checkQuota(estimatedInputTokens);
         try {
@@ -58,18 +81,18 @@ public class ModelScopeClient {
             }
             messages.add(new UserMessage(java.util.Objects.requireNonNull(userMessage, "userMessage cannot be null")));
 
-            log.info("调用 ModelScope API, model={}, 消息长度={}", aiConfig.getModel(), userMessage.length());
+            log.info("调用 ModelScope API, model={}, 消息长度={}", model, userMessage.length());
             ChatResponse response = chatModel.call(new Prompt(
                     messages,
                     OpenAiChatOptions.builder()
-                            .model(aiConfig.getModel())
+                            .model(model)
                             .maxTokens(aiConfig.getMaxTokens())
                             .temperature(temperature)
                             .build()
             ));
             if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
-                log.warn("AI 返回空响应, model={}, response={}", aiConfig.getModel(), response);
-                aiUsageService.record(aiConfig.getModel(), "CHAT", estimatedInputTokens, 0, false, "AI 返回空响应");
+                log.warn("AI 返回空响应, model={}, response={}", model, response);
+                aiUsageService.record(model, "CHAT", estimatedInputTokens, 0, false, "AI 返回空响应");
                 throw new RuntimeException("AI 服务返回空响应，请重试");
             }
             String content = response.getResult().getOutput().getText();
@@ -84,13 +107,13 @@ public class ModelScopeClient {
                         outputTokens,
                         usage.getTotalTokens() != null ? usage.getTotalTokens() : inputTokens + outputTokens);
             }
-            aiUsageService.record(aiConfig.getModel(), "CHAT", inputTokens, outputTokens, true, null);
+            aiUsageService.record(model, "CHAT", inputTokens, outputTokens, true, null);
 
             return content;
 
         } catch (Exception e) {
             log.error("调用 ModelScope API 异常: {}", e.getMessage(), e);
-            aiUsageService.record(aiConfig.getModel(), "CHAT", estimatedInputTokens, 0, false, e.getMessage());
+            aiUsageService.record(model, "CHAT", estimatedInputTokens, 0, false, e.getMessage());
             throw new RuntimeException("AI 服务调用异常: " + e.getMessage());
         }
     }
@@ -99,6 +122,29 @@ public class ModelScopeClient {
      * 调用 Chat Completion API，并支持传入 Tool (Function Calling)
      */
     public String chatWithTools(String systemPrompt, String userMessage, java.util.List<String> toolNames) {
+        try {
+            return doChatWithTools(systemPrompt, userMessage, toolNames, aiConfig.getModel());
+        } catch (Exception primaryEx) {
+            String fallback = aiConfig.getFallbackModel();
+            if (fallback != null && !fallback.isEmpty() && !fallback.equals(aiConfig.getModel())) {
+                log.warn("主模型 {} Agent 调用失败，切换备用模型 {}: {}", aiConfig.getModel(), fallback, primaryEx.getMessage());
+                try {
+                    String result = doChatWithTools(systemPrompt, userMessage, toolNames, fallback);
+                    log.info("备用模型 {} Agent 调用成功（fallback）", fallback);
+                    return result;
+                } catch (Exception fallbackEx) {
+                    log.error("备用模型 {} Agent 调用也失败: {}", fallback, fallbackEx.getMessage());
+                    throw primaryEx;
+                }
+            }
+            throw primaryEx;
+        }
+    }
+
+    /**
+     * 实际调用 Agent API（可指定模型）
+     */
+    private String doChatWithTools(String systemPrompt, String userMessage, java.util.List<String> toolNames, String model) {
         int estimatedInputTokens = estimateTokens(systemPrompt) + estimateTokens(userMessage);
         aiUsageService.checkQuota(estimatedInputTokens);
         try {
@@ -108,25 +154,24 @@ public class ModelScopeClient {
             }
             messages.add(new UserMessage(java.util.Objects.requireNonNull(userMessage, "userMessage cannot be null")));
 
-            log.info("调用 Agentic API (带有工具), model={}, 工具={}", aiConfig.getModel(), toolNames);
-            
+            log.info("调用 Agentic API (带有工具), model={}, 工具={}", model, toolNames);
+
             OpenAiChatOptions.Builder optionsBuilder = OpenAiChatOptions.builder()
-                    .model(aiConfig.getModel())
+                    .model(model)
                     .maxTokens(aiConfig.getMaxTokens())
                     .temperature(aiConfig.getTemperature());
-            
+
             if (toolNames != null && !toolNames.isEmpty()) {
                 optionsBuilder.toolNames(new java.util.HashSet<>(toolNames));
             }
 
             ChatResponse response = chatModel.call(new Prompt(messages, optionsBuilder.build()));
-            
+
             if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
                 log.warn("AI (带有工具) 返回空响应");
                 throw new RuntimeException("AI 服务返回空响应，请重试");
             }
-            
-            // 工具调用的 Tokens 使用量通常由底层记录
+
             return response.getResult().getOutput().getText();
 
         } catch (Exception e) {
