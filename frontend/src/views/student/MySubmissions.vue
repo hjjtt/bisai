@@ -49,9 +49,17 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="最终得分" width="110" align="right">
+        <el-table-column label="AI得分" width="100" align="right">
           <template #default="{ row }">
-            <span class="score-text">{{ row.totalScore ?? '-' }}</span>
+            <span :class="['score-text', 'score-ai']">{{ row.autoTotalScore ?? '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="最终得分" width="100" align="right">
+          <template #default="{ row }">
+            <span v-if="row.scoreStatus === 'TEACHER_CONFIRMED' || row.scoreStatus === 'PUBLISHED'" class="score-text">
+              {{ row.totalScore ?? '-' }}
+            </span>
+            <span v-else class="score-pending">待确认</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="210" fixed="right" align="right">
@@ -299,6 +307,17 @@ onMounted(loadSubmissions)
   color: #2563eb;
   font-size: 16px;
   font-weight: 700;
+}
+
+.score-ai {
+  color: #6366f1;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.score-pending {
+  color: #9ca3af;
+  font-size: 13px;
 }
 
 .el-pagination {

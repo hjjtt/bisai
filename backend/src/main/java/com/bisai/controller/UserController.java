@@ -19,7 +19,7 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<PageResult<User>> list(PageQuery query,
                                          @RequestParam(required = false) String role) {
         return userService.listUsers(query, role);
