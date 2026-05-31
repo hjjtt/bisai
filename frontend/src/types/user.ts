@@ -26,6 +26,15 @@ export interface LoginRequest {
   captchaCode?: string
 }
 
+// 注册请求
+export interface RegisterRequest {
+  username: string
+  password: string
+  realName: string
+  role: 'STUDENT' | 'TEACHER'
+  classId?: number
+}
+
 // 登录响应
 export interface LoginResponse {
   token: string

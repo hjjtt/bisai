@@ -11,7 +11,7 @@
           <el-tag :type="task.allowResubmit ? 'success' : 'danger'">{{ task.allowResubmit ? '是' : '否' }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag>{{ getTaskStatusLabel(task.status) }}</el-tag>
+          <el-tag :type="getTaskStatusType(task.status, task.endTime)">{{ getTaskStatusLabel(task.status, task.endTime) }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="允许文件类型" :span="2">
           <el-tag v-for="ft in parseFileTypes(task.allowedFileTypes)" :key="ft" size="small" style="margin-right: 4px">{{ ft }}</el-tag>
@@ -33,11 +33,11 @@
         </el-descriptions>
         <div style="margin-top: 16px; text-align: right">
           <el-button v-if="mySubmission.scoreStatus === 'PUBLISHED'" type="success" @click="$router.push(`/student/result/${mySubmission.id}`)">查看评价结果</el-button>
-          <el-button v-if="task?.allowResubmit && task?.status === 'PUBLISHED'" type="warning" @click="$router.push(`/student/submit/${taskId}`)">重新提交</el-button>
+          <el-button v-if="task?.allowResubmit && task?.status === 'PUBLISHED' && (!task?.endTime || new Date(task.endTime).getTime() > Date.now())" type="warning" @click="$router.push(`/student/submit/${taskId}`)">重新提交</el-button>
         </div>
       </div>
 
-      <div style="margin-top: 20px; text-align: right" v-if="task?.status === 'PUBLISHED' && !mySubmission">
+      <div style="margin-top: 20px; text-align: right" v-if="task?.status === 'PUBLISHED' && !mySubmission && (!task?.endTime || new Date(task.endTime).getTime() > Date.now())">
         <el-button type="primary" @click="$router.push(`/student/submit/${taskId}`)">提交成果</el-button>
       </div>
 
@@ -51,7 +51,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getTask, getSubmissions } from '@/api/task'
-import { getTaskStatusLabel, getScoreStatusType, getScoreStatusLabel } from '@/utils/status'
+import { getTaskStatusLabel, getTaskStatusType, getScoreStatusType, getScoreStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
 import { getUserInfo } from '@/utils/auth'
 import type { TrainingTask, Submission } from '@/types'

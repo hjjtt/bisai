@@ -4,7 +4,10 @@
       <template #header>
         <div class="card-header">
           <span>模型配置</span>
-          <el-tag type="success">当前接入: {{ form.model || 'Qwen/Qwen3.5-35B-A3B' }}</el-tag>
+          <div>
+            <el-tag type="success">主模型: {{ form.model || 'Qwen/Qwen3.5-35B-A3B' }}</el-tag>
+            <el-tag type="warning" style="margin-left: 8px">备用: {{ form.fallbackModel || '未配置' }}</el-tag>
+          </div>
         </div>
       </template>
 
@@ -26,6 +29,12 @@
         </el-form-item>
         <el-form-item label="模型名称">
           <el-input v-model="form.model" placeholder="Qwen/Qwen3.5-35B-A3B" />
+        </el-form-item>
+        <el-form-item label="备用模型">
+          <el-input v-model="form.fallbackModel" placeholder="stepfun-ai/Step-3.7-Flash" />
+          <div class="el-form-item__tip" style="color: #909399; font-size: 12px; margin-top: 4px">
+            主模型调用失败时自动切换到此模型重试，留空则不启用备用
+          </div>
         </el-form-item>
         <el-form-item label="超时时间(ms)">
           <el-input-number v-model="form.timeout" :min="5000" :max="120000" :step="5000" />
@@ -63,6 +72,7 @@ interface SystemConfigData {
   textModelApiUrl?: string
   textModelApiKey?: string
   model?: string
+  fallbackModel?: string
   timeout?: string | number
   temperature?: string | number
   maxTokens?: string | number
@@ -76,6 +86,7 @@ const form = reactive({
   textModelApiUrl: 'https://api-inference.modelscope.cn/v1',
   textModelApiKey: '',
   model: 'Qwen/Qwen3.5-35B-A3B',
+  fallbackModel: 'stepfun-ai/Step-3.7-Flash',
   timeout: 30000,
   temperature: 0.3,
   maxTokens: 4096,
@@ -89,6 +100,7 @@ async function loadConfig() {
     if (data.textModelApiUrl) form.textModelApiUrl = data.textModelApiUrl
     if (data.textModelApiKey) form.textModelApiKey = data.textModelApiKey
     if (data.model) form.model = data.model
+    if (data.fallbackModel) form.fallbackModel = data.fallbackModel
     if (data.timeout) form.timeout = Number(data.timeout)
     if (data.temperature !== undefined) form.temperature = Number(data.temperature)
     if (data.maxTokens) form.maxTokens = Number(data.maxTokens)
@@ -123,6 +135,7 @@ async function handleSave() {
       textModelApiUrl: form.textModelApiUrl,
       textModelApiKey: form.textModelApiKey,
       model: form.model || 'Qwen/Qwen3.5-35B-A3B',
+      fallbackModel: form.fallbackModel || '',
       timeout: String(form.timeout),
       temperature: String(form.temperature),
       maxTokens: String(form.maxTokens),

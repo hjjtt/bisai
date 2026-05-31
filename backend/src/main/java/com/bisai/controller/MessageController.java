@@ -7,7 +7,10 @@ import com.bisai.entity.Message;
 import com.bisai.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Collection;
 
 @RestController
 @RequestMapping("/api/messages")
@@ -22,7 +25,10 @@ public class MessageController {
                                              @RequestParam(required = false) Boolean isRead,
                                              Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        return messageService.listMessages(userId, query, type, isRead);
+        // 管理员可查看所有消息，其他角色只看自己的
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        return messageService.listMessages(isAdmin ? null : userId, query, type, isRead);
     }
 
     @GetMapping("/unread-count")

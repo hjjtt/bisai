@@ -74,6 +74,7 @@ ai:
   base-url: https://api-inference.modelscope.cn/v1
   api-key: ${AI_API_KEY:ms-c3d32764-83c2-4362-8d70-83feeda30596}
   model: Qwen/Qwen3.5-35B-A3B
+  fallback-model: stepfun-ai/Step-3.7-Flash
   embedding-model: damo/nlp_corom_sentence-embedding_chinese-base
   vision-model: Qwen/Qwen3.5-35B-A3B
   max-tokens: 2048

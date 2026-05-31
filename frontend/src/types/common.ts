@@ -40,7 +40,7 @@ export type CheckStatus = 'NOT_CHECKED' | 'CHECKING' | 'SUCCESS' | 'CHECK_FAILED
 export type AsyncTaskStatus = 'PENDING' | 'RUNNING' | 'RETRYING' | 'SUCCESS' | 'FAILED' | 'CANCELLED'
 
 // 消息类型（与后端 Message.type 一致，参考 utils/status.ts 中的映射）
-export type MessageType = 'SUBMISSION' | 'AI_PARSE' | 'AI_CHECK' | 'AI_SCORE' | 'SCORE_PUBLISHED' | 'SCORE_CORRECTED'
+export type MessageType = 'SUBMISSION' | 'AI_PARSE' | 'AI_CHECK' | 'AI_SCORE' | 'SCORE_PUBLISHED' | 'SCORE_CORRECTED' | 'SUBMISSION_RETURNED' | 'AI_CHECK_REDFLAG' | 'AI_SCORE_AGENT'
 
 // 批量任务进度
 export interface BatchProgress {

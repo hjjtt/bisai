@@ -38,6 +38,7 @@
           </div>
         </template>
         <el-steps :active="activeAiStep" finish-status="success" process-status="process" simple style="margin-bottom: 16px">
+          <el-step title="门禁" :status="getStepStatus('PRECHECK')" />
           <el-step title="解析" :status="getStepStatus('PARSE')" />
           <el-step title="核查" :status="getStepStatus('CHECK')" />
           <el-step title="评分" :status="getStepStatus('SCORE')" />
@@ -196,6 +197,15 @@ function startProgressPolling() {
       if (tasksRes.data.length === 0) return
       aiTasks.value = tasksRes.data
 
+      // 检查提交级别的终态：门禁退回、红线熔断等
+      const submissionTerminal = checkSubmissionTerminal(latestSubmission)
+      if (submissionTerminal) {
+        clearInterval(progressTimer!)
+        progressTimer = null
+        loadSubmissions()
+        return
+      }
+
       const currentTask = getCurrentAiTask(tasksRes.data)
       if (!currentTask) return
 
@@ -203,23 +213,27 @@ function startProgressPolling() {
       aiTaskCurrentStep.value = `${getTaskTypeLabel(currentTask.taskType)}：${currentTask.currentStep || getAsyncTaskStatusLabel(currentTask.status)}`
       aiTaskStatus.value = currentTask.status || ''
 
+      // 检查是否有失败任务
       const failedTask = tasksRes.data.find(task => task.status === 'FAILED' || task.status === 'CANCELLED')
-      const scoreTask = findLatestTask(tasksRes.data, 'SCORE')
-      // 如果链路完成或失败，停止轮询
-      if ((scoreTask && scoreTask.status === 'SUCCESS') || failedTask) {
+      if (failedTask) {
         clearInterval(progressTimer!)
         progressTimer = null
-        if (scoreTask && scoreTask.status === 'SUCCESS') {
-          aiTaskProgress.value = 100
-          aiTaskStatus.value = 'SUCCESS'
-          aiTaskCurrentStep.value = '评分：AI 处理完成，等待教师复核'
-          ElMessage.success('AI 处理完成！')
-        } else {
-          aiTaskStatus.value = failedTask?.status || 'FAILED'
-          aiTaskCurrentStep.value = `${getTaskTypeLabel(failedTask?.taskType || '')}：${failedTask?.currentStep || failedTask?.errorMessage || '处理失败'}`
-          ElMessage.error('AI 处理失败: ' + (failedTask?.currentStep || failedTask?.errorMessage || '请联系教师处理'))
-        }
-        // 刷新提交列表
+        aiTaskStatus.value = failedTask.status || 'FAILED'
+        aiTaskCurrentStep.value = `${getTaskTypeLabel(failedTask.taskType || '')}：${failedTask.currentStep || failedTask.errorMessage || '处理失败'}`
+        ElMessage.error('AI 处理失败: ' + (failedTask.currentStep || failedTask.errorMessage || '请联系教师处理'))
+        loadSubmissions()
+        return
+      }
+
+      // 检查评分任务（SCORE 或 SCORE_AGENT）是否完成
+      const scoreTask = findLatestTask(tasksRes.data, 'SCORE') || findLatestTask(tasksRes.data, 'SCORE_AGENT')
+      if (scoreTask && scoreTask.status === 'SUCCESS') {
+        clearInterval(progressTimer!)
+        progressTimer = null
+        aiTaskProgress.value = 100
+        aiTaskStatus.value = 'SUCCESS'
+        aiTaskCurrentStep.value = '评分：AI 处理完成，等待教师复核'
+        ElMessage.success('AI 处理完成！')
         loadSubmissions()
       }
     } catch (e) {
@@ -229,7 +243,40 @@ function startProgressPolling() {
   }, 2000) // 每 2 秒查询一次
 }
 
+/**
+ * 检查提交级别是否已到达终态（无需继续轮询）
+ * - 门禁退回：scoreStatus=RETURNED
+ * - 红线熔断 / 评分完成：scoreStatus=AI_SCORED（且没有运行中的任务）
+ */
+function checkSubmissionTerminal(submission: Submission): boolean {
+  const scoreStatus = submission.scoreStatus
+  // 门禁退回
+  if (scoreStatus === 'RETURNED') {
+    aiTaskProgress.value = 100
+    aiTaskStatus.value = 'FAILED'
+    aiTaskCurrentStep.value = '门禁：未通过校验，提交已退回'
+    ElMessage.warning('门禁未通过，提交已退回，请修改后重新提交')
+    return true
+  }
+  // AI 评分完成（含红线熔断）
+  if (scoreStatus === 'AI_SCORED') {
+    const hasRunning = aiTasks.value.some(t => ['PENDING', 'RUNNING', 'RETRYING'].includes(t.status))
+    if (!hasRunning) {
+      aiTaskProgress.value = 100
+      aiTaskStatus.value = 'SUCCESS'
+      aiTaskCurrentStep.value = 'AI 处理完成'
+      ElMessage.success('AI 处理完成！')
+      return true
+    }
+  }
+  return false
+}
+
 function findLatestTask(tasks: AsyncTask[], taskType: string) {
+  // 同时匹配 SCORE 和 SCORE_AGENT
+  if (taskType === 'SCORE') {
+    return tasks.find(task => task.taskType === 'SCORE' || task.taskType === 'SCORE_AGENT')
+  }
   return tasks.find(task => task.taskType === taskType)
 }
 
@@ -238,17 +285,20 @@ function getCurrentAiTask(tasks: AsyncTask[]) {
     || findLatestTask(tasks, 'SCORE')
     || findLatestTask(tasks, 'CHECK')
     || findLatestTask(tasks, 'PARSE')
+    || findLatestTask(tasks, 'PRECHECK')
 }
 
 function getTaskTypeLabel(taskType: string) {
-  const map: Record<string, string> = { PARSE: '解析', CHECK: '核查', SCORE: '评分' }
+  const map: Record<string, string> = {
+    PRECHECK: '门禁', PARSE: '解析', CHECK: '核查', SCORE: '评分', SCORE_AGENT: '评分',
+  }
   return map[taskType] || '处理'
 }
 
 const activeAiStep = computed(() => {
   const current = getCurrentAiTask(aiTasks.value)
   if (!current) return 0
-  const map: Record<string, number> = { PARSE: 0, CHECK: 1, SCORE: 2 }
+  const map: Record<string, number> = { PRECHECK: 0, PARSE: 1, CHECK: 2, SCORE: 3, SCORE_AGENT: 3 }
   return map[current.taskType] ?? 0
 })
 
