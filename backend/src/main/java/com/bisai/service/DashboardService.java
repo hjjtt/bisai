@@ -28,10 +28,23 @@ public class DashboardService {
     public DashboardStats.StudentStats getStudentStats(Long userId) {
         DashboardStats.StudentStats stats = new DashboardStats.StudentStats();
 
-        // 进行中的任务数
-        Long ongoingTasks = taskMapper.selectCount(
-                new LambdaQueryWrapper<TrainingTask>().eq(TrainingTask::getStatus, "PUBLISHED")
-        );
+        // 获取学生所在班级的课程列表，用于过滤任务（与 TaskService.listTasks 保持一致）
+        List<Long> classCourseIds = null;
+        User student = userMapper.selectById(userId);
+        if (student != null && student.getClassId() != null) {
+            classCourseIds = courseMapper.selectList(
+                    new LambdaQueryWrapper<Course>().eq(Course::getClassId, student.getClassId())
+            ).stream().map(Course::getId).collect(Collectors.toList());
+        }
+        boolean hasCourses = classCourseIds != null && !classCourseIds.isEmpty();
+
+        // 进行中的任务数（仅统计班级关联课程下的任务）
+        LambdaQueryWrapper<TrainingTask> publishedWrapper = new LambdaQueryWrapper<TrainingTask>()
+                .eq(TrainingTask::getStatus, "PUBLISHED");
+        if (hasCourses) {
+            publishedWrapper.in(TrainingTask::getCourseId, classCourseIds);
+        }
+        Long ongoingTasks = taskMapper.selectCount(publishedWrapper);
         stats.setOngoingTasks(ongoingTasks);
 
         // 已提交数
@@ -57,13 +70,14 @@ public class DashboardService {
         );
         stats.setUnreadMessages(unreadMessages);
 
-        // 近期任务（已发布的）
-        List<TrainingTask> tasks = taskMapper.selectList(
-                new LambdaQueryWrapper<TrainingTask>()
-                        .eq(TrainingTask::getStatus, "PUBLISHED")
-                        .orderByDesc(TrainingTask::getEndTime)
-                        .last("LIMIT 10")
-        );
+        // 近期任务（仅班级关联课程下已发布的）
+        LambdaQueryWrapper<TrainingTask> recentWrapper = new LambdaQueryWrapper<TrainingTask>()
+                .eq(TrainingTask::getStatus, "PUBLISHED");
+        if (hasCourses) {
+            recentWrapper.in(TrainingTask::getCourseId, classCourseIds);
+        }
+        recentWrapper.orderByDesc(TrainingTask::getEndTime).last("LIMIT 10");
+        List<TrainingTask> tasks = taskMapper.selectList(recentWrapper);
 
         // 批量查询课程名称，避免 N+1 查询
         Set<Long> courseIds = tasks.stream()
