@@ -6,6 +6,7 @@ export interface SystemConfigMap {
   textModelApiUrl?: string
   textModelApiKey?: string
   model?: string
+  fallbackModel?: string
   maxTokens?: string
   temperature?: string
   timeout?: string

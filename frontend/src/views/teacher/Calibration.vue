@@ -141,6 +141,12 @@ async function loadTasks() {
   try {
     const res = await getTaskList({ size: 100 })
     tasks.value = res.data.items
+    // 默认选中第一个任务（最新）
+    if (tasks.value.length > 0) {
+      selectedTaskId.value = tasks.value[0].id
+      await loadCalibrations()
+      await loadSubmissions()
+    }
   } catch {
   }
 }

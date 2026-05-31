@@ -11,6 +11,8 @@ public class AiConfig {
     private String baseUrl = "https://api-inference.modelscope.cn/v1";
     private String apiKey;
     private String model = "Qwen/Qwen3.5-35B-A3B";
+    /** 备用模型：主模型调用失败时自动切换 */
+    private String fallbackModel = "stepfun-ai/Step-3.7-Flash";
     private String embeddingModel = "damo/nlp_corom_sentence-embedding_chinese-base";
     private String visionModel = "Qwen/Qwen3.5-35B-A3B";
     private int maxTokens = 4096;

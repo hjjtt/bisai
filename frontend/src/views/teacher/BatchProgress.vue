@@ -40,7 +40,7 @@
 
       <el-progress
         v-if="progress"
-        :percentage="progress.total > 0 ? Math.round(((progress.success + progress.failed) / progress.total) * 100) : 0"
+        :percentage="progress.total ? Math.min(100, Math.round(((progress.success || 0) + (progress.failed || 0)) / progress.total * 100)) : 0"
         style="margin-top: 20px"
       />
 
@@ -81,8 +81,11 @@
               <span v-else style="color: #c0c4cc">-</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="200" fixed="right" align="center">
+          <el-table-column label="操作" width="260" fixed="right" align="center">
             <template #default="{ row }">
+              <el-button size="small" @click="router.push(`/teacher/submissions/${row.id}/score`)">
+                详情
+              </el-button>
               <el-button
                 v-if="row.parseStatus === 'FAILED'"
                 type="warning"
@@ -126,12 +129,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Loading, Refresh } from '@element-plus/icons-vue'
 import { getTaskList, getBatchProgress, batchParse, batchScore, getSubmissions, startParse, startScore, getAsyncTasksByBizId, cancelAsyncTask } from '@/api/task'
 import type { TrainingTask, BatchProgress, Submission, AsyncTask } from '@/types'
 import { getParseStatusType, getParseStatusLabel, getScoreStatusType, getScoreStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
+
+const router = useRouter()
 
 const tasks = ref<TrainingTask[]>([])
 const selectedTaskId = ref<number>()
@@ -150,6 +156,11 @@ async function loadTasks() {
   try {
     const res = await getTaskList({ size: 100 })
     tasks.value = res.data.items
+    // 默认选中第一个任务（最新）
+    if (tasks.value.length > 0) {
+      selectedTaskId.value = tasks.value[0].id
+      await loadProgress()
+    }
   } catch (e) {
     console.error('[BatchProgress] 加载任务列表失败:', e)
   }

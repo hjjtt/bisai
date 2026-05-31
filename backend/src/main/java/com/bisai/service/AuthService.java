@@ -2,6 +2,7 @@ package com.bisai.service;
 
 import com.bisai.common.Result;
 import com.bisai.dto.LoginRequest;
+import com.bisai.dto.RegisterRequest;
 import com.bisai.entity.User;
 import com.bisai.mapper.UserMapper;
 import com.bisai.util.JwtUtil;
@@ -141,4 +142,46 @@ public class AuthService {
 
     private static final int MAX_FAILURES = 5;
     private static final int LOCK_DURATION_MINUTES = 15;
+
+    /**
+     * 用户注册
+     */
+    public Result<Void> register(RegisterRequest request) {
+        // 角色校验：只允许注册学生或教师
+        String role = request.getRole();
+        if (!"STUDENT".equals(role) && !"TEACHER".equals(role)) {
+            return Result.error(40004, "注册仅支持学生或教师角色");
+        }
+
+        // 学生必须选择班级
+        if ("STUDENT".equals(role) && request.getClassId() == null) {
+            return Result.error(40005, "学生请选择所属班级");
+        }
+
+        // 用户名唯一性
+        User existing = userMapper.selectOne(
+                new LambdaQueryWrapper<User>().eq(User::getUsername, request.getUsername())
+        );
+        if (existing != null) {
+            return Result.error(40006, "用户名已存在");
+        }
+
+        // 密码复杂度
+        if (!validatePassword(request.getPassword())) {
+            return Result.error(40002, "密码必须包含字母和数字，且长度至少8位");
+        }
+
+        // 创建用户
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setRealName(request.getRealName());
+        user.setRole(role);
+        user.setClassId("STUDENT".equals(role) ? request.getClassId() : null);
+        user.setStatus("ENABLED");
+        user.setMustChangePassword(false);
+        userMapper.insert(user);
+
+        return Result.ok();
+    }
 }
