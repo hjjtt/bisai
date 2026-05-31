@@ -56,6 +56,7 @@ logging:
     com.bisai.controller: info
     "[org.apache.fontbox]": error
     "[org.apache.pdfbox.pdmodel.font.FileSystemFontProvider]": error
+    "[org.apache.poi.hwpf.converter]": error
 
 # 文件存储
 file:

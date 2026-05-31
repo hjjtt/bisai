@@ -36,6 +36,15 @@ public class CourseService {
         if ("TEACHER".equals(role)) {
             wrapper.eq(Course::getTeacherId, userId);
         }
+        // 学生只能看到自己班级的课程
+        if ("STUDENT".equals(role)) {
+            User student = userMapper.selectById(userId);
+            if (student != null && student.getClassId() != null) {
+                wrapper.eq(Course::getClassId, student.getClassId());
+            } else {
+                wrapper.eq(Course::getId, -1L); // 无班级则返回空
+            }
+        }
 
         if (query.getKeyword() != null && !query.getKeyword().isEmpty()) {
             wrapper.like(Course::getName, query.getKeyword());

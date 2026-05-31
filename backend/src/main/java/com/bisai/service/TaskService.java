@@ -7,11 +7,13 @@ import com.bisai.entity.AsyncTask;
 import com.bisai.entity.Course;
 import com.bisai.entity.Submission;
 import com.bisai.entity.TrainingTask;
+import com.bisai.entity.User;
 import com.bisai.mapper.AsyncTaskMapper;
 import com.bisai.mapper.CourseMapper;
 import com.bisai.mapper.EvaluationTemplateMapper;
 import com.bisai.mapper.SubmissionMapper;
 import com.bisai.mapper.TrainingTaskMapper;
+import com.bisai.mapper.UserMapper;
 import com.bisai.entity.EvaluationTemplate;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -41,6 +43,7 @@ public class TaskService {
     private final PermissionService permissionService;
     private final CourseMapper courseMapper;
     private final EvaluationTemplateMapper evaluationTemplateMapper;
+    private final UserMapper userMapper;
 
     private static final Map<Long, BatchJob> activeJobs = new ConcurrentHashMap<>();
 
@@ -59,9 +62,20 @@ public class TaskService {
                 wrapper.in(TrainingTask::getCourseId, courseIds);
             }
         }
-        // 学生只能看已发布的任务
+        // 学生只能看自己班级对应课程下已发布的任务
         if ("STUDENT".equals(role)) {
             wrapper.eq(TrainingTask::getStatus, "PUBLISHED");
+            User student = userMapper.selectById(userId);
+            if (student != null && student.getClassId() != null) {
+                List<Long> classCourseIds = courseMapper.selectList(
+                        new LambdaQueryWrapper<Course>().eq(Course::getClassId, student.getClassId())
+                ).stream().map(Course::getId).collect(Collectors.toList());
+                if (classCourseIds.isEmpty()) {
+                    wrapper.eq(TrainingTask::getCourseId, -1L); // 无课程则返回空
+                } else {
+                    wrapper.in(TrainingTask::getCourseId, classCourseIds);
+                }
+            }
         }
 
         if (courseId != null) {

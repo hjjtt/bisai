@@ -151,6 +151,18 @@ export const teacherRoutes: RouteRecordRaw[] = [
         meta: { title: '评价模板', icon: 'Stamp' },
       },
       {
+        path: 'classes',
+        name: 'TeacherClasses',
+        component: () => import('@/views/teacher/ClassManage.vue'),
+        meta: { title: '班级管理', icon: 'School' },
+      },
+      {
+        path: 'courses',
+        name: 'TeacherCourses',
+        component: () => import('@/views/teacher/CourseManage.vue'),
+        meta: { title: '课程管理', icon: 'Reading' },
+      },
+      {
         path: 'messages',
         name: 'TeacherMessages',
         component: () => import('@/views/common/Messages.vue'),
@@ -182,8 +194,14 @@ export const adminRoutes: RouteRecordRaw[] = [
       {
         path: 'classes',
         name: 'AdminClasses',
-        component: () => import('@/views/admin/Classes.vue'),
-        meta: { title: '班级课程', icon: 'School' },
+        component: () => import('@/views/teacher/ClassManage.vue'),
+        meta: { title: '班级管理', icon: 'School' },
+      },
+      {
+        path: 'courses',
+        name: 'AdminCourses',
+        component: () => import('@/views/teacher/CourseManage.vue'),
+        meta: { title: '课程管理', icon: 'Reading' },
       },
       {
         path: 'knowledge',

@@ -17,19 +17,19 @@ public class ClassController {
     private final ClassService classService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<PageResult<ClassEntity>> list(PageQuery query) {
         return classService.listClasses(query);
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<ClassEntity> create(@RequestBody ClassEntity entity) {
         return classService.createClass(entity);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<ClassEntity> update(@PathVariable Long id, @RequestBody ClassEntity entity) {
         return classService.updateClass(id, entity);
     }
