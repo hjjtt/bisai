@@ -2,9 +2,15 @@
   <div class="student-result">
     <el-page-header @back="$router.back()" title="返回" content="评价结果" />
     <el-card style="margin-top: 16px" v-loading="loading">
-      <template v-if="hasActualScores">
-        <!-- 总分 -->
+      <template v-if="hasActualScores || submission?.autoTotalScore != null">
+        <!-- AI 得分 -->
         <div class="score-summary">
+          <span class="score-label">AI 智能评分</span>
+          <span class="score-value score-ai">{{ submission?.autoTotalScore ?? '--' }}</span>
+        </div>
+
+        <!-- 最终得分（教师确认后） -->
+        <div v-if="submission?.scoreStatus === 'TEACHER_CONFIRMED' || submission?.scoreStatus === 'PUBLISHED'" class="score-summary" style="margin-top: 12px">
           <span class="score-label">最终得分</span>
           <span class="score-value">{{ submission?.totalScore ?? '--' }}</span>
         </div>
@@ -12,7 +18,8 @@
         <!-- 各项得分 -->
         <el-table :data="scores" stripe style="margin-top: 20px">
           <el-table-column prop="indicatorName" label="评价指标" />
-          <el-table-column prop="finalScore" label="得分" width="100" />
+          <el-table-column prop="autoScore" label="AI评分" width="100" />
+          <el-table-column v-if="showTeacherScore" prop="teacherScore" label="教师评分" width="100" />
           <el-table-column prop="reason" label="评分理由" min-width="200" />
         </el-table>
       </template>
@@ -57,6 +64,11 @@ const submissionId = computed(() => Number(route.params.submissionId) || 0)
 // 是否有实际评分（至少一条记录有分数）
 const hasActualScores = computed(() =>
   scores.value.some(s => s.finalScore != null || s.autoScore != null || s.teacherScore != null)
+)
+
+// 是否显示教师评分列
+const showTeacherScore = computed(() =>
+  submission.value?.scoreStatus === 'TEACHER_CONFIRMED' || submission.value?.scoreStatus === 'PUBLISHED'
 )
 
 async function loadData() {
@@ -104,6 +116,11 @@ onMounted(loadData)
     font-size: 48px;
     font-weight: bold;
     color: #409eff;
+
+    &.score-ai {
+      color: #6366f1;
+      font-size: 40px;
+    }
   }
 }
 
