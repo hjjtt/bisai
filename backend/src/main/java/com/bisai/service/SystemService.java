@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,22 @@ public class SystemService {
     private final AiConfig aiConfig;
     private final ModelScopeClient modelScopeClient;
 
+    /**
+     * 启动时从数据库加载 AI 配置到 AiConfig Bean
+     */
+    @PostConstruct
+    public void loadAiConfigOnStartup() {
+        Map<String, String> dbConfig = new HashMap<>();
+        configMapper.selectList(new LambdaQueryWrapper<SystemConfig>()
+                .like(SystemConfig::getConfigKey, "ai."))
+                .forEach(c -> dbConfig.put(c.getConfigKey(), c.getConfigValue()));
+        if (!dbConfig.isEmpty()) {
+            refreshAiConfig(dbConfig);
+            log.info("从数据库加载 AI 配置: model={}, fallback={}",
+                    aiConfig.getModel(), aiConfig.getFallbackModels());
+        }
+    }
+
     private static final Set<String> ALLOWED_CONFIG_KEYS = Set.of(
             "ai.api-key", "ai.chat-model", "ai.fallback-model", "ai.embedding-model", "ai.rerank-model",
             "ai.api-url", "ai.max-tokens", "ai.daily-token-limit", "ai.daily-call-limit",
@@ -34,7 +51,7 @@ public class SystemService {
             "textModelApiUrl", "ai.api-url",
             "textModelApiKey", "ai.api-key",
             "model", "ai.chat-model",
-            "fallbackModel", "ai.fallback-model",
+            "fallbackModels", "ai.fallback-model",
             "maxTokens", "ai.max-tokens",
             "temperature", "ai.temperature",
             "timeout", "ai.timeout"
@@ -45,7 +62,7 @@ public class SystemService {
             "ai.api-url", "textModelApiUrl",
             "ai.api-key", "textModelApiKey",
             "ai.chat-model", "model",
-            "ai.fallback-model", "fallbackModel",
+            "ai.fallback-model", "fallbackModels",
             "ai.max-tokens", "maxTokens",
             "ai.temperature", "temperature",
             "ai.timeout", "timeout"
@@ -104,7 +121,7 @@ public class SystemService {
         updates.forEach((dbKey, value) -> {
             switch (dbKey) {
                 case "ai.chat-model" -> aiConfig.setModel(value);
-                case "ai.fallback-model" -> aiConfig.setFallbackModel(value);
+                case "ai.fallback-model" -> aiConfig.setFallbackModels(value);
                 case "ai.api-url" -> aiConfig.setBaseUrl(value);
                 case "ai.api-key" -> aiConfig.setApiKey(value);
                 case "ai.max-tokens" -> aiConfig.setMaxTokens(Integer.parseInt(value));

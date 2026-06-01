@@ -287,7 +287,9 @@ public class ScoreService {
 
         // 并发冲突检查：传入的 updatedAt 与数据库不一致说明数据已被其他人修改
         if (expectedUpdatedAt != null && !expectedUpdatedAt.isEmpty() && submission.getUpdatedAt() != null) {
-            if (!submission.getUpdatedAt().toString().equals(expectedUpdatedAt)) {
+            // LocalDateTime.toString() 输出 ISO-8601（带T），前端传的是 yyyy-MM-dd HH:mm:ss（带空格），需统一格式比较
+            String dbUpdatedAt = submission.getUpdatedAt().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            if (!dbUpdatedAt.equals(expectedUpdatedAt)) {
                 return Result.error(40902, "数据已被其他人修改，请刷新页面后重新操作");
             }
         }

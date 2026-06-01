@@ -43,7 +43,7 @@
           <el-step title="核查" :status="getStepStatus('CHECK')" />
           <el-step title="评分" :status="getStepStatus('SCORE')" />
         </el-steps>
-        <el-progress :percentage="aiTaskProgress" :status="aiTaskProgress === 100 ? 'success' : undefined" :stroke-width="16" />
+        <el-progress :percentage="overallProgress" :status="overallProgress === 100 ? 'success' : undefined" :stroke-width="16" />
         <p style="margin-top: 8px; color: #666; font-size: 14px">{{ aiTaskCurrentStep }}</p>
       </el-card>
 
@@ -300,6 +300,26 @@ const activeAiStep = computed(() => {
   if (!current) return 0
   const map: Record<string, number> = { PRECHECK: 0, PARSE: 1, CHECK: 2, SCORE: 3, SCORE_AGENT: 3 }
   return map[current.taskType] ?? 0
+})
+
+// 总体进度：4 个阶段各占 25%，已完成的阶段满额，当前阶段按比例
+const overallProgress = computed(() => {
+  const STAGE_WEIGHT = 25
+  const stages = ['PRECHECK', 'PARSE', 'CHECK', 'SCORE']
+  let total = 0
+  for (const stage of stages) {
+    const task = findLatestTask(aiTasks.value, stage)
+    if (!task) break
+    if (task.status === 'SUCCESS') {
+      total += STAGE_WEIGHT
+    } else if (['RUNNING', 'RETRYING', 'PENDING'].includes(task.status)) {
+      total += Math.round((task.progress || 0) * STAGE_WEIGHT / 100)
+      break // 当前阶段之后的不计入
+    } else {
+      break
+    }
+  }
+  return Math.min(100, total)
 })
 
 function getStepStatus(taskType: string) {

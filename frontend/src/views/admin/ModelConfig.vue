@@ -6,7 +6,7 @@
           <span>模型配置</span>
           <div>
             <el-tag type="success">主模型: {{ form.model || 'Qwen/Qwen3.5-35B-A3B' }}</el-tag>
-            <el-tag type="warning" style="margin-left: 8px">备用: {{ form.fallbackModel || '未配置' }}</el-tag>
+            <el-tag type="warning" style="margin-left: 8px">备用: {{ form.fallbackModelss || '未配置' }}</el-tag>
           </div>
         </div>
       </template>
@@ -31,9 +31,9 @@
           <el-input v-model="form.model" placeholder="Qwen/Qwen3.5-35B-A3B" />
         </el-form-item>
         <el-form-item label="备用模型">
-          <el-input v-model="form.fallbackModel" placeholder="stepfun-ai/Step-3.7-Flash" />
+          <el-input v-model="form.fallbackModels" placeholder="stepfun-ai/Step-3.7-Flash,XiaomiMiMo/MiMo-V2-Flash:xiaomi" />
           <div class="el-form-item__tip" style="color: #909399; font-size: 12px; margin-top: 4px">
-            主模型调用失败时自动切换到此模型重试，留空则不启用备用
+            多个备用模型用逗号分隔，按顺序尝试。配额耗尽自动跳过，留空则不启用备用
           </div>
         </el-form-item>
         <el-form-item label="超时时间(ms)">
@@ -72,7 +72,7 @@ interface SystemConfigData {
   textModelApiUrl?: string
   textModelApiKey?: string
   model?: string
-  fallbackModel?: string
+  fallbackModels?: string
   timeout?: string | number
   temperature?: string | number
   maxTokens?: string | number
@@ -86,7 +86,7 @@ const form = reactive({
   textModelApiUrl: 'https://api-inference.modelscope.cn/v1',
   textModelApiKey: '',
   model: 'Qwen/Qwen3.5-35B-A3B',
-  fallbackModel: 'stepfun-ai/Step-3.7-Flash',
+  fallbackModels: 'stepfun-ai/Step-3.7-Flash',
   timeout: 30000,
   temperature: 0.3,
   maxTokens: 4096,
@@ -100,7 +100,7 @@ async function loadConfig() {
     if (data.textModelApiUrl) form.textModelApiUrl = data.textModelApiUrl
     if (data.textModelApiKey) form.textModelApiKey = data.textModelApiKey
     if (data.model) form.model = data.model
-    if (data.fallbackModel) form.fallbackModel = data.fallbackModel
+    if (data.fallbackModels) form.fallbackModels = data.fallbackModels
     if (data.timeout) form.timeout = Number(data.timeout)
     if (data.temperature !== undefined) form.temperature = Number(data.temperature)
     if (data.maxTokens) form.maxTokens = Number(data.maxTokens)
@@ -135,7 +135,7 @@ async function handleSave() {
       textModelApiUrl: form.textModelApiUrl,
       textModelApiKey: form.textModelApiKey,
       model: form.model || 'Qwen/Qwen3.5-35B-A3B',
-      fallbackModel: form.fallbackModel || '',
+      fallbackModels: form.fallbackModels || '',
       timeout: String(form.timeout),
       temperature: String(form.temperature),
       maxTokens: String(form.maxTokens),

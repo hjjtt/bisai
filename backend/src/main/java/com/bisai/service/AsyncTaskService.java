@@ -172,6 +172,10 @@ public class AsyncTaskService {
             // 检查批量任务是否完成
             checkBatchJobCompletion(fresh.getBizId());
 
+        } catch (RateLimitException e) {
+            // AI 配额超限：友好提示，不重试（重试也不会成功）
+            log.warn("AI 配额超限，任务暂停: id={}, type={}", fresh.getId(), fresh.getTaskType());
+            handleTaskFailure(fresh, "今日 AI 调用额度已用完，请明天再试");
         } catch (Exception e) {
             log.error("异步任务执行失败: id={}, type={}, error={}", fresh.getId(), fresh.getTaskType(), e.getMessage());
             handleTaskFailure(fresh, e.getMessage());
