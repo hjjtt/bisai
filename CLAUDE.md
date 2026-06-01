@@ -42,14 +42,14 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 - **后端**: Spring Boot 3.4.3 + Spring Security (JWT) + MyBatis-Plus 3.5.9 + Spring AI (ModelScope)
 - **前端**: Vue 3 + TypeScript + Vite 8 + Element Plus + Pinia + ECharts + Axios
 - **文档解析**: PDFBox 3.0.3, POI 5.3.0, docx4j 11.4.11, iText 8.0.4
-- **AI**: ModelScope 平台，默认 Qwen3.5-35B-A3B，管理后台可动态切换任意模型，支持 RAG 知识库检索增强
+- **AI**: ModelScope 平台，主模型 stepfun-ai/Step-3.7-Flash，备用链（逗号分隔）自动切换，支持 RAG 知识库检索增强
 
 ### 后端包结构 (`com.bisai`)
 - `controller/` — REST API（16个），使用 `@PreAuthorize` 做角色控制
-- `service/` — 业务逻辑层，核心：`AiService`（解析/核查/评分）、`KnowledgeService`（知识库管理）、`ScoreService`（评分流程）、`ModelScopeClient`（AI调用封装）
+- `service/` — 业务逻辑层，核心：`AiService`（解析/核查/混合评分）、`KnowledgeService`（知识库管理）、`ScoreService`（评分流程）、`ModelScopeClient`（AI调用封装，多模型备用链）
 - `entity/` — MyBatis-Plus 实体，核心业务表已启用 `@TableLogic` 逻辑删除
 - `mapper/` — MyBatis-Plus Mapper 接口
-- `config/` — `SecurityConfig`（CORS/JWT/权限）、`AsyncConfig`（AI任务线程池）、`JacksonConfig`（LocalDateTime 全局格式化）、`AiConfig`（AI模型参数，支持运行时刷新）
+- `config/` — `SecurityConfig`（CORS/JWT/权限）、`AsyncConfig`（AI任务线程池）、`JacksonConfig`（LocalDateTime 全局格式化）、`AiConfig`（AI模型参数，`fallbackModels` 多备用链，支持运行时刷新）
 - 工具库：Hutool 5.8（通用工具）、EasyExcel 3.3（Excel 导入导出）、JFreeChart 1.5（可视化报表图表）、Lombok（实体类注解）
 
 ### 前端结构
@@ -67,13 +67,26 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 - 前端路由级：`meta.roles` 控制页面访问
 
 ### 系统配置管理
-- `SystemService` 维护 `FRONTEND_TO_DB_KEY` / `DB_TO_FRONTEND_KEY` 映射表，解决前端字段名（如 `model`）与数据库 key（如 `ai.chat-model`）不一致的问题
+- `SystemService` 维护 `FRONTEND_TO_DB_KEY` / `DB_TO_FRONTEND_KEY` 映射表，解决前端字段名（如 `model`、`fallbackModels`）与数据库 key（如 `ai.chat-model`、`ai.fallback-model`）不一致的问题
+- `@PostConstruct loadAiConfigOnStartup()` 启动时从数据库加载 AI 配置到 `AiConfig` Bean
 - `updateConfig()` 保存到数据库后调用 `refreshAiConfig()` 刷新 `AiConfig` Bean，使模型参数变更立即生效，无需重启
 - `JacksonConfig` 全局配置 `LocalDateTime` 序列化/反序列化格式为 `yyyy-MM-dd HH:mm:ss`，所有实体自动生效
 - 前端日期选择器 `value-format="YYYY-MM-DD HH:mm:ss"` 与后端格式匹配
 
 ### 异步任务
-`AsyncTaskService` 用 `@Scheduled(fixedDelay=5000)` 数据库轮询（非消息队列），处理 PARSE/CHECK/SCORE 任务，最多重试 3 次（递增延迟），僵尸任务 10 分钟自动清理。`TaskService` 管理批量操作并发控制。
+`AsyncTaskService` 用 `@Scheduled(fixedDelay=5000)` 数据库轮询（非消息队列），处理 PRECHECK/PARSE/CHECK/SCORE 任务，最多重试 3 次（递增延迟），僵尸任务 10 分钟自动清理。`TaskService` 管理批量操作并发控制。
+
+### AI 模型管理
+- `AiConfig.fallbackModels` 支持逗号分隔的多备用模型链，主模型配额耗尽（429）时自动跳过，直接使用下一个模型
+- `ModelScopeClient` 内置 `quotaExhausted` 追踪表，记录今日配额已耗尽的模型，第二天自动重置
+- Qwen3 模型自动加 `/no_think` 前缀禁用思维链，节省 token 和时间
+- `RateLimitException` 自定义异常，429 时抛出，`AsyncTaskService` 捕获后友好提示（不重试、不打 ERROR 堆栈）
+- `SystemService.@PostConstruct` 启动时从数据库加载 AI 配置到 `AiConfig` Bean
+
+### AI 评分（混合评分）
+- **规则预评分**：代码检测缺失项（测试验证/总结反思），直接给 0 分，消除模型随机性
+- **AI 质量评估**：只评估有内容的指标，评分下限 40%（已确认有内容）
+- `hasRealSection()` 精确匹配章节标题，排除否定描述（"缺少测试"不会误判为有测试）
 
 ### 知识库 RAG
 `KnowledgeService` 处理文档上传→解析→分块(1200字符)→向量化。`KnowledgeRetrievalService` 两阶段检索（向量 Top-20 + 可选 Rerank Top-5），为 AI 评分提供上下文。
@@ -112,12 +125,15 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 
 ### LocalDateTime 序列化
 - `JacksonConfig` 已全局配置 `yyyy-MM-dd HH:mm:ss` 格式，所有 `LocalDateTime` 字段自动生效
+- `JsonUtil` 使用独立 ObjectMapper，也配置了相同格式（与 `JacksonConfig` 一致）
+- `LocalDateTime.toString()` 输出 ISO-8601（带 `T`），与前端传的格式（带空格）不同，比较时必须统一格式
 - 前端日期选择器必须使用 `value-format="YYYY-MM-dd HH:mm:ss"` 以匹配后端格式
 - `spring.jackson.date-format` 只对 `java.util.Date` 生效，对 `LocalDateTime` 无效（由 `JacksonConfig` 处理）
 
 ### 系统配置 key 映射
-- 前端表单字段名（如 `model`、`textModelApiUrl`）与数据库 key（如 `ai.chat-model`、`ai.api-url`）不同
+- 前端表单字段名（如 `model`、`fallbackModels`、`textModelApiUrl`）与数据库 key（如 `ai.chat-model`、`ai.fallback-model`、`ai.api-url`）不同
 - `SystemService` 中有双向映射表 `FRONTEND_TO_DB_KEY` / `DB_TO_FRONTEND_KEY`，新增配置项时必须同步更新
+- 数据库 `system_config` 表中的 `ai.*` 配置会覆盖 `AiConfig.java` 的代码默认值，修改默认值后需同步更新数据库
 
 ### TypeScript 6.0.3
 - `tsconfig.app.json` 必须保留 `"ignoreDeprecations": "6.0"`，TS 6.0.3 的 `baseUrl` 已废弃，不加会报 TS5101
