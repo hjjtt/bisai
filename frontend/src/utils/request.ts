@@ -38,6 +38,14 @@ service.interceptors.response.use(
 
     // 认证错误
     if (code >= 40100 && code <= 40199) {
+      const requestUrl = response.config.url || ''
+      const isLoginRequest = requestUrl.includes('/auth/login')
+      // 登录接口本身返回的 401xx（如用户名/密码错误、账号锁定）不应当被当作“登录过期”
+      if (isLoginRequest) {
+        ElMessage.error(message || '登录失败')
+        return Promise.reject(new Error(message || '登录失败'))
+      }
+
       removeToken()
       router.push('/login')
       ElMessage.error('登录已过期，请重新登录')
