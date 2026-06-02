@@ -3,8 +3,8 @@ package com.bisai.service;
 import com.bisai.config.AiConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -14,7 +14,11 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.model.tool.ToolCallingManager;
+import org.springframework.ai.model.tool.ToolExecutionResult;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MimeTypeUtils;
@@ -31,7 +35,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ModelScopeClient {
 
     private final AiConfig aiConfig;
@@ -39,6 +42,19 @@ public class ModelScopeClient {
     private final AiUsageService aiUsageService;
     private final ChatModel chatModel;
     private final EmbeddingModel embeddingModel;
+    /** Spring AI 工具调用管理器，用于解析和执行 Agent 工具 */
+    @Lazy @Autowired(required = false)
+    private ToolCallingManager toolCallingManager;
+
+    public ModelScopeClient(AiConfig aiConfig, ObjectMapper objectMapper,
+                            AiUsageService aiUsageService, ChatModel chatModel,
+                            EmbeddingModel embeddingModel) {
+        this.aiConfig = aiConfig;
+        this.objectMapper = objectMapper;
+        this.aiUsageService = aiUsageService;
+        this.chatModel = chatModel;
+        this.embeddingModel = embeddingModel;
+    }
 
     /** 记录今日配额已耗尽的模型，key=模型名，value=耗尽日期 */
     private final ConcurrentHashMap<String, LocalDate> quotaExhausted = new ConcurrentHashMap<>();
@@ -203,7 +219,7 @@ public class ModelScopeClient {
     }
 
     /**
-     * 实际调用 Agent API（可指定模型）
+     * 实际调用 Agent API（可指定模型）— ReAct 多轮工具调用循环
      */
     private String doChatWithTools(String systemPrompt, String userMessage, java.util.List<String> toolNames, String model) {
         int estimatedInputTokens = estimateTokens(systemPrompt) + estimateTokens(userMessage);
@@ -215,7 +231,7 @@ public class ModelScopeClient {
             }
             messages.add(new UserMessage(java.util.Objects.requireNonNull(userMessage, "userMessage cannot be null")));
 
-            log.info("调用 Agentic API (带有工具), model={}, 工具={}", model, toolNames);
+            log.info("调用 Agentic API (ReAct 循环), model={}, 工具={}", model, toolNames);
 
             OpenAiChatOptions.Builder optionsBuilder = OpenAiChatOptions.builder()
                     .model(model)
@@ -226,14 +242,59 @@ public class ModelScopeClient {
                 optionsBuilder.toolNames(new java.util.HashSet<>(toolNames));
             }
 
-            ChatResponse response = chatModel.call(new Prompt(messages, optionsBuilder.build()));
+            // ReAct 多轮循环：模型可多次调用工具，直到产出最终文本或达到上限
+            final int MAX_ITERATIONS = 10;
+            for (int iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+                // 每轮迭代都检查配额（会话历史持续增长，token 消耗递增）
+                if (iteration > 0) {
+                    int historyTokens = messages.stream()
+                            .mapToInt(m -> estimateTokens(m.getText()))
+                            .sum();
+                    aiUsageService.checkQuota(historyTokens);
+                }
 
-            if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
-                log.warn("AI (带有工具) 返回空响应");
-                throw new RuntimeException("AI 服务返回空响应，请重试");
+                Prompt prompt = new Prompt(messages, optionsBuilder.build());
+                ChatResponse response = chatModel.call(prompt);
+
+                if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+                    log.warn("AI (带有工具) 返回空响应, iteration={}", iteration);
+                    throw new RuntimeException("AI 服务返回空响应，请重试");
+                }
+
+                AssistantMessage output = response.getResult().getOutput();
+
+                // 检查是否有 tool_calls
+                List<AssistantMessage.ToolCall> toolCalls = output.getToolCalls();
+                if (toolCalls == null || toolCalls.isEmpty()) {
+                    // 无 tool_calls → 模型产出最终文本，循环结束
+                    String text = output.getText();
+                    log.info("ReAct 循环结束 (iteration={}), 模型最终回复长度={}", iteration,
+                            text != null ? text.length() : 0);
+                    return text;
+                }
+
+                // 有 tool_calls → 执行工具并用返回的完整对话历史替换 messages
+                log.info("ReAct iteration {}: 模型请求 {} 个工具调用", iteration, toolCalls.size());
+
+                if (toolCallingManager != null) {
+                    // executeToolCalls 返回的 conversationHistory 已包含原始消息 + assistant + tool response
+                    ToolExecutionResult toolResult = toolCallingManager.executeToolCalls(prompt, response);
+                    messages = new ArrayList<>(toolResult.conversationHistory());
+                    log.debug("工具执行完成, 当前会话历史 {} 条消息", messages.size());
+                } else {
+                    // ToolCallingManager 不可用时无法执行工具调用，Agentic 模式不可降级
+                    log.error("ToolCallingManager 不可用，Agentic 评分无法执行工具调用。请检查 Spring AI 工具自动配置是否启用。");
+                    throw new RuntimeException("Agent 工具执行器未就绪，无法运行 Agentic 评分。请联系管理员检查 Spring AI 配置。");
+                }
             }
 
-            return response.getResult().getOutput().getText();
+            // 循环用尽
+            log.warn("ReAct 循环达到最大轮次({}), 强制结束", MAX_ITERATIONS);
+            return messages.stream()
+                    .filter(m -> m instanceof AssistantMessage)
+                    .map(m -> ((AssistantMessage) m).getText())
+                    .reduce((a, b) -> b)
+                    .orElse("");
 
         } catch (Exception e) {
             aiUsageService.record(model, "AGENT", estimatedInputTokens, 0, false, e.getMessage());

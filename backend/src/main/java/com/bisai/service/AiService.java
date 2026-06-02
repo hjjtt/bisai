@@ -73,19 +73,23 @@ public class AiService {
                 return;
             }
 
-            // 文件命名规则检查：文件名必须包含学生姓名
+            // 文件命名规则检查（软性）：检查文件名是否包含学生身份标识，作为 AI 门禁的参考信号而非硬性拦截
+            String nameCheckWarning = "";
             if (studentName != null && !studentName.isEmpty()) {
                 boolean nameInFileName = files.stream().anyMatch(f -> {
                     String fileName = f.getOriginalName() != null ? f.getOriginalName() : "";
-                    return fileName.contains(studentName);
+                    return fileName.contains(studentName)
+                            || (!studentUsername.isEmpty() && fileName.toLowerCase().contains(studentUsername.toLowerCase()));
                 });
                 if (!nameInFileName) {
                     String fileNames = files.stream()
                             .map(f -> f.getOriginalName() != null ? f.getOriginalName() : "未知文件")
                             .collect(java.util.stream.Collectors.joining("、"));
-                    handlePrecheckFail(submission, asyncTaskId,
-                            "文件命名不规范：提交的文件名中未包含学生姓名「" + studentName + "」。当前文件名：" + fileNames + "。请将文件重命名为包含姓名的格式（如：" + studentName + "-实训报告.docx）");
-                    return;
+                    nameCheckWarning = "\n【系统提示】文件名中未检测到学生姓名「" + studentName
+                            + "」或账号「" + studentUsername + "」，当前文件名：" + fileNames
+                            + "。请重点核查文档正文内是否包含该学生的身份标识。";
+                    log.info("文件命名检查: 未匹配姓名/账号, submissionId={}, studentName={}, fileNames={}",
+                            submissionId, studentName, fileNames);
                 }
             }
 
@@ -109,17 +113,19 @@ public class AiService {
 
             // 构建 PRECHECK 提示词
             String systemPrompt = "你是实训报告门禁校验系统。快速判定以下三项：\n" +
-                    "1. 文档中是否包含学生姓名或账号作为身份标识？\n" +
+                    "1. 文档正文中是否包含学生姓名或账号作为身份标识？（文件名仅作参考，以正文内容为准）\n" +
                     "2. 内容是否与实训任务相关？\n" +
                     "3. 是否有实质性内容（非空文档/模板）？\n\n" +
+                    "判定标准：三项全部不通过才判定 failed，单项存疑时可通过（交由后续 AI 核查）。\n" +
                     "返回 JSON：{\"passed\":true/false, \"reason\":\"未通过原因\"}";
 
             String userMessage = "## 任务与学生信息\n" +
                     "任务标题：" + taskTitle + "\n" +
                     "任务要求：" + taskRequirements + "\n" +
-                    "学生姓名（必须在文档中体现）：" + studentName + "\n" +
-                    "学生账号（辅助参考，可能不是学号格式）：" + studentUsername + "\n\n" +
-                    "## 学生提交成果提取片段\n" + fileContent;
+                    "学生姓名：" + studentName + "\n" +
+                    "学生账号：" + studentUsername + "\n\n" +
+                    "## 学生提交成果提取片段\n" + fileContent
+                    + nameCheckWarning;
 
             JsonNode result = aiClient.chatAsJson(systemPrompt, userMessage);
             boolean passed = result.path("passed").asBoolean(false);
@@ -352,7 +358,7 @@ public class AiService {
                     }
                 }
                 if (content != null) {
-                    if (content.length() > 4000) content = content.substring(0, 4000) + "...";
+                    if (content.length() > 4000) content = smartTruncate(content, 4000);
                     fileContent.append(content).append("\n\n");
                 }
             }
@@ -439,16 +445,8 @@ public class AiService {
                 }
             }
 
-            // 红线熔断决策：PARSE 阶段已判定内容完整时，豁免红线熔断
-            String parseCompleteness = submission.getParseCompleteness();
-            boolean parseConfirmedComplete = "HIGH".equals(parseCompleteness) || "MEDIUM".equals(parseCompleteness);
-            if (hasRedLineError && parseConfirmedComplete) {
-                log.info("红线问题被 PARSE 完整度({})豁免, submissionId={}, 红线原因: {}",
-                        parseCompleteness, submissionId, redLineReason);
-                hasRedLineError = false;
-            }
-
-            // 红线熔断 — 存在严重问题时终止流水线，不进入评分阶段
+            // 红线熔断 — 存在严重问题（FAIL + HIGH）时终止流水线，不进入评分阶段
+            // 不再使用 PARSE 完整度豁免：PARSE 的 completeness 也是 AI 自评，用它覆盖 CHECK 的红线判定不可靠
             if (hasRedLineError) {
                 submission.setCheckStatus("SUCCESS");
                 submission.setScoreStatus("AI_SCORED");
@@ -545,13 +543,26 @@ public class AiService {
                 fileContent.append("【").append(file.getOriginalName()).append("】\n");
                 String content = documentTextExtractor.extract(file).content();
                 if (documentTextExtractor.isImage(file)) {
-                    String vision = analyzeImage(file);
-                    if (vision != null && !vision.isBlank()) {
-                        content = content + "\n图片多模态分析:\n" + vision;
+                    // 优先复用 PARSE 阶段的 OCR 缓存，避免重复调用多模态 API
+                    ParseResult cachedVision = parseResultMapper.selectOne(
+                            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ParseResult>()
+                                    .eq(ParseResult::getFileId, file.getId())
+                                    .eq(ParseResult::getSubmissionId, submissionId)
+                                    .eq(ParseResult::getParserType, "VISION")
+                                    .last("LIMIT 1")
+                    );
+                    if (cachedVision != null && cachedVision.getContent() != null && !cachedVision.getContent().isEmpty()) {
+                        content = content + "\n图片多模态分析:\n" + cachedVision.getContent();
+                        log.info("SCORE 复用图片 OCR 缓存, fileId={}", file.getId());
+                    } else {
+                        String vision = analyzeImage(file);
+                        if (vision != null && !vision.isBlank()) {
+                            content = content + "\n图片多模态分析:\n" + vision;
+                        }
                     }
                 }
                 if (content != null) {
-                    if (content.length() > 3000) content = content.substring(0, 3000) + "...";
+                    if (content.length() > 3000) content = smartTruncate(content, 3000);
                     fileContent.append(content).append("\n\n");
                 }
             }
@@ -670,11 +681,8 @@ public class AiService {
 
             updateTaskProgress(asyncTaskId, 80, "正在保存评分结果...");
 
-            // 清除旧的 AI 评分结果
-            scoreResultMapper.delete(
-                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ScoreResult>()
-                            .eq(ScoreResult::getSubmissionId, submissionId)
-            );
+            // 注意：不在 AI 调用前删除旧评分，避免 AI 失败时旧数据丢失
+            // 旧评分在 AI 成功后、写入新结果前清除
 
             // 保存评分结果（加权计算）
             BigDecimal autoTotalScore = BigDecimal.ZERO;
@@ -696,7 +704,12 @@ public class AiService {
                 }
             }
 
-            // 4. 保存所有评分结果
+            // 4. AI 评分成功，清除旧结果后写入新评分（原子替换）
+            scoreResultMapper.delete(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ScoreResult>()
+                            .eq(ScoreResult::getSubmissionId, submissionId)
+            );
+
             for (Indicator ind : indicators) {
                 BigDecimal score = finalScores.getOrDefault(ind.getId(), BigDecimal.ZERO);
                 String reason = finalReasons.getOrDefault(ind.getId(), "未评估");
@@ -755,31 +768,34 @@ public class AiService {
 
     /**
      * 智能评分 - 基于 Spring AI Tools 的 Agentic 架构实现
-     * 含事前清理、事后差集验证、失败回滚
+     * 含备份保护、事后差集验证、失败回滚+恢复
      */
     public void doScoreAgentic(Long submissionId, Long asyncTaskId) {
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission == null) return;
-        // 复用标准 SCORING 状态，前端无感知
         submission.setScoreStatus("SCORING");
         submissionMapper.updateById(submission);
 
-        // 重置工具调用计数器
         toolCallGuard.reset(submissionId);
+
+        // 备份旧评分（内存），用于失败时恢复
+        List<ScoreResult> backupScores = scoreResultMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ScoreResult>()
+                        .eq(ScoreResult::getSubmissionId, submissionId)
+        );
 
         try {
             updateTaskProgress(asyncTaskId, 5, "正在准备 Agent 评分环境...");
 
-            // ============ 事前清理：清除历史评分残余 ============
-            int deleted = scoreResultMapper.delete(
-                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ScoreResult>()
-                            .eq(ScoreResult::getSubmissionId, submissionId)
-            );
-            if (deleted > 0) {
-                log.info("Agent 评分事前清理：已清除旧评分记录 {} 条, submissionId={}", deleted, submissionId);
+            // 清除旧评分（Agent 工具会写入新评分）
+            if (!backupScores.isEmpty()) {
+                scoreResultMapper.delete(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ScoreResult>()
+                                .eq(ScoreResult::getSubmissionId, submissionId)
+                );
+                log.info("Agent 评分：已备份并清除旧评分 {} 条, submissionId={}", backupScores.size(), submissionId);
             }
 
-            // 预先加载期望指标集合（用于事后差集验证）
             TrainingTask task = taskMapper.selectById(submission.getTaskId());
             if (task == null || task.getTemplateId() == null) {
                 throw new RuntimeException("任务不存在或未关联评分模板");
@@ -787,7 +803,7 @@ public class AiService {
             List<Indicator> expectedIndicators = indicatorMapper.selectList(
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Indicator>()
                             .eq(Indicator::getTemplateId, task.getTemplateId())
-                            .isNull(Indicator::getParentId)  // 只验证顶级指标
+                            .isNull(Indicator::getParentId)
             );
             Set<Long> expectedIndicatorIds = expectedIndicators.stream()
                     .map(Indicator::getId)
@@ -818,11 +834,10 @@ public class AiService {
 
             updateTaskProgress(asyncTaskId, 50, "Agent 正在思考并调度工具（可能需要较长时间）...");
 
-            // 进入 ReAct 循环
             String finalResult = aiClient.chatWithTools(systemPrompt, userMessage, tools);
             log.info("Agent 阅卷循环结束，模型最终回复: {}", finalResult);
 
-            // ============ 事后差集验证：检查是否有指标漏评 ============
+            // 事后差集验证
             List<ScoreResult> savedResults = scoreResultMapper.selectList(
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ScoreResult>()
                             .eq(ScoreResult::getSubmissionId, submissionId)
@@ -831,7 +846,6 @@ public class AiService {
                     .map(ScoreResult::getIndicatorId)
                     .collect(java.util.stream.Collectors.toSet());
 
-            // 计算差集：期望但未评分的指标
             Set<Long> missedIndicatorIds = new java.util.HashSet<>(expectedIndicatorIds);
             missedIndicatorIds.removeAll(savedIndicatorIds);
 
@@ -841,7 +855,6 @@ public class AiService {
 
             updateTaskProgress(asyncTaskId, 80, "正在汇总评分结果...");
 
-            // 汇总成绩（加权计算）
             BigDecimal autoTotalScore = BigDecimal.ZERO;
             for (ScoreResult sr : savedResults) {
                 Indicator ind = indicatorMapper.selectById(sr.getIndicatorId());
@@ -869,16 +882,22 @@ public class AiService {
             toolCallGuard.cleanup(submissionId);
 
         } catch (Exception e) {
-            log.error("Agent 智能评分失败，触发回滚, submissionId={}: {}", submissionId, e.getMessage());
+            log.error("Agent 智能评分失败, submissionId={}: {}", submissionId, e.getMessage());
             toolCallGuard.cleanup(submissionId);
 
-            // ============ 失败回滚：清除本次产生的半成品评分数据 ============
-            int rolledBack = scoreResultMapper.delete(
+            // 回滚：清除半成品评分
+            scoreResultMapper.delete(
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ScoreResult>()
                             .eq(ScoreResult::getSubmissionId, submissionId)
             );
-            if (rolledBack > 0) {
-                log.info("Agent 评分回滚：已清除半成品评分记录 {} 条, submissionId={}", rolledBack, submissionId);
+
+            // 恢复旧评分备份
+            if (!backupScores.isEmpty()) {
+                for (ScoreResult backup : backupScores) {
+                    backup.setId(null); // 清除旧 ID，让数据库自增
+                    scoreResultMapper.insert(backup);
+                }
+                log.info("Agent 评分回滚：已恢复旧评分 {} 条, submissionId={}", backupScores.size(), submissionId);
             }
 
             submission.setScoreStatus("SCORE_FAILED");
@@ -972,27 +991,6 @@ public class AiService {
             log.warn("图片多模态分析失败 fileId={}: {}", file.getId(), e.getMessage());
             return null;
         }
-    }
-
-    private JsonNode parseJson(String aiResult) throws Exception {
-        String json = aiResult.trim();
-        // 剥离 markdown 代码块
-        if (json.contains("```json")) {
-            int start = json.indexOf("```json") + 7;
-            int end = json.indexOf("```", start);
-            json = end > start ? json.substring(start, end) : json.substring(start);
-        } else if (json.contains("```")) {
-            int start = json.indexOf("```") + 3;
-            int end = json.indexOf("```", start);
-            json = end > start ? json.substring(start, end) : json.substring(start);
-        }
-        json = json.trim();
-        // 如果不是以 { 开头，尝试提取首个 JSON 对象
-        if (!json.startsWith("{")) {
-            int start = json.indexOf('{');
-            if (start >= 0) json = json.substring(start);
-        }
-        return objectMapper.readTree(json);
     }
 
     /**

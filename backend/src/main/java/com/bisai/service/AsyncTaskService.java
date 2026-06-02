@@ -200,6 +200,12 @@ public class AsyncTaskService {
             // 重试次数用尽
             task.setStatus("FAILED");
             log.error("任务重试失败，次数已达上限: id={}, type={}", task.getId(), task.getTaskType());
+
+            // Agent 评分失败后自动降级到传统评分
+            if ("SCORE_AGENT".equals(task.getTaskType())) {
+                log.info("Agent 评分重试耗尽，自动降级到传统评分: bizId={}", task.getBizId());
+                createTaskIfAbsent("SCORE", task.getBizId());
+            }
         }
         asyncTaskMapper.updateById(task);
 
@@ -222,6 +228,7 @@ public class AsyncTaskService {
 
     /**
      * 单个 AI 阶段成功后推进下一阶段
+     * 注：不需要 @Transactional，因为 executeTask 的 CAS 机制已保证同 submission 不会并发执行此方法
      */
     private void handleTaskSuccess(AsyncTask task) {
         Submission submission = submissionMapper.selectById(task.getBizId());
@@ -271,62 +278,6 @@ public class AsyncTaskService {
     /**
      * 查询任务状态
      */
-    private void triggerAutoPipelineNextTask(AsyncTask finishedTask, Submission submission) {
-        if (finishedTask == null || submission == null) {
-            return;
-        }
-        switch (finishedTask.getTaskType()) {
-            case "PARSE" -> triggerAutoCheckTask(submission);
-            case "CHECK" -> triggerAutoScoreTask(submission);
-            default -> {
-            }
-        }
-    }
-
-    private void triggerAutoCheckTask(Submission submission) {
-        String checkStatus = submission.getCheckStatus();
-        if ("SUCCESS".equals(checkStatus) || "CHECKING".equals(checkStatus)) {
-            return;
-        }
-        if (hasActiveTask("CHECK", submission.getId())) {
-            return;
-        }
-        submission.setCheckStatus("CHECKING");
-        submissionMapper.updateById(submission);
-        createTask("CHECK", submission.getId());
-    }
-
-    private void triggerAutoScoreTask(Submission submission) {
-        String scoreStatus = submission.getScoreStatus();
-        if ("PUBLISHED".equals(scoreStatus)
-                || "TEACHER_CONFIRMED".equals(scoreStatus)
-                || "AI_SCORED".equals(scoreStatus)
-                || "SCORING".equals(scoreStatus)) {
-            return;
-        }
-        // 检查两种评分任务类型是否已有活跃任务
-        String scoreTaskType = aiConfig.isUseAgentScore() ? "SCORE_AGENT" : "SCORE";
-        if (hasActiveTask(scoreTaskType, submission.getId())) {
-            return;
-        }
-        submission.setScoreStatus("SCORING");
-        submissionMapper.updateById(submission);
-        createTask(scoreTaskType, submission.getId());
-    }
-
-    private boolean hasActiveTask(String taskType, Long bizId) {
-        if (taskType == null || bizId == null) {
-            return false;
-        }
-        Long count = asyncTaskMapper.selectCount(
-                new LambdaQueryWrapper<AsyncTask>()
-                        .eq(AsyncTask::getTaskType, taskType)
-                        .eq(AsyncTask::getBizId, bizId)
-                        .in(AsyncTask::getStatus, "PENDING", "RUNNING", "RETRYING")
-        );
-        return count != null && count > 0;
-    }
-
     public AsyncTask getTaskStatus(Long taskId) {
         return asyncTaskMapper.selectById(taskId);
     }
