@@ -1,6 +1,7 @@
 package com.bisai.controller;
 
 import com.bisai.common.Result;
+import com.bisai.dto.ChangePasswordRequest;
 import com.bisai.dto.LoginRequest;
 import com.bisai.dto.RegisterRequest;
 import com.bisai.entity.ClassEntity;
@@ -54,8 +55,8 @@ public class AuthController {
     }
 
     @PostMapping("/change-password")
-    public Result<Void> changePassword(@RequestBody Map<String, String> body, Authentication auth) {
+    public Result<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        return authService.changePassword(userId, body.get("oldPassword"), body.get("newPassword"));
+        return authService.changePassword(userId, request.getOldPassword(), request.getNewPassword());
     }
 }

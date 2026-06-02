@@ -144,6 +144,11 @@ export function getStudentScores(submissionId: number) {
   return get<ScoreResult[]>(`/submissions/${submissionId}/student-scores`)
 }
 
+// 学生查看核查结果
+export function getStudentCheckResults(submissionId: number) {
+  return get<CheckResult[]>(`/submissions/${submissionId}/student-check-results`)
+}
+
 // 评分校准
 export interface CalibrationItem {
   indicatorId: number

@@ -1,7 +1,9 @@
 package com.bisai.controller;
 
 import com.bisai.common.Result;
+import com.bisai.dto.TestModelRequest;
 import com.bisai.service.SystemService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -29,10 +31,7 @@ public class SystemController {
 
     @PostMapping("/test-model")
     @PreAuthorize("hasRole('ADMIN')")
-    public Result<Map<String, Object>> testModel(@RequestBody Map<String, String> body) {
-        String apiUrl = body.get("apiUrl");
-        String apiKey = body.get("apiKey");
-        String model = body.get("model");
-        return systemService.testModelConnection(apiUrl, apiKey, model);
+    public Result<Map<String, Object>> testModel(@Valid @RequestBody TestModelRequest request) {
+        return systemService.testModelConnection(request.getApiUrl(), request.getApiKey(), request.getModel());
     }
 }

@@ -7,11 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Backend (Spring Boot 3 + Java 17)
 ```bash
 cd backend
-mvn compile                 # 编译
+mvn compile                 # 编译（主要验证方式）
 mvn spring-boot:run         # 启动 (端口 8080)
-mvn test                    # 运行全部测试
-mvn test -Dtest=ClassName   # 运行单个测试类
-mvn test -Dtest=ClassName#methodName  # 运行单个测试方法
 mvn clean package -DskipTests         # 生产构建 (target/backend-1.0.0.jar)
 ```
 
@@ -21,8 +18,11 @@ cd frontend
 npm install                 # 安装依赖
 npm run dev                 # 开发服务器 (端口 3000，代理 /api → localhost:8080)
 npm run build               # 生产构建 (vue-tsc + vite build)
-npx vue-tsc --noEmit        # 仅类型检查
+npx vue-tsc --noEmit        # 仅类型检查（无 lint 脚本）
 ```
+
+### 无测试套件
+前后端均无真实测试。`backend/src/test/` 中只有一个反射工具类（非 `@Test`），前端无 `*.test.*` / `*.spec.*`。**不要用 `mvn test` 或 `npm test` 验证**，用 `mvn compile` 和 `vue-tsc --noEmit` 代替。
 - `@` 别名映射到 `src/`（`@/api/xxx` = `src/api/xxx`），配置在 `tsconfig.app.json` 的 `paths` 和 `vite.config.ts` 的 `resolve.alias`
 - Vite 开发代理：`/api` → `http://localhost:8080`，无需在前端配置后端地址
 
@@ -42,10 +42,11 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 - **后端**: Spring Boot 3.4.3 + Spring Security (JWT) + MyBatis-Plus 3.5.9 + Spring AI (ModelScope)
 - **前端**: Vue 3 + TypeScript + Vite 8 + Element Plus + Pinia + ECharts + Axios
 - **文档解析**: PDFBox 3.0.3, POI 5.3.0, docx4j 11.4.11, iText 8.0.4
-- **AI**: ModelScope 平台，主模型 stepfun-ai/Step-3.7-Flash，备用链（逗号分隔）自动切换，支持 RAG 知识库检索增强
+- **AI**: ModelScope 平台，主模型 Qwen/Qwen3.5-35B-A3B（yml 配置），备用链（逗号分隔）自动切换，支持 RAG 知识库检索增强。Embedding 模型：`damo/nlp_corom_sentence-embedding_chinese-base`
 
 ### 后端包结构 (`com.bisai`)
 - `controller/` — REST API（16个），使用 `@PreAuthorize` 做角色控制
+- `dto/` — 请求/响应 DTO（`LoginRequest`、`RegisterRequest`、`PageQuery`、`DashboardStats` 等），使用 `@Valid` 参数校验
 - `service/` — 业务逻辑层，核心：`AiService`（解析/核查/混合评分）、`KnowledgeService`（知识库管理）、`ScoreService`（评分流程）、`ModelScopeClient`（AI调用封装，多模型备用链）
 - `entity/` — MyBatis-Plus 实体，核心业务表已启用 `@TableLogic` 逻辑删除
 - `mapper/` — MyBatis-Plus Mapper 接口
@@ -79,7 +80,7 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 ### AI 模型管理
 - `AiConfig.fallbackModels` 支持逗号分隔的多备用模型链，主模型配额耗尽（429）时自动跳过，直接使用下一个模型
 - `ModelScopeClient` 内置 `quotaExhausted` 追踪表，记录今日配额已耗尽的模型，第二天自动重置
-- Qwen3 模型自动加 `/no_think` 前缀禁用思维链，节省 token 和时间
+- Qwen3 模型自动加 `/no_think` 前缀禁用思维链，节省 token 和时间。`stripThinkingTags()` 兜底剥离 `<think...</think>` 标签。修改 AI 调用逻辑时注意这两个机制
 - `RateLimitException` 自定义异常，429 时抛出，`AsyncTaskService` 捕获后友好提示（不重试、不打 ERROR 堆栈）
 - `SystemService.@PostConstruct` 启动时从数据库加载 AI 配置到 `AiConfig` Bean
 
@@ -113,6 +114,10 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 - 前端文件下载/预览必须通过 axios 带 token，禁止 `window.open` 直接访问 API
 - 热部署已禁用（devtools `restart.enabled: false`），修改 Java 代码后需手动重启
 - MyBatis 日志使用 `Slf4jImpl`（非 `StdOutImpl`），避免定时任务刷屏
+- 文件上传最大 200MB，存储路径 `./data/files/`
+
+### `shannon/` 目录
+独立 git 仓库（`@keygraph/shannon` 渗透测试工具），不属于本项目，修改时忽略。
 
 ## Pitfalls
 
@@ -149,7 +154,7 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 ### 课程权限
 - `CourseService.listCourses` 按角色过滤：教师只看到自己的课程，管理员看到所有
 - `TaskService.createTask` 通过 `isTeacherOwnerOfCourse` 验证教师只能在自己课程下创建任务
-- `PermissionService` 提供 `isStudentOwnerOfSubmission` 验证学生只能访问自己的提交
+- `PermissionService` 提供数据级权限校验：`isStudentOwnerOfSubmission`、`isTeacherOwnerOfCourse`
 
 ### 文件路径
 - `ReportService` 生成报告文件时使用 `toAbsolutePath().normalize()` 存储绝对路径

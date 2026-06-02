@@ -24,6 +24,48 @@
         </el-table>
       </template>
 
+      <!-- AI 核查结果 -->
+      <template v-if="checkResults.length > 0">
+        <el-divider />
+        <h4 style="margin-bottom: 16px">AI 核查结果</h4>
+        <el-row :gutter="16" style="margin-bottom: 16px">
+          <el-col :span="8">
+            <el-card shadow="never" body-style="padding: 10px; text-align: center">
+              <div style="font-size: 28px; font-weight: 700; color: #67c23a">{{ lowRiskCount }}</div>
+              <div style="font-size: 13px; color: #909399">低风险</div>
+            </el-card>
+          </el-col>
+          <el-col :span="8">
+            <el-card shadow="never" body-style="padding: 10px; text-align: center">
+              <div style="font-size: 28px; font-weight: 700; color: #e6a23c">{{ mediumRiskCount }}</div>
+              <div style="font-size: 13px; color: #909399">中风险</div>
+            </el-card>
+          </el-col>
+          <el-col :span="8">
+            <el-card shadow="never" body-style="padding: 10px; text-align: center">
+              <div style="font-size: 28px; font-weight: 700; color: #f56c6c">{{ highRiskCount }}</div>
+              <div style="font-size: 13px; color: #909399">高风险</div>
+            </el-card>
+          </el-col>
+        </el-row>
+        <el-table :data="checkResults" stripe>
+          <el-table-column prop="checkType" label="核查维度" width="120" />
+          <el-table-column prop="checkItem" label="检查项" width="150" />
+          <el-table-column label="结果" width="100">
+            <template #default="{ row }">
+              <el-tag :type="getResultType(row.result)" size="small">{{ getResultLabel(row.result) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="风险等级" width="100">
+            <template #default="{ row }">
+              <el-tag :type="getRiskType(row.riskLevel)" size="small">{{ getRiskLabel(row.riskLevel) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="description" label="说明" min-width="200" />
+          <el-table-column prop="suggestion" label="修改建议" min-width="180" />
+        </el-table>
+      </template>
+
       <!-- 退回/评语信息 -->
       <template v-if="teacherComment">
         <el-divider />
@@ -48,15 +90,17 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getSubmission, getStudentScores } from '@/api/task'
+import { getSubmission, getStudentScores, getStudentCheckResults } from '@/api/task'
 import { exportStudentReport } from '@/api/report'
 import { downloadFile } from '@/api/system'
-import type { Submission, ScoreResult } from '@/types'
+import { getResultType, getResultLabel, getRiskType, getRiskLabel } from '@/utils/status'
+import type { Submission, ScoreResult, CheckResult } from '@/types'
 
 const route = useRoute()
 const loading = ref(false)
 const submission = ref<Submission | null>(null)
 const scores = ref<ScoreResult[]>([])
+const checkResults = ref<CheckResult[]>([])
 const teacherComment = ref('')
 
 const submissionId = computed(() => Number(route.params.submissionId) || 0)
@@ -71,16 +115,23 @@ const showTeacherScore = computed(() =>
   submission.value?.scoreStatus === 'TEACHER_CONFIRMED' || submission.value?.scoreStatus === 'PUBLISHED'
 )
 
+// 核查结果风险统计
+const lowRiskCount = computed(() => checkResults.value.filter(r => r.riskLevel === 'LOW').length)
+const mediumRiskCount = computed(() => checkResults.value.filter(r => r.riskLevel === 'MEDIUM').length)
+const highRiskCount = computed(() => checkResults.value.filter(r => r.riskLevel === 'HIGH').length)
+
 async function loadData() {
   if (!submissionId.value) return
   loading.value = true
   try {
-    const [subRes, scoreRes] = await Promise.all([
+    const [subRes, scoreRes, checkRes] = await Promise.all([
       getSubmission(submissionId.value),
       getStudentScores(submissionId.value),
+      getStudentCheckResults(submissionId.value).catch(() => ({ data: [] })),
     ])
     submission.value = subRes.data
     scores.value = scoreRes.data
+    checkResults.value = checkRes.data
     teacherComment.value = subRes.data?.teacherComment || ''
   } catch (e) {
     ElMessage.error('加载评价结果失败')

@@ -2,11 +2,15 @@ package com.bisai.controller;
 
 import com.bisai.common.PageResult;
 import com.bisai.common.Result;
+import com.bisai.dto.CorrectScoreRequest;
 import com.bisai.dto.PageQuery;
+import com.bisai.dto.ReturnRequest;
+import com.bisai.dto.SaveScoresRequest;
 import com.bisai.entity.FileEntity;
 import com.bisai.entity.Submission;
 import com.bisai.service.ScoreService;
 import com.bisai.service.SubmissionService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -148,20 +152,17 @@ public class SubmissionController {
     @PutMapping("/{id}/scores")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Void> saveTeacherScores(@PathVariable Long id,
-                                           @RequestBody Map<String, Object> body,
+                                           @Valid @RequestBody SaveScoresRequest request,
                                            Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
         String role = auth.getAuthorities().stream()
                 .findFirst()
                 .map(a -> a.getAuthority().replace("ROLE_", ""))
                 .orElse("");
-        Object scoresObj = body.get("scores");
-        List<com.bisai.entity.ScoreResult> scores = scoresObj != null
-                ? com.bisai.util.JsonUtil.convertList(scoresObj, com.bisai.entity.ScoreResult.class)
+        List<com.bisai.entity.ScoreResult> scores = request.getScores() != null
+                ? request.getScores()
                 : List.of();
-        String comment = (String) body.get("comment");
-        String expectedUpdatedAt = (String) body.get("expectedUpdatedAt");
-        return scoreService.saveTeacherScores(id, scores, comment, expectedUpdatedAt, userId, role);
+        return scoreService.saveTeacherScores(id, scores, request.getComment(), request.getExpectedUpdatedAt(), userId, role);
     }
 
     // 发布成绩
@@ -179,13 +180,13 @@ public class SubmissionController {
     // 退回提交
     @PutMapping("/{id}/return")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Void> returnSubmission(@PathVariable Long id, @RequestBody Map<String, String> body, Authentication auth) {
+    public Result<Void> returnSubmission(@PathVariable Long id, @Valid @RequestBody ReturnRequest request, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
         String role = auth.getAuthorities().stream()
                 .findFirst()
                 .map(a -> a.getAuthority().replace("ROLE_", ""))
                 .orElse("");
-        return scoreService.returnSubmission(id, body.get("reason"), userId, role);
+        return scoreService.returnSubmission(id, request.getReason(), userId, role);
     }
 
     // 客观评分
@@ -203,18 +204,15 @@ public class SubmissionController {
     // 成绩修正
     @PutMapping("/{id}/correct")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public Result<Void> correctScore(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
+    public Result<Void> correctScore(@PathVariable Long id, @Valid @RequestBody CorrectScoreRequest request, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
         String role = auth.getAuthorities().stream()
                 .findFirst()
                 .map(a -> a.getAuthority().replace("ROLE_", ""))
                 .orElse("");
-        Object indicatorIdObj = body.get("indicatorId");
-        Long indicatorId = indicatorIdObj != null ? Long.valueOf(indicatorIdObj.toString()) : null;
-        Object newScoreObj = body.get("newScore");
-        if (newScoreObj == null) return Result.error(40001, "newScore 不能为空");
-        java.math.BigDecimal newScore = new java.math.BigDecimal(newScoreObj.toString());
-        String reason = (String) body.get("reason");
-        return scoreService.correctScore(id, indicatorId, newScore, reason, userId, role);
+        Long indicatorId = request.getIndicatorId();
+        java.math.BigDecimal newScore = request.getNewScore();
+        if (newScore == null) return Result.error(40001, "newScore 不能为空");
+        return scoreService.correctScore(id, indicatorId, newScore, request.getReason(), userId, role);
     }
 }
