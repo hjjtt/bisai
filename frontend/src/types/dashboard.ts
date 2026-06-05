@@ -39,4 +39,63 @@ export interface AdminStats {
   submissions: number[]
   parsed: number[]
   scored: number[]
+  // P2.9: 评分一致性看板
+  consistency?: ConsistencyData
+}
+
+// 评分一致性趋势数据
+export interface ConsistencyData {
+  dates: string[]
+  pearsonCorrelation: number[]
+  mae: number[]
+  avgDivergence: number[]
+  latestPearson?: number
+  latestSpearman?: number
+  latestMae?: number
+  latestRmse?: number
+  totalEvaluated?: number
+}
+
+// 校准相关性统计
+export interface CorrelationStats {
+  sampleSize: number
+  pearsonCorrelation: number
+  spearmanCorrelation: number
+  rmse: number
+  mae: number
+  avgDivergence: number
+  biasDirection: string
+  crossModelAgreement?: number
+  indicatorAnalysis?: IndicatorCorrelation[]
+}
+
+export interface IndicatorCorrelation {
+  indicatorId: number
+  indicatorName?: string
+  sampleSize: number
+  pearsonCorrelation: number
+  mae: number
+}
+
+// Pairwise 排名
+export interface PairwiseRanking {
+  rank: number
+  submissionId: number
+  studentName: string
+  aiScore: number
+  wins: number
+  losses: number
+  netWins: number
+}
+
+export interface PairwiseComparison {
+  id: number
+  submissionAId: number
+  submissionBId: number
+  winner: string
+  reasoning: string
+  studentAName: string
+  studentBName: string
+  scoreA: number
+  scoreB: number
 }

@@ -101,6 +101,8 @@ const aiTaskCurrentStep = ref<string>('')
 const aiTaskStatus = ref<string>('')
 const aiTasks = ref<AsyncTask[]>([])
 let progressTimer: ReturnType<typeof setInterval> | null = null
+/** 流水线终态标记：空=运行中, RETURNED=门禁退回, COMPLETED=正常完成, REDFLAG=红线熔断, FAILED=任务失败 */
+const pipelineTerminal = ref<string>('')
 
 const taskId = computed(() => Number(route.params.taskId) || 0)
 const acceptTypes = '.doc,.docx,.pdf,.jpg,.jpeg,.png,.xls,.xlsx,.zip'
@@ -169,6 +171,7 @@ async function submitUpload() {
     fileList.value = []
 
     // 开始轮询 AI 任务进度
+    pipelineTerminal.value = ''
     startProgressPolling()
   } catch (e) {
     ElMessage.error('上传失败，请重试')
@@ -218,6 +221,7 @@ function startProgressPolling() {
       if (failedTask) {
         clearInterval(progressTimer!)
         progressTimer = null
+        pipelineTerminal.value = 'FAILED'
         aiTaskStatus.value = failedTask.status || 'FAILED'
         aiTaskCurrentStep.value = `${getTaskTypeLabel(failedTask.taskType || '')}：${failedTask.currentStep || failedTask.errorMessage || '处理失败'}`
         ElMessage.error('AI 处理失败: ' + (failedTask.currentStep || failedTask.errorMessage || '请联系教师处理'))
@@ -230,6 +234,7 @@ function startProgressPolling() {
       if (scoreTask && scoreTask.status === 'SUCCESS') {
         clearInterval(progressTimer!)
         progressTimer = null
+        pipelineTerminal.value = 'COMPLETED'
         aiTaskProgress.value = 100
         aiTaskStatus.value = 'SUCCESS'
         aiTaskCurrentStep.value = '评分：AI 处理完成，等待教师复核'
@@ -252,6 +257,7 @@ function checkSubmissionTerminal(submission: Submission): boolean {
   const scoreStatus = submission.scoreStatus
   // 门禁退回
   if (scoreStatus === 'RETURNED') {
+    pipelineTerminal.value = 'RETURNED'
     aiTaskProgress.value = 100
     aiTaskStatus.value = 'FAILED'
     aiTaskCurrentStep.value = '门禁：未通过校验，提交已退回'
@@ -262,10 +268,15 @@ function checkSubmissionTerminal(submission: Submission): boolean {
   if (scoreStatus === 'AI_SCORED') {
     const hasRunning = aiTasks.value.some(t => ['PENDING', 'RUNNING', 'RETRYING'].includes(t.status))
     if (!hasRunning) {
+      // 区分正常完成 vs 红线熔断（无 SCORE 任务但 CHECK 有 FAIL+HIGH）
+      const hasScoreTask = aiTasks.value.some(t => t.taskType === 'SCORE' || t.taskType === 'SCORE_AGENT')
+      pipelineTerminal.value = hasScoreTask ? 'COMPLETED' : 'REDFLAG'
       aiTaskProgress.value = 100
       aiTaskStatus.value = 'SUCCESS'
-      aiTaskCurrentStep.value = 'AI 处理完成'
-      ElMessage.success('AI 处理完成！')
+      aiTaskCurrentStep.value = hasScoreTask
+        ? 'AI 处理完成'
+        : '核查发现严重问题，评分已终止（总分 0 分），请等待教师处理'
+      ElMessage.success(hasScoreTask ? 'AI 处理完成！' : '核查发现严重问题，已终止自动评分')
       return true
     }
   }
@@ -296,6 +307,8 @@ function getTaskTypeLabel(taskType: string) {
 }
 
 const activeAiStep = computed(() => {
+  // 流水线终态时显示所有步骤完成
+  if (pipelineTerminal.value) return 4
   const current = getCurrentAiTask(aiTasks.value)
   if (!current) return 0
   const map: Record<string, number> = { PRECHECK: 0, PARSE: 1, CHECK: 2, SCORE: 3, SCORE_AGENT: 3 }
@@ -304,6 +317,8 @@ const activeAiStep = computed(() => {
 
 // 总体进度：4 个阶段各占 25%，已完成的阶段满额，当前阶段按比例
 const overallProgress = computed(() => {
+  // 流水线终态时直接显示 100%
+  if (pipelineTerminal.value) return 100
   const STAGE_WEIGHT = 25
   const stages = ['PRECHECK', 'PARSE', 'CHECK', 'SCORE']
   let total = 0
@@ -323,6 +338,24 @@ const overallProgress = computed(() => {
 })
 
 function getStepStatus(taskType: string) {
+  // 流水线终态时，所有已完成的步骤显示 success，跳过的步骤也显示 success
+  if (pipelineTerminal.value) {
+    // 门禁退回：只有 PRECHECK 显示 error，其余 wait
+    if (pipelineTerminal.value === 'RETURNED') {
+      if (taskType === 'PRECHECK') return 'error'
+      return 'wait'
+    }
+    // 任务失败：失败的那步 error，之前的 success
+    if (pipelineTerminal.value === 'FAILED') {
+      const task = findLatestTask(aiTasks.value, taskType)
+      if (!task) return 'wait'
+      if (task.status === 'FAILED' || task.status === 'CANCELLED') return 'error'
+      if (task.status === 'SUCCESS') return 'success'
+      return 'wait'
+    }
+    // COMPLETED / REDFLAG：所有步骤显示 success
+    return 'success'
+  }
   const task = findLatestTask(aiTasks.value, taskType)
   if (!task) return 'wait'
   if (task.status === 'SUCCESS') return 'success'

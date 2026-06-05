@@ -50,5 +50,7 @@ public class DashboardStats {
         private List<Long> submissions;
         private List<Long> parsed;
         private List<Long> scored;
+        // P2.9: 评分一致性看板
+        private Map<String, Object> consistency;
     }
 }

@@ -103,6 +103,58 @@
         </div>
       </aside>
     </section>
+
+    <!-- P2.9: 评分一致性看板 -->
+    <section class="consistency-section">
+      <div class="section-header">
+        <div>
+          <h3>AI 评分一致性分析</h3>
+          <p>LLM-as-a-Judge 评分与教师评分的相关性和偏差趋势。</p>
+        </div>
+        <div class="consistency-actions">
+          <el-button size="small" @click="refreshConsistency" :loading="consistencyLoading">
+            刷新
+          </el-button>
+        </div>
+      </div>
+
+      <!-- 关键指标卡片 -->
+      <div class="consistency-metrics" v-if="consistencyData">
+        <div class="metric-card">
+          <span class="metric-label">Pearson 相关系数</span>
+          <strong class="metric-value" :class="getCorrelationClass(consistencyData.latestPearson)">
+            {{ consistencyData.latestPearson != null ? consistencyData.latestPearson.toFixed(3) : '—' }}
+          </strong>
+          <span class="metric-desc">AI 与教师评分的线性相关度</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">MAE（平均绝对误差）</span>
+          <strong class="metric-value" :class="consistencyData.latestMae != null && consistencyData.latestMae < 5 ? 'is-good' : 'is-warn'">
+            {{ consistencyData.latestMae != null ? consistencyData.latestMae.toFixed(2) : '—' }}
+          </strong>
+          <span class="metric-desc">AI 与教师评分的平均偏差（分）</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">已校准样本</span>
+          <strong class="metric-value">{{ consistencyData.totalEvaluated ?? 0 }}</strong>
+          <span class="metric-desc">教师已确认的评分数</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">一致性评级</span>
+          <strong class="metric-value" :class="getOverallClass(consistencyData)">
+            {{ getOverallGrade(consistencyData) }}
+          </strong>
+          <span class="metric-desc">综合 Pearson 和 MAE 判定</span>
+        </div>
+      </div>
+
+      <div class="consistency-empty" v-else-if="!consistencyLoading">
+        <el-empty description="暂无校准数据，需教师确认评分后自动生成" :image-size="60" />
+      </div>
+
+      <!-- 趋势图表 -->
+      <div ref="consistencyChartRef" class="chart-container" v-if="consistencyData && consistencyData.dates?.length > 1"></div>
+    </section>
   </div>
 </template>
 
@@ -130,7 +182,7 @@ import {
   Warning,
 } from '@element-plus/icons-vue'
 import { getAdminStats } from '@/api/dashboard'
-import type { SystemStatusItem, BaseStats } from '@/types'
+import type { SystemStatusItem, BaseStats, ConsistencyData } from '@/types'
 
 echarts.use([LineChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent, CanvasRenderer])
 
@@ -149,6 +201,12 @@ const statCards = ref([
 const systemStatus = ref<SystemStatusItem[]>([])
 const apiUsage = ref(0)
 const serverLoad = ref(0)
+
+// P2.9: 一致性看板
+const consistencyData = ref<ConsistencyData | null>(null)
+const consistencyLoading = ref(false)
+const consistencyChartRef = ref<HTMLElement>()
+let consistencyChart: echarts.ECharts | null = null
 
 const healthType = computed(() => {
   if (serverLoad.value >= 80 || apiUsage.value >= 90) return 'danger'
@@ -180,6 +238,11 @@ async function loadStats() {
     apiUsage.value = d.apiUsage || 0
     serverLoad.value = d.serverLoad || 0
     initChart(d)
+    // P2.9: 提取一致性数据
+    if (d.consistency) {
+      consistencyData.value = d.consistency as unknown as ConsistencyData
+      initConsistencyChart()
+    }
   } catch {
     // 请求错误已由拦截器处理
   } finally {
@@ -277,6 +340,110 @@ function initChart(data: BaseStats) {
 
 function handleResize() {
   chartInstance?.resize()
+  consistencyChart?.resize()
+}
+
+// P2.9: 一致性看板方法
+function getCorrelationClass(val: number | undefined): string {
+  if (val == null) return ''
+  if (val >= 0.8) return 'is-good'
+  if (val >= 0.5) return 'is-warn'
+  return 'is-bad'
+}
+
+function getOverallClass(data: ConsistencyData): string {
+  const p = data.latestPearson
+  const m = data.latestMae
+  if (p == null || m == null) return ''
+  if (p >= 0.8 && m < 5) return 'is-good'
+  if (p >= 0.5 || m < 10) return 'is-warn'
+  return 'is-bad'
+}
+
+function getOverallGrade(data: ConsistencyData): string {
+  const p = data.latestPearson
+  const m = data.latestMae
+  if (p == null || m == null) return '—'
+  if (p >= 0.8 && m < 5) return '优秀'
+  if (p >= 0.6 && m < 8) return '良好'
+  if (p >= 0.4 || m < 10) return '一般'
+  return '待优化'
+}
+
+async function refreshConsistency() {
+  consistencyLoading.value = true
+  try {
+    const res = await getAdminStats(timeRange.value === '30d' ? 30 : 7)
+    const d = res.data as BaseStats
+    if (d.consistency) {
+      consistencyData.value = d.consistency as unknown as ConsistencyData
+      initConsistencyChart()
+    }
+  } catch { /* ignored */ } finally {
+    consistencyLoading.value = false
+  }
+}
+
+function initConsistencyChart() {
+  if (!consistencyChartRef.value || !consistencyData.value) return
+  const data = consistencyData.value
+  if (!data.dates || data.dates.length < 2) return
+
+  if (!consistencyChart) {
+    consistencyChart = echarts.init(consistencyChartRef.value)
+  }
+
+  consistencyChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(255,255,255,0.96)',
+      borderColor: '#e2e8f0',
+      textStyle: { color: '#1e293b' },
+    },
+    legend: {
+      data: ['Pearson 相关系数', 'MAE（平均偏差）'],
+      top: 0, right: 0,
+      icon: 'circle', itemWidth: 10, itemHeight: 10,
+      textStyle: { color: '#64748b', fontSize: 13 },
+    },
+    grid: { top: 44, left: '2%', right: '3%', bottom: '4%', containLabel: true },
+    xAxis: {
+      type: 'category', boundaryGap: false,
+      data: data.dates,
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
+      axisLabel: { color: '#64748b', margin: 12 },
+      axisTick: { show: false },
+    },
+    yAxis: [
+      {
+        type: 'value', name: 'Pearson',
+        min: -1, max: 1,
+        splitLine: { lineStyle: { color: '#eef2f7', type: 'dashed' } },
+        axisLabel: { color: '#64748b' },
+      },
+      {
+        type: 'value', name: 'MAE(分)',
+        splitLine: { show: false },
+        axisLabel: { color: '#64748b' },
+      },
+    ],
+    series: [
+      {
+        name: 'Pearson 相关系数',
+        type: 'line', smooth: true, showSymbol: false,
+        data: data.pearsonCorrelation || [],
+        itemStyle: { color: '#2563eb' },
+        yAxisIndex: 0,
+      },
+      {
+        name: 'MAE（平均偏差）',
+        type: 'line', smooth: true, showSymbol: false,
+        data: data.mae || [],
+        itemStyle: { color: '#f59e0b' },
+        yAxisIndex: 1,
+      },
+    ],
+  })
 }
 
 onMounted(() => {
@@ -288,6 +455,7 @@ watch(timeRange, () => loadStats())
 
 onUnmounted(() => {
   chartInstance?.dispose()
+  consistencyChart?.dispose()
   window.removeEventListener('resize', handleResize)
 })
 </script>
@@ -596,6 +764,70 @@ onUnmounted(() => {
   .section-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+// P2.9: 一致性看板样式
+.consistency-section {
+  margin-top: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+
+  .consistency-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    padding: 20px 24px;
+    border-bottom: 1px solid #eef2f7;
+  }
+
+  .metric-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 16px;
+    border-radius: 8px;
+    background: #f8fafc;
+    text-align: center;
+
+    .metric-label {
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .metric-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0f172a;
+
+      &.is-good { color: #059669; }
+      &.is-warn { color: #d97706; }
+      &.is-bad { color: #dc2626; }
+    }
+
+    .metric-desc {
+      color: #94a3b8;
+      font-size: 11px;
+    }
+  }
+
+  .consistency-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .consistency-empty {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 860px) {
+  .consistency-section .consistency-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

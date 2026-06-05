@@ -5,12 +5,14 @@ import com.bisai.entity.*;
 import com.bisai.mapper.*;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
@@ -24,6 +26,7 @@ public class DashboardService {
     private final CheckResultMapper checkResultMapper;
     private final AsyncTaskMapper asyncTaskMapper;
     private final AiCallLogMapper aiCallLogMapper;
+    private final ScoreConsistencyService scoreConsistencyService;
 
     public DashboardStats.StudentStats getStudentStats(Long userId) {
         DashboardStats.StudentStats stats = new DashboardStats.StudentStats();
@@ -342,6 +345,13 @@ public class DashboardService {
 
         // 最近操作日志
         stats.setRecentLogs(List.of());
+
+        // P2.9: 评分一致性看板数据
+        try {
+            stats.setConsistency(scoreConsistencyService.getConsistencyTrend(30));
+        } catch (Exception e) {
+            log.warn("获取一致性看板数据失败: {}", e.getMessage());
+        }
 
         return stats;
     }
