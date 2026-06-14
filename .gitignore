@@ -41,3 +41,11 @@ backend/data/files/
 .env
 .env.*
 *.sql
+
+# 第三方工具（独立 git 仓库，非本项目代码）
+shannon/
+
+# 本地工具/缓存目录
+.playwright-mcp/
+.understand-anything/
+backend/src/test/
