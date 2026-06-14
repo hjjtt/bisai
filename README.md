@@ -3,7 +3,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.3-brightgreen?logo=springboot)](https://spring.io/projects/spring-boot)
 [![Vue 3](https://img.shields.io/badge/Vue-3.5-42b883?logo=vuedotjs)](https://vuejs.org/)
 [![Java](https://img.shields.io/badge/Java-17-orange?logo=openjdk)](https://openjdk.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178c6?logo=typescript)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6?logo=typescript)](https://www.typescriptlang.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql)](https://www.mysql.com/)
 [![License](https://img.shields.io/badge/License-Educational-lightgrey)]()
 
@@ -30,7 +30,7 @@
 | **AI** | Spring AI 1.0 · ModelScope (Qwen / DeepSeek / Kimi 等可切换) · RAG 检索增强 |
 | **文档** | PDFBox 3.0 · POI 5.3 · docx4j 11.4 · iText 8.0 |
 | **数据库** | MySQL 8.0 (utf8mb4) |
-| **前端** | Vue 3.5 · TypeScript 5 · Vite 8 · Element Plus 2.13 · Pinia 3.0 · ECharts 6.0 |
+| **前端** | Vue 3.5 · TypeScript 6 · Vite 8 · Element Plus 2.13 · Pinia 3.0 · ECharts 6.0 |
 | **工程化** | Maven · npm · Axios |
 
 ## 系统架构
@@ -45,7 +45,7 @@
 ┌──────────────────────┴───────────────────────────────┐
 │                后端 (Spring Boot :8080)                 │
 │                                                        │
-│  Controller (16 REST) → Service (业务逻辑) → Mapper     │
+│  Controller (17 REST) → Service (业务逻辑) → Mapper     │
 │                                                        │
 │  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │
 │  │ Security     │  │ AI 服务层     │  │ AsyncTask   │  │
@@ -63,8 +63,10 @@
 ## 核心业务流程
 
 ```
-任务创建 → 学生上传 → [门禁校验 → AI 解析] → 教师触发 → [AI 核查 → AI 评分] → 教师复核 → 成绩发布
-  教师       学生        自动即时反馈        批量/单条       异步             教师       批量/单条
+① 创建任务 ──▶ ② 学生上传 ──▶ ③ 门禁+解析 ──▶ ④ 教师触发 ──▶ ⑤ AI 核查 ──▶ ⑥ AI 评分 ──▶ ⑦ 教师复核 ──▶ ⑧ 成绩发布
+   教师          学生          自动即时         批量/单条       异步         紧随核查      逐项校准      单条/批量
+                              反馈门禁结果                    命中红线                      可见偏差告警    导出报告
+                                                            自动熔断
 ```
 
 > **设计要点**：学生上传后**只自动触发门禁校验 + 文档解析**（即时反馈门禁结果与内容摘要），
@@ -96,8 +98,8 @@ bisai/
 ├── backend/                          # Spring Boot 后端
 │   └── src/main/java/com/bisai/
 │       ├── config/                   # Security · AI · Async · Jackson · MyBatis · MVC
-│       ├── controller/               # 16 个 REST 控制器
-│       ├── service/                  # 21 个业务服务
+│       ├── controller/               # 17 个 REST 控制器
+│       ├── service/                  # 23 个业务服务
 │       │   ├── AiService             #   AI 解析/核查/评分核心
 │       │   ├── ModelScopeClient      #   ModelScope API 调用封装
 │       │   ├── KnowledgeService      #   知识库（文档→分块→向量化）
@@ -111,7 +113,7 @@ bisai/
 │   └── src/
 │       ├── views/
 │       │   ├── student/             # 6 个学生页面
-│       │   ├── teacher/             # 14 个教师页面
+│       │   ├── teacher/             # 16 个教师页面
 │       │   └── admin/               # 6 个管理员页面
 │       ├── api/                      # 9 个 API 模块
 │       ├── store/                    # Pinia (user · app)
@@ -237,8 +239,6 @@ java -jar backend-1.0.0.jar          # 后端
 | 安全加固 | ✅ IDOR · 路径遍历 · Mass Assignment · XSS · 时间窗口校验 · 幂等上传 防护 |
 | 业务逻辑加固 | ✅ AI 链路触发时机优化 · 批量发布 · 版本管理 · 模板关联保护 · 数据可见性收敛 |
 | 评分一致性 | ✅ Pearson/Spearman/RMSE 统计 · 交叉模型校验 · 一致性看板 |
-| 自动化测试 | 🚧 计划中 |
-| CI/CD | 🚧 计划中 |
 
 ## 许可证
 
