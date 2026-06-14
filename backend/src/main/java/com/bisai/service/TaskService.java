@@ -44,6 +44,7 @@ public class TaskService {
     private final CourseMapper courseMapper;
     private final EvaluationTemplateMapper evaluationTemplateMapper;
     private final UserMapper userMapper;
+    private final MessageService messageService;
 
     private static final Map<Long, BatchJob> activeJobs = new ConcurrentHashMap<>();
 
@@ -169,6 +170,32 @@ public class TaskService {
         }
         task.setStatus("CLOSED");
         taskMapper.updateById(task);
+
+        // 任务关闭后，取消该任务下所有学生仍在运行的门禁/解析任务
+        // （这两阶段是学生上传时自动触发的，任务关闭后不应再消耗 AI 配额）。
+        // 核查/评分不取消：教师可能需要在任务关闭后批量处理已提交的内容。
+        try {
+            List<Submission> submissions = submissionMapper.selectList(
+                    new LambdaQueryWrapper<Submission>().eq(Submission::getTaskId, id)
+            );
+            int cancelled = 0;
+            for (Submission sub : submissions) {
+                List<AsyncTask> tasks = asyncTaskService.getTasksByBizId(sub.getId());
+                for (AsyncTask t : tasks) {
+                    if (("PRECHECK".equals(t.getTaskType()) || "PARSE".equals(t.getTaskType()))
+                            && ("PENDING".equals(t.getStatus()) || "RUNNING".equals(t.getStatus())
+                                || "RETRYING".equals(t.getStatus()))) {
+                        asyncTaskService.cancelTask(t.getId());
+                        cancelled++;
+                    }
+                }
+            }
+            if (cancelled > 0) {
+                log.info("任务 {} 关闭，已取消 {} 个进行中的门禁/解析任务", id, cancelled);
+            }
+        } catch (Exception e) {
+            log.warn("任务关闭时取消进行中任务失败: {}", e.getMessage());
+        }
         return Result.ok();
     }
 
@@ -326,6 +353,57 @@ public class TaskService {
         result.put("total", submissions.size());
         result.put("created", created);
         result.put("skipped", submissions.size() - created);
+        return Result.ok(result);
+    }
+
+    /**
+     * 批量发布成绩：将任务下所有 TEACHER_CONFIRMED 的提交一次性发布，避免教师逐条点 30 次。
+     * 必须校验 totalScore 非空，防止漏填分数发布 0 分。
+     */
+    public Result<Map<String, Object>> batchPublish(Long taskId, Long userId, String role) {
+        if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(taskId, userId)) {
+            return Result.error(40301, "无权操作该任务");
+        }
+        TrainingTask task = taskMapper.selectById(taskId);
+        if (task == null) {
+            return Result.error(40401, "任务不存在");
+        }
+
+        List<Submission> confirmed = submissionMapper.selectList(
+                new LambdaQueryWrapper<Submission>()
+                        .eq(Submission::getTaskId, taskId)
+                        .eq(Submission::getScoreStatus, "TEACHER_CONFIRMED")
+        );
+
+        int published = 0;
+        int skipped = 0;
+        for (Submission sub : confirmed) {
+            if (sub.getTotalScore() == null) {
+                skipped++; // 漏填分数，跳过避免发布 0 分
+                continue;
+            }
+            sub.setScoreStatus("PUBLISHED");
+            submissionMapper.updateById(sub);
+            published++;
+            // 通知学生
+            try {
+                messageService.sendMessage(
+                        sub.getStudentId(),
+                        "SCORE_PUBLISHED",
+                        "实训成绩已发布",
+                        String.format("您的实训任务（提交ID:%d）成绩已发布，最终得分：%.2f 分。",
+                                sub.getId(), sub.getTotalScore().doubleValue()),
+                        sub.getId()
+                );
+            } catch (Exception e) {
+                log.warn("批量发布：发送通知失败 submissionId={}: {}", sub.getId(), e.getMessage());
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("total", confirmed.size());
+        result.put("published", published);
+        result.put("skipped", skipped);
         return Result.ok(result);
     }
 

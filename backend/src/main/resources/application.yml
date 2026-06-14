@@ -63,7 +63,7 @@ file:
   upload-path: ./data/files/
   allowed-types: .doc,.docx,.pdf,.jpg,.jpeg,.png,.xls,.xlsx,.zip
   max-size: 209715200
-  max-versions: 5
+  max-versions: 10
 
 # JWT
 jwt:

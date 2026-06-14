@@ -21,6 +21,7 @@ public class EvaluationTemplateService {
 
     private final EvaluationTemplateMapper templateMapper;
     private final IndicatorMapper indicatorMapper;
+    private final com.bisai.mapper.TrainingTaskMapper taskMapper;
 
     public boolean isOwner(Long templateId, Long userId) {
         EvaluationTemplate template = templateMapper.selectById(templateId);
@@ -88,6 +89,16 @@ public class EvaluationTemplateService {
         EvaluationTemplate existing = templateMapper.selectById(id);
         if (existing == null) {
             return Result.error(40401, "模板不存在");
+        }
+
+        // 检查是否被任务引用：DRAFT/PUBLISHED/CLOSED 状态的任务仍需该模板评分，删除会导致评分静默失效
+        long taskCount = taskMapper.selectCount(
+                new LambdaQueryWrapper<com.bisai.entity.TrainingTask>()
+                        .eq(com.bisai.entity.TrainingTask::getTemplateId, id)
+                        .in(com.bisai.entity.TrainingTask::getStatus, "DRAFT", "PUBLISHED", "CLOSED")
+        );
+        if (taskCount > 0) {
+            return Result.error(40901, "该模板正被 " + taskCount + " 个任务引用，无法删除（请先解除关联或将任务归档）");
         }
 
         // 逻辑删除模板

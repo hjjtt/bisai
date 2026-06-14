@@ -60,19 +60,36 @@ public class AsyncTaskService {
 
     /**
      * 创建任务前按任务类型和业务ID去重，避免自动链路和手动触发重复排队。
+     * 含 FAILED 状态：若存在已失败任务，重置为 PENDING 复用（而非新建），防止同 bizId+type 任务堆积。
      */
     public Long createTaskIfAbsent(String taskType, Long bizId) {
         AsyncTask existing = asyncTaskMapper.selectOne(
                 new LambdaQueryWrapper<AsyncTask>()
                         .eq(AsyncTask::getTaskType, taskType)
                         .eq(AsyncTask::getBizId, bizId)
-                        .in(AsyncTask::getStatus, "PENDING", "RUNNING", "RETRYING", "SUCCESS")
+                        .in(AsyncTask::getStatus, "PENDING", "RUNNING", "RETRYING", "SUCCESS", "FAILED")
                         .orderByDesc(AsyncTask::getCreatedAt)
                         .last("LIMIT 1")
         );
         if (existing != null) {
-            log.info("跳过重复异步任务: type={}, bizId={}, existingId={}, status={}",
-                    taskType, bizId, existing.getId(), existing.getStatus());
+            // 已成功/进行中：跳过，返回已存在任务
+            if (!"FAILED".equals(existing.getStatus())) {
+                log.info("跳过重复异步任务: type={}, bizId={}, existingId={}, status={}",
+                        taskType, bizId, existing.getId(), existing.getStatus());
+                return existing.getId();
+            }
+            // 已失败：重置为 PENDING 复用，避免 FAILED + 新任务并存
+            existing.setStatus("PENDING");
+            existing.setRetryCount(0);
+            existing.setNextRunAt(LocalDateTime.now());
+            asyncTaskMapper.updateById(existing);
+            // 清空 error_message（updateById 默认忽略 null）
+            com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<AsyncTask> uw =
+                    new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<AsyncTask>()
+                            .eq("id", existing.getId())
+                            .set("error_message", null);
+            asyncTaskMapper.update(null, uw);
+            log.info("复用已失败任务并重置: type={}, bizId={}, taskId={}", taskType, bizId, existing.getId());
             return existing.getId();
         }
         return createTask(taskType, bizId);
@@ -248,10 +265,14 @@ public class AsyncTaskService {
                 createTaskIfAbsent("PARSE", task.getBizId());
             }
             case "PARSE" -> {
+                // 解析完成即终止自动链路。
+                // 设计：学生上传后只自动跑"门禁 + 解析"（即时反馈门禁结果和内容摘要），
+                // 核查与评分延后到任务截止后由教师通过 triggerCheck/triggerScore 或批量处理统一触发。
+                // 这样既保护 AI 配额（避免学生反复改稿耗尽），也保证评分公平（截止后统一标准）。
                 submission.setParseStatus("SUCCESS");
-                submission.setCheckStatus("CHECKING");
+                submission.setCheckStatus("NOT_CHECKED");
                 submissionMapper.updateById(submission);
-                createTaskIfAbsent("CHECK", task.getBizId());
+                log.info("解析完成，自动链路终止，等待教师触发核查, submissionId={}", submission.getId());
             }
             case "CHECK" -> {
                 submission.setCheckStatus("SUCCESS");

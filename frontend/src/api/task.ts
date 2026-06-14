@@ -112,6 +112,11 @@ export function batchCheck(taskId: number) {
   return post<{ total: number; created: number; skipped: number }>(`/tasks/${taskId}/batch-check`)
 }
 
+// 批量发布成绩（任务下所有 TEACHER_CONFIRMED 的提交一次性发布）
+export function batchPublish(taskId: number) {
+  return post<{ total: number; published: number; skipped: number }>(`/tasks/${taskId}/batch-publish`)
+}
+
 export function getBatchProgress(taskId: number) {
   return get<{ total: number; parsed: number; checked: number; scored: number; parseFailed: number; checkFailed: number; scoreFailed: number; totalFailed: number; running: number }>(`/tasks/${taskId}/batch-progress`)
 }

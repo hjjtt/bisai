@@ -225,9 +225,10 @@ public class ScoreService {
             return Result.error(40301, "无权访问该提交");
         }
 
-        // 未评分状态才返回空；RETURNED/AI_SCORED/TEACHER_CONFIRMED/PUBLISHED 都返回已有数据
+        // 学生只能查看已正式发布（PUBLISHED）的成绩，其他状态（AI 评分中/教师复核中/红线熔断/退回）
+        // 都不返回分数明细，避免泄漏 AI 评分过程或让教师未复核的分数提前可见
         String status = submission.getScoreStatus();
-        if ("NOT_SCORED".equals(status) || "SCORING".equals(status) || "SCORE_FAILED".equals(status)) {
+        if (!"PUBLISHED".equals(status)) {
             return Result.ok(List.of());
         }
 
@@ -255,7 +256,7 @@ public class ScoreService {
     }
 
     /**
-     * 学生查看自己提交的核查结果
+     * 学生查看自己提交的核查结果（仅成绩发布后可见，且过滤证据字段防止对抗核查）
      */
     public Result<List<CheckResult>> getStudentCheckResults(Long submissionId, Long userId) {
         Submission submission = submissionMapper.selectById(submissionId);
@@ -265,12 +266,15 @@ public class ScoreService {
         if (!submission.getStudentId().equals(userId)) {
             return Result.error(40301, "无权访问该提交");
         }
-        if (!"SUCCESS".equals(submission.getCheckStatus())) {
+        // 学生仅在成绩发布后可见核查结论；其他阶段（核查中/复核中/退回）不返回，避免泄漏核查过程
+        if (!"PUBLISHED".equals(submission.getScoreStatus())) {
             return Result.ok(List.of());
         }
         List<CheckResult> results = checkResultMapper.selectList(
                 new LambdaQueryWrapper<CheckResult>().eq(CheckResult::getSubmissionId, submissionId)
         );
+        // 过滤 evidence（核查证据），保留 suggestion（改进建议，对学生有益）
+        results.forEach(r -> r.setEvidence(null));
         return Result.ok(results);
     }
 
@@ -381,6 +385,9 @@ public class ScoreService {
         if (!"TEACHER_CONFIRMED".equals(submission.getScoreStatus())) {
             return Result.error(40901, "请先完成教师复核确认后再发布成绩");
         }
+        if (submission.getTotalScore() == null) {
+            return Result.error(40001, "总分未设置，无法发布（请先保存评分）");
+        }
         submission.setScoreStatus("PUBLISHED");
         submissionMapper.updateById(submission);
 
@@ -410,7 +417,22 @@ public class ScoreService {
             return Result.error(40401, "提交记录不存在");
         }
         submission.setScoreStatus("RETURNED");
+        // 退回原因落库，供学生查看
+        submission.setTeacherComment(reason);
         submissionMapper.updateById(submission);
+
+        // 消息通知学生退回原因
+        try {
+            messageService.sendMessage(
+                    submission.getStudentId(),
+                    "SUBMISSION_RETURNED",
+                    "提交已退回",
+                    "您的提交已被教师退回。退回原因：" + (reason != null && !reason.isEmpty() ? reason : "未填写"),
+                    submissionId
+            );
+        } catch (Exception e) {
+            log.warn("发送退回通知失败: {}", e.getMessage());
+        }
         return Result.ok();
     }
 

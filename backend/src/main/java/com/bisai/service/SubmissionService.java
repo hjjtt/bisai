@@ -168,6 +168,15 @@ public class SubmissionService {
             return Result.error(40901, "当前任务不可提交");
         }
 
+        // 1.1 校验任务时间窗口（后端强制，防止绕过前端按钮可见性）
+        LocalDateTime now = LocalDateTime.now();
+        if (task.getStartTime() != null && now.isBefore(task.getStartTime())) {
+            return Result.error(40901, "任务尚未开始，开始时间：" + task.getStartTime());
+        }
+        if (task.getEndTime() != null && now.isAfter(task.getEndTime())) {
+            return Result.error(40901, "任务已截止，截止时间：" + task.getEndTime());
+        }
+
         // 2. 校验成绩是否已发布 (FILE-005)
         List<Submission> existing = submissionMapper.selectList(
                 new LambdaQueryWrapper<Submission>()
@@ -178,6 +187,20 @@ public class SubmissionService {
                 .anyMatch(s -> "PUBLISHED".equals(s.getScoreStatus()));
         if (hasPublished) {
             return Result.error(40902, "成绩已发布，无法重新提交，请联系教师退回");
+        }
+
+        // 2.1 校验任务是否允许重新提交（后端强制，防止绕过前端）
+        //      allowResubmit=false 时，学生已有提交记录则禁止再传
+        if (Boolean.FALSE.equals(task.getAllowResubmit()) && !existing.isEmpty()) {
+            return Result.error(40903, "当前任务不允许重新提交");
+        }
+
+        // 2.2 幂等保护：10 秒内同任务同学生已有提交，视为重复点击，拒绝创建重复版本
+        LocalDateTime idempotentThreshold = now.minusSeconds(10);
+        boolean hasRecentSubmission = existing.stream()
+                .anyMatch(s -> s.getSubmitTime() != null && s.getSubmitTime().isAfter(idempotentThreshold));
+        if (hasRecentSubmission) {
+            return Result.error(40904, "提交过于频繁，请稍后再试");
         }
 
         // 3. 先校验所有文件，再创建提交记录 (FILE-002/003/004/006/007)
@@ -245,19 +268,9 @@ public class SubmissionService {
                 .orElse(0) + 1;
         long count = existing.size();
 
-        // 检查版本数量限制
+        // 版本数量限制：达到上限时拒绝上传，提示学生联系教师处理，避免静默删除辛苦修改的早期版本
         if (count >= maxVersions) {
-            List<Submission> oldSubmissions = submissionMapper.selectList(
-                    new LambdaQueryWrapper<Submission>()
-                            .eq(Submission::getTaskId, taskId)
-                            .eq(Submission::getStudentId, studentId)
-                            .orderByAsc(Submission::getVersion)
-                            .last("LIMIT " + ((int) count - maxVersions + 1))
-            );
-            for (Submission old : oldSubmissions) {
-                fileMapper.delete(new LambdaQueryWrapper<FileEntity>().eq(FileEntity::getSubmissionId, old.getId()));
-                submissionMapper.deleteById(old.getId());
-            }
+            return Result.error(40905, "提交版本已达上限（" + maxVersions + " 个），请联系教师退回后再重新提交");
         }
 
         // 创建提交记录

@@ -53,7 +53,17 @@ public class AsyncTaskController {
                 && !permissionService.isStudentOwnerOfSubmission(bizId, userId)) {
             return Result.error(40301, "无权访问该任务");
         }
-        return Result.ok(asyncTaskService.getTasksByBizId(bizId));
+        List<AsyncTask> tasks = asyncTaskService.getTasksByBizId(bizId);
+        // 学生角色过滤敏感字段，避免泄漏 errorMessage/retryCount 等内部状态
+        if ("STUDENT".equals(role)) {
+            tasks.forEach(t -> {
+                t.setErrorMessage(null);
+                t.setRetryCount(null);
+                t.setMaxRetry(null);
+                t.setNextRunAt(null);
+            });
+        }
+        return Result.ok(tasks);
     }
 
     @PostMapping("/{taskId}/retry")

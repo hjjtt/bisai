@@ -115,6 +115,17 @@ public class TaskController {
         return taskService.batchCheck(id, userId, role);
     }
 
+    @PostMapping("/{id}/batch-publish")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<Map<String, Object>> batchPublish(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return taskService.batchPublish(id, userId, role);
+    }
+
     @GetMapping("/{id}/batch-progress")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Map<String, Object>> batchProgress(@PathVariable Long id, Authentication auth) {
