@@ -55,13 +55,10 @@ public class SubmissionController {
     @PreAuthorize("hasRole('STUDENT')")
     public Result<Void> uploadFiles(@PathVariable Long taskId,
                                      @RequestParam("files") MultipartFile[] files,
-                                     Authentication auth) {
+                                     Authentication auth) throws java.io.IOException {
         Long userId = (Long) auth.getPrincipal();
-        try {
-            return submissionService.uploadFiles(taskId, userId, files);
-        } catch (Exception e) {
-            return Result.error("文件上传失败: " + e.getMessage());
-        }
+        // IOException 等异常交由全局处理器，避免吞掉事务回滚信息或泄漏内部错误
+        return submissionService.uploadFiles(taskId, userId, files);
     }
 
     @GetMapping("/{submissionId}/files")
@@ -210,9 +207,7 @@ public class SubmissionController {
                 .findFirst()
                 .map(a -> a.getAuthority().replace("ROLE_", ""))
                 .orElse("");
-        Long indicatorId = request.getIndicatorId();
-        java.math.BigDecimal newScore = request.getNewScore();
-        if (newScore == null) return Result.error(40001, "newScore 不能为空");
-        return scoreService.correctScore(id, indicatorId, newScore, request.getReason(), userId, role);
+        // reason 由 @NotBlank、newScore 由 @NotNull 在 @Valid 阶段校验
+        return scoreService.correctScore(id, request.getIndicatorId(), request.getNewScore(), request.getReason(), userId, role);
     }
 }

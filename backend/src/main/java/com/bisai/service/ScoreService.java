@@ -135,12 +135,15 @@ public class ScoreService {
     }
 
     /**
-     * 检查任务是否正在运行
+     * 检查评分相关任务是否正在运行或已完成。
+     * 评分有两种实现路径：传统 LLM-as-a-Judge（SCORE）和 Agentic（SCORE_AGENT），
+     * 视 ai.use-agent-score 配置切换，因此锁判断需同时覆盖两者，避免重复触发。
      */
     private boolean isTaskLocked(String taskType, Long bizId) {
         List<AsyncTask> tasks = asyncTaskService.getTasksByBizId(bizId);
-        return tasks.stream().anyMatch(t -> 
-            taskType.equals(t.getTaskType()) && 
+        String lockType = "SCORE".equals(taskType) ? "SCORE_AGENT" : taskType;
+        return tasks.stream().anyMatch(t ->
+            (taskType.equals(t.getTaskType()) || lockType.equals(t.getTaskType())) &&
             ( "PENDING".equals(t.getStatus()) || "RUNNING".equals(t.getStatus())
                     || "RETRYING".equals(t.getStatus()) || "SUCCESS".equals(t.getStatus()) )
         );
@@ -680,14 +683,18 @@ public class ScoreService {
         }
 
         public Map<String, Object> toMap() {
+            // 前端契约：{ scores: Record<string,number>, total: number, missingSections, deductions }
             Map<String, Object> map = new java.util.LinkedHashMap<>();
-            map.put("onTimeScore", onTimeScore);
-            map.put("formatScore", formatScore);
-            map.put("sectionScore", sectionScore);
-            map.put("screenshotScore", screenshotScore);
-            map.put("wordScore", wordScore);
-            map.put("testScore", testScore);
-            map.put("totalScore", totalScore);
+            Map<String, Integer> scores = new java.util.LinkedHashMap<>();
+            scores.put("按时提交", onTimeScore);
+            scores.put("文件格式", formatScore);
+            scores.put("必要章节", sectionScore);
+            scores.put("运行截图", screenshotScore);
+            scores.put("字数达标", wordScore);
+            scores.put("测试结果", testScore);
+            map.put("scores", scores);
+            map.put("total", totalScore);
+            // 后端独有明细，前端可选展示
             map.put("missingSections", missingSections);
             map.put("deductions", deductions);
             return map;

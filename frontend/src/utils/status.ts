@@ -186,3 +186,49 @@ export function getMessageTypeLabel(type: string): string {
   }
   return map[type] || type
 }
+
+// 启用/停用状态（账号、班级、课程、模板等通用）
+export function getEnableStatusType(status?: string | null): string {
+  return status === 'ENABLED' ? 'success' : 'danger'
+}
+
+export function getEnableStatusLabel(status?: string | null): string {
+  return status === 'ENABLED' ? '启用' : '停用'
+}
+
+// 知识库向量化状态（补充 VECTORIZING，原 getKnowledgeStatus* 缺该分支）
+export function getVectorStatusType(status: string): string {
+  switch (status) {
+    case 'SUCCESS': return 'success'
+    case 'VECTORIZING':
+    case 'PROCESSING':
+    case 'PARSING': return 'warning'
+    case 'FAILED': return 'danger'
+    default: return 'info'
+  }
+}
+
+export function getVectorStatusLabel(status: string): string {
+  switch (status) {
+    case 'SUCCESS': return '已完成'
+    case 'VECTORIZING': return '向量化中'
+    case 'PROCESSING':
+    case 'PARSING': return '处理中'
+    case 'FAILED': return '失败'
+    case 'PENDING': return '等待中'
+    default: return status
+  }
+}
+
+// 异步任务类型标签
+export function getTaskTypeLabel(type?: string | null): string {
+  const map: Record<string, string> = {
+    PRECHECK: '门禁校验',
+    PARSE: '解析',
+    CHECK: '核查',
+    SCORE: '评分',
+    // Agent 评分对学生展示同"评分"，避免暴露实现细节
+    SCORE_AGENT: '评分',
+  }
+  return map[type || ''] || '处理'
+}

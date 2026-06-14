@@ -48,15 +48,63 @@
             </div>
           </template>
 
+          <!-- LLM-as-a-Judge 偏差告警横幅：存在多模型评分偏差的指标时提醒教师重点复核 -->
+          <el-alert
+            v-if="divergentCount > 0"
+            :title="`检测到 ${divergentCount} 个指标存在多模型评分偏差（>15 分），建议重点复核`"
+            type="warning"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 12px"
+          />
+
           <el-table :data="scores" stripe v-loading="loading">
             <el-table-column prop="indicatorName" label="评价指标" width="180">
               <template #default="{ row }">
                 {{ row.indicatorName || '指标 #' + row.indicatorId }}
               </template>
             </el-table-column>
-            <el-table-column prop="autoScore" label="AI建议分" width="100">
+            <el-table-column prop="autoScore" label="AI建议分" width="170">
               <template #default="{ row }">
-                <span class="auto-score">{{ row.autoScore ?? '--' }}</span>
+                <div class="auto-score-cell">
+                  <span class="auto-score">{{ row.autoScore ?? '--' }}</span>
+                  <!-- 多轮采样：展示每轮分数（hover 看详情） -->
+                  <el-tooltip
+                    v-if="parseSampleScores(row.sampleScores).length > 1"
+                    placement="top"
+                  >
+                    <template #content>
+                      多轮采样分数：{{ parseSampleScores(row.sampleScores).join(' / ') }}
+                      <template v-if="row.wordCount">
+                        <br />字数 {{ row.wordCount }}
+                        <template v-if="row.verbosityFactor && row.verbosityFactor < 1">
+                          （已冗长修正 ×{{ row.verbosityFactor }}）
+                        </template>
+                      </template>
+                    </template>
+                    <el-tag size="small" type="info" effect="plain" class="sample-tag">
+                      ×{{ parseSampleScores(row.sampleScores).length }}轮
+                    </el-tag>
+                  </el-tooltip>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="交叉模型" width="110">
+              <template #default="{ row }">
+                <template v-if="row.crossModelScore != null">
+                  <el-tooltip
+                    :content="`备用模型评分：${row.crossModelScore} 分，偏差 ${row.crossModelDivergence ?? 0} 分`"
+                    placement="top"
+                  >
+                    <el-tag
+                      size="small"
+                      :type="(row.crossModelDivergence ?? 0) > 15 ? 'danger' : 'success'"
+                    >
+                      {{ row.crossModelScore }} 分
+                    </el-tag>
+                  </el-tooltip>
+                </template>
+                <el-text v-else type="info" size="small">未启用</el-text>
               </template>
             </el-table-column>
             <el-table-column label="教师评分" width="140">
@@ -66,10 +114,31 @@
             </el-table-column>
             <el-table-column prop="reason" label="评分理由" min-width="200">
               <template #default="{ row }">
-                <el-text type="info" size="small">{{ row.reason || '--' }}</el-text>
+                <div class="reason-cell">
+                  <el-text type="info" size="small">{{ row.reason || '--' }}</el-text>
+                  <!-- 覆盖度分析：点击展开 -->
+                  <el-popover
+                    v-if="parseCoverage(row.coverageDetails).length > 0"
+                    placement="bottom"
+                    :width="320"
+                    trigger="click"
+                  >
+                    <template #reference>
+                      <el-button link type="primary" size="small">覆盖度</el-button>
+                    </template>
+                    <div class="coverage-list">
+                      <div v-for="(c, i) in parseCoverage(row.coverageDetails)" :key="i" class="coverage-item">
+                        <el-tag size="small" :type="coverageTagType(c.status)" effect="plain">
+                          {{ coverageStatusLabel(c.status) }}
+                        </el-tag>
+                        <span class="coverage-point">{{ c.point }}</span>
+                      </div>
+                    </div>
+                  </el-popover>
+                </div>
               </template>
             </el-table-column>
-            <el-table-column prop="evidence" label="证据" min-width="150">
+            <el-table-column prop="evidence" label="证据" min-width="120">
               <template #default="{ row }">
                 <el-text type="warning" size="small">{{ row.evidence || '--' }}</el-text>
               </template>
@@ -157,7 +226,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getScoreResults, saveTeacherScores, publishScore, returnSubmission, startScore, getSubmission, getObjectiveScore, correctScore } from '@/api/task'
 import { getParseStatusType, getParseStatusLabel, getScoreStatusType, getScoreStatusLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
-import type { ScoreResult, Submission } from '@/types'
+import type { ScoreResult, Submission, CoverageDetail } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -175,6 +244,48 @@ const canStartAiScore = computed(() => {
   const status = submission.value?.scoreStatus
   return !aiScoring.value && ['NOT_SCORED', 'SCORE_FAILED', 'CANCELLED'].includes(status || '')
 })
+
+// ===== LLM-as-a-Judge 数据解析辅助 =====
+
+/** 解析 sampleScores JSON 字符串为数字数组，容错处理 */
+function parseSampleScores(raw?: string): number[] {
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr.map((n) => Number(n)).filter((n) => !isNaN(n)) : []
+  } catch {
+    return []
+  }
+}
+
+/** 解析 coverageDetails JSON 字符串为覆盖度项数组 */
+function parseCoverage(raw?: string): CoverageDetail[] {
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
+  }
+}
+
+function coverageTagType(status?: string): 'success' | 'warning' | 'danger' {
+  if (status === 'covered') return 'success'
+  if (status === 'partial') return 'warning'
+  return 'danger'
+}
+
+function coverageStatusLabel(status?: string): string {
+  if (status === 'covered') return '已覆盖'
+  if (status === 'partial') return '部分覆盖'
+  if (status === 'missing') return '缺失'
+  return status || ''
+}
+
+/** 存在交叉模型偏差超阈值的指标数，用于全局告警 */
+const divergentCount = computed(() =>
+  scores.value.filter((s) => (s.crossModelDivergence ?? 0) > 15).length
+)
 
 // 客观评分
 const showObjectiveDialog = ref(false)
@@ -347,5 +458,36 @@ onBeforeUnmount(stopScorePolling)
 .auto-score {
   color: #409eff;
   font-weight: bold;
+}
+.auto-score-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sample-tag {
+  cursor: help;
+}
+.reason-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.coverage-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+.coverage-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--el-border-color-lighter, #ebeef5);
+}
+.coverage-item:last-child {
+  border-bottom: none;
+}
+.coverage-point {
+  font-size: 13px;
+  line-height: 1.5;
 }
 </style>

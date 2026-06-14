@@ -28,13 +28,16 @@ public class AsyncTaskController {
                 .findFirst()
                 .map(a -> a.getAuthority().replace("ROLE_", ""))
                 .orElse("");
+        AsyncTask task = asyncTaskService.getTaskStatus(taskId);
         if (!permissionService.isAdmin(role)) {
-            AsyncTask task = asyncTaskService.getTaskStatus(taskId);
-            if (task == null || !permissionService.isTeacherOwnerOfSubmission(task.getBizId(), userId)) {
+            if (task == null) {
+                return Result.error(40401, "任务不存在");
+            }
+            if (!permissionService.isTeacherOwnerOfSubmission(task.getBizId(), userId)) {
                 return Result.error(40301, "无权访问该任务");
             }
         }
-        return Result.ok(asyncTaskService.getTaskStatus(taskId));
+        return Result.ok(task);
     }
 
     @GetMapping("/biz/{bizId}")
@@ -63,7 +66,10 @@ public class AsyncTaskController {
                 .orElse("");
         if (!permissionService.isAdmin(role)) {
             AsyncTask task = asyncTaskService.getTaskStatus(taskId);
-            if (task == null || !permissionService.isTeacherOwnerOfSubmission(task.getBizId(), userId)) {
+            if (task == null) {
+                return Result.error(40401, "任务不存在");
+            }
+            if (!permissionService.isTeacherOwnerOfSubmission(task.getBizId(), userId)) {
                 return Result.error(40301, "无权操作该任务");
             }
         }
@@ -81,7 +87,10 @@ public class AsyncTaskController {
                 .orElse("");
         if (!permissionService.isAdmin(role)) {
             AsyncTask task = asyncTaskService.getTaskStatus(taskId);
-            if (task == null || !permissionService.isTeacherOwnerOfSubmission(task.getBizId(), userId)) {
+            if (task == null) {
+                return Result.error(40401, "任务不存在");
+            }
+            if (!permissionService.isTeacherOwnerOfSubmission(task.getBizId(), userId)) {
                 return Result.error(40301, "无权操作该任务");
             }
         }
@@ -95,12 +104,13 @@ public class AsyncTaskController {
         Long userId = (Long) auth.getPrincipal();
         String role = auth.getAuthorities().stream().findFirst()
                 .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("");
+        // 一次 IN 查询替代 stream 内逐个查询（N+1）
+        List<AsyncTask> tasks = asyncTaskService.getTasksByIds(taskIds);
         if (!permissionService.isAdmin(role)) {
-            taskIds = taskIds.stream().filter(tid -> {
-                AsyncTask task = asyncTaskService.getTaskStatus(tid);
-                return task != null && permissionService.isTeacherOwnerOfSubmission(task.getBizId(), userId);
-            }).toList();
+            tasks = tasks.stream()
+                    .filter(t -> permissionService.isTeacherOwnerOfSubmission(t.getBizId(), userId))
+                    .toList();
         }
-        return Result.ok(asyncTaskService.getBatchStatus(taskIds));
+        return Result.ok(asyncTaskService.getBatchStatus(tasks));
     }
 }

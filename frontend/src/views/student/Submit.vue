@@ -83,7 +83,7 @@ import { useRoute } from 'vue-router'
 import type { UploadFile, UploadRawFile } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { getTask, getSubmissions, uploadFiles, getAsyncTasksByBizId } from '@/api/task'
-import { getParseStatusType, getParseStatusLabel, getScoreStatusType, getScoreStatusLabel, getAsyncTaskStatusType, getAsyncTaskStatusLabel } from '@/utils/status'
+import { getParseStatusType, getParseStatusLabel, getScoreStatusType, getScoreStatusLabel, getAsyncTaskStatusType, getAsyncTaskStatusLabel, getTaskTypeLabel } from '@/utils/status'
 import { formatDate } from '@/utils/date'
 import type { AsyncTask, TrainingTask, Submission } from '@/types'
 
@@ -297,13 +297,6 @@ function getCurrentAiTask(tasks: AsyncTask[]) {
     || findLatestTask(tasks, 'CHECK')
     || findLatestTask(tasks, 'PARSE')
     || findLatestTask(tasks, 'PRECHECK')
-}
-
-function getTaskTypeLabel(taskType: string) {
-  const map: Record<string, string> = {
-    PRECHECK: '门禁', PARSE: '解析', CHECK: '核查', SCORE: '评分', SCORE_AGENT: '评分',
-  }
-  return map[taskType] || '处理'
 }
 
 const activeAiStep = computed(() => {

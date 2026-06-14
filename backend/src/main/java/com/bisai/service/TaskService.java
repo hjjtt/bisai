@@ -180,7 +180,7 @@ public class TaskService {
         if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(taskId, userId)) {
             return Result.error(40301, "无权操作该任务");
         }
-        if (activeJobs.containsKey(taskId)) {
+        if (isBatchJobActive(taskId)) {
             return Result.error(40901, "该任务正在批量处理中，请稍后重试");
         }
 
@@ -233,7 +233,7 @@ public class TaskService {
         if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(taskId, userId)) {
             return Result.error(40301, "无权操作该任务");
         }
-        if (activeJobs.containsKey(taskId)) {
+        if (isBatchJobActive(taskId)) {
             return Result.error(40901, "该任务正在批量处理中，请稍后重试");
         }
 
@@ -285,7 +285,7 @@ public class TaskService {
         if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfTask(taskId, userId)) {
             return Result.error(40301, "无权操作该任务");
         }
-        if (activeJobs.containsKey(taskId)) {
+        if (isBatchJobActive(taskId)) {
             return Result.error(40901, "该任务正在批量处理中，请稍后重试");
         }
 
@@ -424,8 +424,36 @@ public class TaskService {
         tasks.forEach(t -> t.setTemplateName(templateNameMap.getOrDefault(t.getTemplateId(), "")));
     }
 
+    /**
+     * 批量任务占位记录，用于防止同一任务并发批量处理。
+     * 记录创建时间，避免事件未发布时锁永久泄漏。
+     */
     private static class BatchJob {
+        final long createdAt = System.currentTimeMillis();
+        final String type;
+        final int total;
         BatchJob(Long taskId, String type, int total) {
+            this.type = type;
+            this.total = total;
         }
+    }
+
+    /** 批量任务锁最长有效时间（30 分钟），超时自动视为泄漏并清理 */
+    private static final long BATCH_JOB_TTL_MS = 30 * 60 * 1000L;
+
+    /**
+     * 判断任务是否仍在批量处理中（含超时清理）。
+     * 若锁存在但已超过 TTL（如事件未发布、进程异常），自动清除并放行，避免永久占用。
+     */
+    private boolean isBatchJobActive(Long taskId) {
+        BatchJob job = activeJobs.get(taskId);
+        if (job == null) return false;
+        if (System.currentTimeMillis() - job.createdAt > BATCH_JOB_TTL_MS) {
+            log.warn("批量任务锁已超时泄漏，自动清理: taskId={}, type={}, age={}ms",
+                    taskId, job.type, System.currentTimeMillis() - job.createdAt);
+            activeJobs.remove(taskId);
+            return false;
+        }
+        return true;
     }
 }

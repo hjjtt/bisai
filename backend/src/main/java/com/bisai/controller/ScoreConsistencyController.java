@@ -51,13 +51,15 @@ public class ScoreConsistencyController {
     }
 
     /**
-     * 手动触发生成一致性快照
+     * 手动触发生成一致性快照（5 分钟内仅允许一次，防止全表扫描雪崩）
      */
     @PostMapping("/snapshot")
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> generateSnapshot() {
-        consistencyService.generateSnapshot();
-        return Result.ok();
+        boolean generated = consistencyService.generateSnapshot();
+        return generated
+                ? Result.ok()
+                : Result.error(42901, "快照生成过于频繁，请 5 分钟后再试");
     }
 
     // ==================== P2.8: Pairwise 比较 ====================

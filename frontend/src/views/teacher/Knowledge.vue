@@ -19,8 +19,8 @@
         </el-table-column>
         <el-table-column label="向量化状态" min-width="120" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.vectorStatus === 'SUCCESS' ? 'success' : row.vectorStatus === 'FAILED' ? 'danger' : 'warning'" size="small">
-              {{ row.vectorStatus === 'SUCCESS' ? '已完成' : row.vectorStatus === 'FAILED' ? '失败' : (row.vectorStatus === 'PROCESSING' || row.vectorStatus === 'PENDING' ? '处理中' : row.vectorStatus) }}
+            <el-tag :type="getVectorStatusType(row.vectorStatus)" size="small">
+              {{ getVectorStatusLabel(row.vectorStatus) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -100,7 +100,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { getKnowledgeList, deleteKnowledge, uploadKnowledge, toggleKnowledgeStatus, updateKnowledge, type KnowledgeDocument } from '@/api/knowledge'
 import { getTaskList } from '@/api/task'
-import { getKnowledgeStatusType, getKnowledgeStatusLabel } from '@/utils/status'
+import { getKnowledgeStatusType, getKnowledgeStatusLabel, getVectorStatusType, getVectorStatusLabel } from '@/utils/status'
 import type { TrainingTask } from '@/types'
 
 const loading = ref(false)

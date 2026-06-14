@@ -42,11 +42,24 @@ export type AsyncTaskStatus = 'PENDING' | 'RUNNING' | 'RETRYING' | 'SUCCESS' | '
 // 消息类型（与后端 Message.type 一致，参考 utils/status.ts 中的映射）
 export type MessageType = 'SUBMISSION' | 'AI_PARSE' | 'AI_CHECK' | 'AI_SCORE' | 'SCORE_PUBLISHED' | 'SCORE_CORRECTED' | 'SUBMISSION_RETURNED' | 'AI_CHECK_REDFLAG' | 'AI_SCORE_AGENT'
 
-// 批量任务进度
+// 批量任务进度（与后端 TaskService.getBatchProgress 返回结构对齐）
 export interface BatchProgress {
   total: number
-  success: number
-  failed: number
+  /** 已解析完成的提交数 */
+  parsed: number
+  /** 已核查完成的提交数 */
+  checked: number
+  /** 已评分完成的提交数 */
+  scored: number
+  /** 解析失败数 */
+  parseFailed: number
+  /** 核查失败数 */
+  checkFailed: number
+  /** 评分失败数 */
+  scoreFailed: number
+  /** 三阶段失败总和（后端返回，便于展示） */
+  totalFailed: number
+  /** 执行中数量 */
   running: number
 }
 

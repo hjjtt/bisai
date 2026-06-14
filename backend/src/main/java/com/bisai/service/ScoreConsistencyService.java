@@ -30,6 +30,7 @@ public class ScoreConsistencyService {
     private final TrainingTaskMapper taskMapper;
     private final ScoreConsistencySnapshotMapper snapshotMapper;
     private final ScoreJudgeService scoreJudgeService;
+    private final com.bisai.config.AiConfig aiConfig;
 
     /**
      * 计算指定任务的 AI vs 教师评分相关性
@@ -99,11 +100,13 @@ public class ScoreConsistencyService {
         // 指标级别的分析
         stats.put("indicatorAnalysis", computeIndicatorLevelAnalysis(results, submissionIds));
 
-        // 交叉模型一致率
+        // 交叉模型一致率（一致判定阈值统一引用 ai.cross-model-divergence-threshold，避免多处硬编码）
+        double divergenceThreshold = aiConfig.getCrossModelDivergenceThreshold();
         long crossModelTotal = results.stream()
                 .filter(r -> r.getCrossModelScore() != null).count();
         long crossModelAgree = results.stream()
-                .filter(r -> r.getCrossModelDivergence() != null && r.getCrossModelDivergence().doubleValue() <= 15.0)
+                .filter(r -> r.getCrossModelDivergence() != null
+                        && r.getCrossModelDivergence().doubleValue() <= divergenceThreshold)
                 .count();
         if (crossModelTotal > 0) {
             double agreement = (double) crossModelAgree / crossModelTotal;
@@ -150,7 +153,19 @@ public class ScoreConsistencyService {
     /**
      * 生成一致性统计快照（可定时调用）
      */
-    public void generateSnapshot() {
+    /** 快照生成最小间隔（分钟），防止管理员高频点击触发全表扫描雪崩 */
+    private static final long SNAPSHOT_MIN_INTERVAL_MIN = 5;
+    /** 最近一次成功生成快照的时间戳，用于内存级频控 */
+    private volatile long lastSnapshotAt = 0L;
+
+    public boolean generateSnapshot() {
+        // 频控：距上次生成不足间隔则跳过，避免重复全表扫描
+        long now = System.currentTimeMillis();
+        if (now - lastSnapshotAt < SNAPSHOT_MIN_INTERVAL_MIN * 60 * 1000L) {
+            log.warn("快照生成被频控拦截（距上次不足 {} 分钟），跳过", SNAPSHOT_MIN_INTERVAL_MIN);
+            return false;
+        }
+
         LocalDate today = LocalDate.now();
 
         // 全局快照
@@ -166,7 +181,9 @@ public class ScoreConsistencyService {
             saveSnapshot(task.getId(), today, taskStats);
         }
 
-        log.info("评分一致性快照已生成, date={}", today);
+        lastSnapshotAt = System.currentTimeMillis();
+        log.info("评分一致性快照已生成, date={}, 任务数={}", today, tasks.size());
+        return true;
     }
 
     private void saveSnapshot(Long taskId, LocalDate date, Map<String, Object> stats) {
@@ -276,17 +293,25 @@ public class ScoreConsistencyService {
         List<TrainingTask> tasks = taskMapper.selectList(
                 new LambdaQueryWrapper<TrainingTask>().eq(TrainingTask::getStatus, "PUBLISHED")
         );
+        if (tasks.isEmpty()) return List.of();
+
+        // 一次性查出所有任务的快照，内存按 taskId 分组取最新，消除循环内 N+1 查询
+        Set<Long> taskIds = tasks.stream().map(TrainingTask::getId).collect(Collectors.toSet());
+        List<ScoreConsistencySnapshot> allSnapshots = snapshotMapper.selectList(
+                new LambdaQueryWrapper<ScoreConsistencySnapshot>()
+                        .in(ScoreConsistencySnapshot::getTaskId, taskIds)
+                        .orderByAsc(ScoreConsistencySnapshot::getTaskId)
+                        .orderByDesc(ScoreConsistencySnapshot::getSnapshotDate)
+        );
+        // taskId -> 最新快照（已按日期倒序，取每组第一条）
+        Map<Long, ScoreConsistencySnapshot> latestByTask = new LinkedHashMap<>();
+        for (ScoreConsistencySnapshot snap : allSnapshots) {
+            latestByTask.putIfAbsent(snap.getTaskId(), snap);
+        }
 
         List<Map<String, Object>> summary = new ArrayList<>();
         for (TrainingTask task : tasks) {
-            // 取该任务最近的快照
-            ScoreConsistencySnapshot snapshot = snapshotMapper.selectOne(
-                    new LambdaQueryWrapper<ScoreConsistencySnapshot>()
-                            .eq(ScoreConsistencySnapshot::getTaskId, task.getId())
-                            .orderByDesc(ScoreConsistencySnapshot::getSnapshotDate)
-                            .last("LIMIT 1")
-            );
-
+            ScoreConsistencySnapshot snapshot = latestByTask.get(task.getId());
             if (snapshot == null) continue;
 
             Map<String, Object> item = new LinkedHashMap<>();

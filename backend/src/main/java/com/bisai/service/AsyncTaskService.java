@@ -294,6 +294,16 @@ public class AsyncTaskService {
     }
 
     /**
+     * 批量查询任务（一次 IN 查询，消除 N+1）
+     */
+    public List<AsyncTask> getTasksByIds(java.util.List<Long> taskIds) {
+        if (taskIds == null || taskIds.isEmpty()) return java.util.List.of();
+        return asyncTaskMapper.selectList(
+                new LambdaQueryWrapper<AsyncTask>().in(AsyncTask::getId, taskIds)
+        );
+    }
+
+    /**
      * 取消正在执行的任务
      */
     public boolean cancelTask(Long taskId) {
@@ -364,15 +374,12 @@ public class AsyncTaskService {
     }
 
     /**
-     * 批量查询任务状态统计（替代 N+1 查询）
+     * 批量查询任务状态统计（接收已查到的任务列表，避免重复查询）
      */
-    public java.util.Map<String, Long> getBatchStatus(java.util.List<Long> taskIds) {
-        if (taskIds == null || taskIds.isEmpty()) {
+    public java.util.Map<String, Long> getBatchStatus(java.util.List<AsyncTask> tasks) {
+        if (tasks == null || tasks.isEmpty()) {
             return java.util.Map.of("total", 0L, "pending", 0L, "running", 0L, "success", 0L, "failed", 0L);
         }
-        List<AsyncTask> tasks = asyncTaskMapper.selectList(
-                new LambdaQueryWrapper<AsyncTask>().in(AsyncTask::getId, taskIds)
-        );
         long pending = 0, running = 0, success = 0, failed = 0;
         for (AsyncTask t : tasks) {
             switch (t.getStatus()) {
@@ -382,8 +389,10 @@ public class AsyncTaskService {
                 case "FAILED" -> failed++;
             }
         }
+        // total 以实际任务数为准
+        long total = pending + running + success + failed;
         return java.util.Map.of(
-                "total", (long) taskIds.size(),
+                "total", total,
                 "pending", pending,
                 "running", running,
                 "success", success,

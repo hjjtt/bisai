@@ -317,25 +317,56 @@ public class DashboardService {
                 new LambdaQueryWrapper<AiCallLog>().ge(AiCallLog::getCreatedAt, todayStart).eq(AiCallLog::getSuccess, false));
         stats.setServerLoad(totalCalls == 0 ? 0 : Math.min(100, Math.round((double) failedCalls / totalCalls * 10000.0) / 100.0));
 
-        // 最近7天图表数据
+        // 最近 N 天图表数据：3 次 GROUP BY 聚合查询替代 days*3 次 selectCount
+        // 给 days 加上限保护，避免前端传入超大值拖垮数据库
+        int safeDays = Math.max(1, Math.min(days, 90));
+        LocalDateTime rangeStart = LocalDateTime.now().minusDays(safeDays - 1L).toLocalDate().atStartOfDay();
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        java.time.format.DateTimeFormatter labelFmt = java.time.format.DateTimeFormatter.ofPattern("MM-dd");
+
+        // 一次查出每天提交数
+        java.util.Map<String, Long> submissionByDay = countByDay(
+                submissionMapper.selectMaps(
+                        new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<Submission>()
+                                .select("DATE_FORMAT(created_at, '%Y-%m-%d') as d, count(*) as c")
+                                .ge("created_at", rangeStart)
+                                .groupBy("DATE_FORMAT(created_at, '%Y-%m-%d')")
+                                .orderByAsc("d")),
+                "d", "c");
+
+        // 一次查出每天解析成功数
+        java.util.Map<String, Long> parsedByDay = countByDay(
+                submissionMapper.selectMaps(
+                        new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<Submission>()
+                                .select("DATE_FORMAT(created_at, '%Y-%m-%d') as d, count(*) as c")
+                                .ge("created_at", rangeStart)
+                                .eq("parse_status", "SUCCESS")
+                                .groupBy("DATE_FORMAT(created_at, '%Y-%m-%d')")
+                                .orderByAsc("d")),
+                "d", "c");
+
+        // 一次查出每天评分完成数
+        java.util.Map<String, Long> scoredByDay = countByDay(
+                submissionMapper.selectMaps(
+                        new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<Submission>()
+                                .select("DATE_FORMAT(created_at, '%Y-%m-%d') as d, count(*) as c")
+                                .ge("created_at", rangeStart)
+                                .in("score_status", "AI_SCORED", "TEACHER_CONFIRMED", "PUBLISHED")
+                                .groupBy("DATE_FORMAT(created_at, '%Y-%m-%d')")
+                                .orderByAsc("d")),
+                "d", "c");
+
         List<String> dates = new ArrayList<>();
         List<Long> submissionsPerDay = new ArrayList<>();
         List<Long> parsedPerDay = new ArrayList<>();
         List<Long> scoredPerDay = new ArrayList<>();
-
-        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("MM-dd");
-        for (int i = days - 1; i >= 0; i--) {
-            LocalDateTime dayStart = LocalDateTime.now().minusDays(i).toLocalDate().atStartOfDay();
-            LocalDateTime dayEnd = dayStart.plusDays(1);
-            dates.add(dayStart.format(fmt));
-
-            submissionsPerDay.add(submissionMapper.selectCount(
-                    new LambdaQueryWrapper<Submission>().ge(Submission::getCreatedAt, dayStart).lt(Submission::getCreatedAt, dayEnd)));
-            parsedPerDay.add(submissionMapper.selectCount(
-                    new LambdaQueryWrapper<Submission>().eq(Submission::getParseStatus, "SUCCESS").ge(Submission::getCreatedAt, dayStart).lt(Submission::getCreatedAt, dayEnd)));
-            scoredPerDay.add(submissionMapper.selectCount(
-                    new LambdaQueryWrapper<Submission>().ge(Submission::getCreatedAt, dayStart).lt(Submission::getCreatedAt, dayEnd)
-                            .and(w -> w.eq(Submission::getScoreStatus, "AI_SCORED").or().eq(Submission::getScoreStatus, "TEACHER_CONFIRMED").or().eq(Submission::getScoreStatus, "PUBLISHED"))));
+        java.time.LocalDate today = java.time.LocalDate.now();
+        for (int i = safeDays - 1; i >= 0; i--) {
+            String dayKey = today.minusDays(i).format(fmt);
+            dates.add(today.minusDays(i).format(labelFmt));
+            submissionsPerDay.add(submissionByDay.getOrDefault(dayKey, 0L));
+            parsedPerDay.add(parsedByDay.getOrDefault(dayKey, 0L));
+            scoredPerDay.add(scoredByDay.getOrDefault(dayKey, 0L));
         }
 
         stats.setDates(dates);
@@ -359,6 +390,26 @@ public class DashboardService {
     private double calcTrend(long current, long previous) {
         if (previous == 0) return current > 0 ? 100 : 0;
         return Math.round((double)(current - previous) / previous * 10000.0) / 100.0;
+    }
+
+    /**
+     * 将 selectMaps 的 GROUP BY 结果（[{d: "2026-06-01", c: 5}, ...]）转为 {日期: 计数} Map。
+     * 容错处理：跳过 key 缺失或计数无法解析的行。
+     */
+    private java.util.Map<String, Long> countByDay(List<Map<String, Object>> rows, String dayKey, String countKey) {
+        java.util.Map<String, Long> result = new java.util.HashMap<>();
+        if (rows == null) return result;
+        for (Map<String, Object> row : rows) {
+            Object d = row.get(dayKey);
+            Object c = row.get(countKey);
+            if (d == null) continue;
+            try {
+                long count = c == null ? 0L : Long.parseLong(c.toString());
+                result.put(d.toString(), count);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return result;
     }
 
     private Map<String, Object> buildStatus(String name, String text) {

@@ -64,8 +64,8 @@
         </el-table-column>
         <el-table-column label="状态" min-width="90" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
-              {{ row.status === 'ENABLED' ? '启用' : '禁用' }}
+            <el-tag :type="getEnableStatusType(row.status)" size="small">
+              {{ getEnableStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -143,7 +143,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, EditPen, Search } from '@element-plus/icons-vue'
 import { createUser, getUserList, resetPassword, toggleUserStatus, updateUser } from '@/api/user'
 import { getClassList } from '@/api/course'
-import { getRoleLabel, getRoleType, ROLE_OPTIONS } from '@/utils/status'
+import { getRoleLabel, getRoleType, ROLE_OPTIONS, getEnableStatusType, getEnableStatusLabel } from '@/utils/status'
 import type { ClassInfo, UserInfo, UserRole } from '@/types'
 
 type RoleTab = '' | UserRole

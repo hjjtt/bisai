@@ -17,8 +17,8 @@
         </el-table-column>
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
-              {{ row.status === 'ENABLED' ? '启用' : '禁用' }}
+            <el-tag :type="getEnableStatusType(row.status)" size="small">
+              {{ getEnableStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -59,6 +59,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { getClassList, createClass, updateClass } from '@/api/course'
 import type { ClassInfo } from '@/types'
+import { getEnableStatusType, getEnableStatusLabel } from '@/utils/status'
 
 const loading = ref(false)
 const classes = ref<ClassInfo[]>([])

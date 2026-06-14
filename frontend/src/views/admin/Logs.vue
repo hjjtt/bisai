@@ -70,6 +70,7 @@ async function loadLogs() {
     modelLogs.value = data.items || []
     pagination.total = data.total || 0
   } catch (e) {
+    console.error('[Logs] 加载日志失败:', e)
   } finally {
     loading.value = false
   }

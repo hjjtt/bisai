@@ -40,6 +40,7 @@ public class AiService {
     private final UserMapper userMapper;
     private final com.bisai.service.tools.ToolCallGuard toolCallGuard;
     private final ScoreJudgeService scoreJudgeService;
+    private final com.bisai.config.AiConfig aiConfig;
 
     // ==================== AI门禁预检 ====================
 
@@ -618,28 +619,31 @@ public class AiService {
             // ===== 混合评分：规则预评分 + AI 质量评估 =====
 
             // 1. 规则预评分：检测缺失项，缺失项直接 0 分
+            //    依赖指标命名约定（含"测试"/"总结"/"需求"等关键词），可在 ai.rule-pre-score-enabled 关闭
             String contentLower = fileContent.toString().toLowerCase();
             java.util.Map<Long, BigDecimal> ruleScores = new java.util.HashMap<>();
             java.util.Map<Long, String> ruleReasons = new java.util.HashMap<>();
 
-            for (Indicator ind : indicators) {
-                String name = ind.getName();
-                BigDecimal maxScore = ind.getMaxScore();
+            if (aiConfig.isRulePreScoreEnabled()) {
+                for (Indicator ind : indicators) {
+                    String name = ind.getName();
+                    BigDecimal maxScore = ind.getMaxScore();
 
-                if (name.contains("测试") || name.contains("验证")) {
-                    if (!hasRealSection(contentLower, "测试", "验证", "test", "用例")) {
-                        ruleScores.put(ind.getId(), BigDecimal.ZERO);
-                        ruleReasons.put(ind.getId(), "报告中完全缺失测试验证章节");
-                    }
-                } else if (name.contains("总结") || name.contains("反思")) {
-                    if (!hasRealSection(contentLower, "总结与反思", "实训总结", "收获与体会", "总结", "反思")) {
-                        ruleScores.put(ind.getId(), BigDecimal.ZERO);
-                        ruleReasons.put(ind.getId(), "报告中完全缺失总结反思章节");
-                    }
-                } else if (name.contains("需求")) {
-                    if (!hasRealSection(contentLower, "需求分析", "需求描述", "功能需求", "业务背景")) {
-                        ruleScores.put(ind.getId(), maxScore.multiply(BigDecimal.valueOf(0.15)));
-                        ruleReasons.put(ind.getId(), "无独立需求分析章节，仅通过流程描述间接体现");
+                    if (name.contains("测试") || name.contains("验证")) {
+                        if (!hasRealSection(contentLower, "测试", "验证", "test", "用例")) {
+                            ruleScores.put(ind.getId(), BigDecimal.ZERO);
+                            ruleReasons.put(ind.getId(), "报告中完全缺失测试验证章节");
+                        }
+                    } else if (name.contains("总结") || name.contains("反思")) {
+                        if (!hasRealSection(contentLower, "总结与反思", "实训总结", "收获与体会", "总结", "反思")) {
+                            ruleScores.put(ind.getId(), BigDecimal.ZERO);
+                            ruleReasons.put(ind.getId(), "报告中完全缺失总结反思章节");
+                        }
+                    } else if (name.contains("需求")) {
+                        if (!hasRealSection(contentLower, "需求分析", "需求描述", "功能需求", "业务背景")) {
+                            ruleScores.put(ind.getId(), maxScore.multiply(BigDecimal.valueOf(0.15)));
+                            ruleReasons.put(ind.getId(), "无独立需求分析章节，仅通过流程描述间接体现");
+                        }
                     }
                 }
             }
@@ -717,7 +721,7 @@ public class AiService {
                     }
                     // 交叉模型偏差告警计数
                     if (judgeItem.crossModelDivergence != null
-                            && judgeItem.crossModelDivergence.doubleValue() > 15.0) {
+                            && judgeItem.crossModelDivergence.doubleValue() > aiConfig.getCrossModelDivergenceThreshold()) {
                         crossModelFlags++;
                     }
                 }
@@ -851,9 +855,13 @@ public class AiService {
 
             updateTaskProgress(asyncTaskId, 80, "正在汇总评分结果...");
 
+            // 复用已查询的指标构建查找表，避免循环内逐个 selectById 造成 N+1 查询
+            java.util.Map<Long, Indicator> indicatorMap = expectedIndicators.stream()
+                    .collect(java.util.stream.Collectors.toMap(Indicator::getId, i -> i, (a, b) -> a));
+
             BigDecimal autoTotalScore = BigDecimal.ZERO;
             for (ScoreResult sr : savedResults) {
-                Indicator ind = indicatorMapper.selectById(sr.getIndicatorId());
+                Indicator ind = indicatorMap.get(sr.getIndicatorId());
                 if (ind != null && sr.getAutoScore() != null && ind.getMaxScore() != null && ind.getMaxScore().compareTo(BigDecimal.ZERO) > 0) {
                     if (ind.getWeight() != null) {
                         BigDecimal contribution = sr.getAutoScore()

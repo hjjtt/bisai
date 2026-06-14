@@ -13,4 +13,11 @@ public class PageQuery {
     public Integer getSize() {
         return size != null ? Math.min(size, MAX_SIZE) : 20;
     }
+
+    /**
+     * page 下限保护：MyBatis-Plus 分页 page 必须 >= 1，传 0 或负数会导致 offset 为负。
+     */
+    public Integer getPage() {
+        return page != null && page >= 1 ? page : 1;
+    }
 }

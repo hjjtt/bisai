@@ -20,8 +20,8 @@
             </el-table-column>
             <el-table-column label="状态" width="80" align="center">
               <template #default="{ row }">
-                <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
-                  {{ row.status === 'ENABLED' ? '启用' : '禁用' }}
+                <el-tag :type="getEnableStatusType(row.status)" size="small">
+                  {{ getEnableStatusLabel(row.status) }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -48,8 +48,8 @@
             <el-table-column prop="className" label="授课班级" width="120" align="center" />
             <el-table-column label="状态" width="80" align="center">
               <template #default="{ row }">
-                <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
-                  {{ row.status === 'ENABLED' ? '启用' : '停用' }}
+                <el-tag :type="getEnableStatusType(row.status)" size="small">
+                  {{ getEnableStatusLabel(row.status) }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -111,6 +111,7 @@ import { EditPen } from '@element-plus/icons-vue'
 import { getClassList, createClass, updateClass, getCourseList, createCourse, updateCourse } from '@/api/course'
 import { getUserList } from '@/api/user'
 import type { ClassInfo, Course, UserInfo } from '@/types'
+import { getEnableStatusType, getEnableStatusLabel } from '@/utils/status'
 
 const activeTab = ref('class')
 const classLoading = ref(false)
@@ -182,6 +183,7 @@ async function loadTeachers() {
     const res = await getUserList({ role: 'TEACHER', size: 100 })
     teachers.value = res.data.items
   } catch (e) {
+    console.error('[Classes] 加载教师列表失败:', e)
   }
 }
 

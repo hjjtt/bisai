@@ -38,4 +38,7 @@ public class AiConfig {
     private double crossModelDivergenceThreshold = 15.0;
     /** 是否启用交叉模型评估（用备用模型独立评分，比较偏差） */
     private boolean enableCrossModel = false;
+    /** 是否启用规则预评分（基于指标名关键词检测缺失章节，命中直接 0 分）。
+     *  规则预评分依赖指标命名约定，命名不规范时建议关闭，避免误伤。 */
+    private boolean rulePreScoreEnabled = true;
 }

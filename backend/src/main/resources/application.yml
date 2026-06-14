@@ -82,5 +82,7 @@ ai:
   temperature: 0.3
   daily-token-limit: ${AI_DAILY_TOKEN_LIMIT:500000}
   daily-call-limit: ${AI_DAILY_CALL_LIMIT:2000}
-  use-agent-score: true
+  # 默认走 LLM-as-a-Judge 多轮采样评分（规则预评分 + 多轮 CoT + few-shot + 冗长修正 + 交叉模型）
+  # 设为 true 则改走 Agentic（ReAct 工具调用）路径，但后者不使用 ScoreJudgeService
+  use-agent-score: false
   rerank-model:

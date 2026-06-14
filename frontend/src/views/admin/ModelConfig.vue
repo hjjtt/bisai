@@ -6,7 +6,7 @@
           <span>模型配置</span>
           <div>
             <el-tag type="success">主模型: {{ form.model || 'Qwen/Qwen3.5-35B-A3B' }}</el-tag>
-            <el-tag type="warning" style="margin-left: 8px">备用: {{ form.fallbackModelss || '未配置' }}</el-tag>
+            <el-tag type="warning" style="margin-left: 8px">备用: {{ form.fallbackModels || '未配置' }}</el-tag>
           </div>
         </div>
       </template>

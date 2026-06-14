@@ -24,8 +24,8 @@
         <el-table-column prop="name" label="模板名称" min-width="160" align="center" />
         <el-table-column label="状态" min-width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'ENABLED' ? 'success' : 'info'">
-              {{ row.status === 'ENABLED' ? '启用' : '禁用' }}
+            <el-tag :type="getEnableStatusType(row.status)">
+              {{ getEnableStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -131,6 +131,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { getTemplateList, getTemplate, createTemplate, updateTemplate, deleteTemplate } from '@/api/course'
 import type { EvaluationTemplate, Indicator } from '@/types'
+import { getEnableStatusType, getEnableStatusLabel } from '@/utils/status'
+import { formatDateTime as formatDate } from '@/utils/date'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -154,11 +156,6 @@ const rules: FormRules = {
     { required: true, message: '请输入模板名称', trigger: 'blur' },
     { max: 100, message: '模板名称不能超过100个字符', trigger: 'blur' },
   ],
-}
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '-'
-  return dateStr.replace('T', ' ').substring(0, 19)
 }
 
 async function loadTemplates() {

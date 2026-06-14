@@ -24,23 +24,29 @@
       </template>
 
       <el-row :gutter="20" v-if="progress">
-        <el-col :span="6">
+        <el-col :span="4">
           <el-statistic title="总数" :value="progress.total" />
         </el-col>
-        <el-col :span="6">
-          <el-statistic title="成功" :value="progress.success" />
+        <el-col :span="4">
+          <el-statistic title="已完成" :value="progress.scored" />
         </el-col>
-        <el-col :span="6">
-          <el-statistic title="失败" :value="progress.failed" />
+        <el-col :span="4">
+          <el-statistic title="失败" :value="progress.totalFailed" />
         </el-col>
-        <el-col :span="6">
+        <el-col :span="4">
           <el-statistic title="执行中" :value="progress.running" />
+        </el-col>
+        <el-col :span="4">
+          <el-statistic title="已解析" :value="progress.parsed" />
+        </el-col>
+        <el-col :span="4">
+          <el-statistic title="已核查" :value="progress.checked" />
         </el-col>
       </el-row>
 
       <el-progress
         v-if="progress"
-        :percentage="progress.total ? Math.min(100, Math.round(((progress.success || 0) + (progress.failed || 0)) / progress.total * 100)) : 0"
+        :percentage="progress.total ? Math.min(100, Math.round(((progress.scored || 0) + (progress.totalFailed || 0)) / progress.total * 100)) : 0"
         style="margin-top: 20px"
       />
 
@@ -48,7 +54,7 @@
       <div v-if="progress && selectedTaskId" style="margin-top: 24px">
         <el-table
           :data="submissions"
-          :loading="listLoading"
+          v-loading="listLoading"
           stripe
           border
           style="width: 100%"

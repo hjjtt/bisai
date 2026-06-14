@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -77,6 +78,9 @@ public class ReportController {
 
     /**
      * 下载报告文件
+     *
+     * 安全校验：报告文件由系统生成，file 表记录了 originalName==磁盘名、submissionId、fileType。
+     * 用 originalName 反查时必须命中唯一记录且归属校验通过，防止构造他人报告文件名越权下载。
      */
     @GetMapping("/download/report/{fileName}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
@@ -88,15 +92,25 @@ public class ReportController {
         Long userId = (Long) auth.getPrincipal();
         String role = auth.getAuthorities().stream().findFirst()
                 .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("");
+
         if (!permissionService.isAdmin(role)) {
-            FileEntity fileEntity = fileMapper.selectOne(
-                    new LambdaQueryWrapper<FileEntity>().eq(FileEntity::getOriginalName, fileName)
-                            .last("LIMIT 1"));
-            if (fileEntity == null || fileEntity.getSubmissionId() == null) {
+            // 非管理员：用 originalName 反查报告文件记录，确认归属
+            List<FileEntity> matches = fileMapper.selectList(
+                    new LambdaQueryWrapper<FileEntity>().eq(FileEntity::getOriginalName, fileName));
+            if (matches.isEmpty() || matches.get(0).getSubmissionId() == null) {
                 return ResponseEntity.status(403).build();
             }
-            if (!permissionService.isTeacherOwnerOfSubmission(fileEntity.getSubmissionId(), userId)
-                    && !permissionService.isStudentOwnerOfSubmission(fileEntity.getSubmissionId(), userId)) {
+            FileEntity reportFile = matches.get(0);
+            Long submissionId = reportFile.getSubmissionId();
+
+            // 班级报表（XLSX）属教师资源，学生无权下载
+            if ("STUDENT".equals(role) && "XLSX".equalsIgnoreCase(reportFile.getFileType())) {
+                return ResponseEntity.status(403).build();
+            }
+
+            boolean allowed = permissionService.isTeacherOwnerOfSubmission(submissionId, userId)
+                    || permissionService.isStudentOwnerOfSubmission(submissionId, userId);
+            if (!allowed) {
                 return ResponseEntity.status(403).build();
             }
         }

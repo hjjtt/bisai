@@ -14,8 +14,8 @@
         <el-table-column prop="className" label="授课班级" width="150" align="center" />
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
-              {{ row.status === 'ENABLED' ? '启用' : '停用' }}
+            <el-tag :type="getEnableStatusType(row.status)" size="small">
+              {{ getEnableStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -63,6 +63,7 @@ import { getCourseList, createCourse, updateCourse, getClassList } from '@/api/c
 import { getUserList } from '@/api/user'
 import { useUserStore } from '@/store'
 import type { Course, ClassInfo, UserInfo } from '@/types'
+import { getEnableStatusType, getEnableStatusLabel } from '@/utils/status'
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)

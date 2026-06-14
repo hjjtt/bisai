@@ -58,14 +58,12 @@ public class MessageService {
     }
 
     public Result<Void> markAllRead(Long userId) {
-        messageMapper.selectList(
-                new LambdaQueryWrapper<Message>()
+        // 单条 UPDATE 替代 N 次 updateById，避免未读消息多时的性能问题
+        messageMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Message>()
                         .eq(Message::getUserId, userId)
                         .eq(Message::getIsRead, false)
-        ).forEach(msg -> {
-            msg.setIsRead(true);
-            messageMapper.updateById(msg);
-        });
+                        .set(Message::getIsRead, true));
         return Result.ok();
     }
 
