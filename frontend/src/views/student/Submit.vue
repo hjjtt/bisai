@@ -40,8 +40,8 @@
         <el-steps :active="activeAiStep" finish-status="success" process-status="process" simple style="margin-bottom: 16px">
           <el-step title="门禁" :status="getStepStatus('PRECHECK')" />
           <el-step title="解析" :status="getStepStatus('PARSE')" />
-          <el-step title="核查" :status="getStepStatus('CHECK')" />
-          <el-step title="评分" :status="getStepStatus('SCORE')" />
+          <el-step :title="pipelineTerminal === 'PARSE_DONE' ? '核查（待教师）' : '核查'" :status="getStepStatus('CHECK')" />
+          <el-step :title="pipelineTerminal === 'PARSE_DONE' ? '评分（待教师）' : '评分'" :status="getStepStatus('SCORE')" />
         </el-steps>
         <el-progress :percentage="overallProgress" :status="overallProgress === 100 ? 'success' : undefined" :stroke-width="16" />
         <p style="margin-top: 8px; color: #666; font-size: 14px">{{ aiTaskCurrentStep }}</p>
@@ -280,6 +280,20 @@ function checkSubmissionTerminal(submission: Submission): boolean {
       return true
     }
   }
+  // 新流程终态：学生上传后只自动触发门禁+解析，核查/评分延后由教师触发。
+  // 当解析已完成（SUCCESS）且无运行中任务、评分未启动时，学生侧流水线视为完成。
+  // 进度条收尾到 100%，核查/评分步骤展示「待教师处理」，避免停在 50% 的误解。
+  if (submission.parseStatus === 'SUCCESS' && (scoreStatus === 'NOT_SCORED' || !scoreStatus)) {
+    const hasRunning = aiTasks.value.some(t => ['PENDING', 'RUNNING', 'RETRYING'].includes(t.status))
+    if (!hasRunning) {
+      pipelineTerminal.value = 'PARSE_DONE'
+      aiTaskProgress.value = 100
+      aiTaskStatus.value = 'SUCCESS'
+      aiTaskCurrentStep.value = '文档解析完成，核查与评分将由教师在截止后统一触发'
+      ElMessage.success('文档解析完成！核查与评分请等待教师处理')
+      return true
+    }
+  }
   return false
 }
 
@@ -345,6 +359,11 @@ function getStepStatus(taskType: string) {
       if (task.status === 'FAILED' || task.status === 'CANCELLED') return 'error'
       if (task.status === 'SUCCESS') return 'success'
       return 'wait'
+    }
+    // 新流程：解析完成后学生侧流水线结束，核查/评分待教师处理
+    if (pipelineTerminal.value === 'PARSE_DONE') {
+      if (taskType === 'PRECHECK' || taskType === 'PARSE') return 'success'
+      return 'wait' // 核查/评分：学生侧不执行，灰色等待（文案另行说明）
     }
     // COMPLETED / REDFLAG：所有步骤显示 success
     return 'success'
