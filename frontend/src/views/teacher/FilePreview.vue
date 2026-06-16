@@ -14,6 +14,8 @@
           <div class="preview-area">
             <!-- PDF 预览 -->
             <iframe v-if="isPdf(file) && blobUrls[file.id]" :src="blobUrls[file.id]" class="preview-iframe" />
+            <!-- Office(doc/docx/xls/xlsx) 后端转 PDF 后用 iframe 预览 -->
+            <iframe v-else-if="isOfficeConvertible(file) && blobUrls[file.id] && blobUrls[file.id] !== '__NO_PREVIEW__'" :src="blobUrls[file.id]" class="preview-iframe" />
             <!-- 图片预览 -->
             <el-image v-else-if="isImage(file) && blobUrls[file.id]" :src="blobUrls[file.id]" fit="contain" class="preview-image" />
             <!-- 其他文件 -->
@@ -50,15 +52,27 @@ function isPdf(file: FileInfo) {
   return file.fileType === 'PDF' || file.originalName.endsWith('.pdf')
 }
 
+// 后端 FileController 会把 doc/docx/xls/xlsx 转成 PDF 返回（Content-Type: application/pdf），
+// 因此这些 Office 类型也走 iframe 预览，而非显示"暂不支持"。
+function isOfficeConvertible(file: FileInfo) {
+  return ['DOC', 'DOCX', 'XLS', 'XLSX'].includes(file.fileType)
+}
+
 function isImage(file: FileInfo) {
   return ['JPG', 'JPEG', 'PNG'].includes(file.fileType)
 }
 
-async function loadBlob(fileId: number) {
+async function loadBlob(file: FileInfo) {
   try {
-    const res = await getFilePreview(fileId)
+    const res = await getFilePreview(file.id)
     const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
-    blobUrls[fileId] = URL.createObjectURL(blob)
+    // 后端对 Office 文件转 PDF：若转换失败会回退返回原二进制（非 PDF），
+    // 此时 blob.type 不是 application/pdf，标记为不可预览，避免 iframe 空白。
+    if (isOfficeConvertible(file) && blob.type && !blob.type.includes('pdf')) {
+      blobUrls[file.id] = '__NO_PREVIEW__'
+      return
+    }
+    blobUrls[file.id] = URL.createObjectURL(blob)
   } catch {
     ElMessage.error('文件预览加载失败')
   }
@@ -81,7 +95,7 @@ async function loadFiles() {
     if (files.value.length > 0) {
       activeTab.value = String(files.value[0].id)
       for (const file of files.value) {
-        await loadBlob(file.id)
+        await loadBlob(file)
       }
     }
   } catch {
@@ -94,7 +108,9 @@ async function loadFiles() {
 onMounted(loadFiles)
 
 onUnmounted(() => {
-  Object.values(blobUrls).forEach(url => URL.revokeObjectURL(url))
+  Object.values(blobUrls).forEach(url => {
+    if (url && url !== '__NO_PREVIEW__') URL.revokeObjectURL(url)
+  })
 })
 </script>
 
