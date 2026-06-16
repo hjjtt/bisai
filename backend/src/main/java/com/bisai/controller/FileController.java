@@ -217,7 +217,7 @@ public class FileController {
 
             return pdfPath;
         } catch (Exception e) {
-            log.warn("Office文件转PDF失败 fileId={}: {}", fileEntity.getId(), e.getMessage());
+            log.warn("Office文件转PDF失败 fileId={} type={}: {}", fileEntity.getId(), fileEntity.getFileType(), e.getMessage(), e);
             return null;
         }
     }
@@ -247,32 +247,122 @@ public class FileController {
         return new org.apache.pdfbox.pdmodel.font.PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA);
     }
 
+    /**
+     * 清洗文本：PDFBox showText 对控制字符/特殊符号会抛 IllegalArgumentException，
+     * 移除 ASCII 控制字符（保留 \t），并将无法显示的字符替换为空格。
+     */
+    private String sanitizeText(String s) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            // 保留制表符、换行不在此处理（外部按行分割），移除其他控制字符
+            if (c == '\t' || c == '\r' || c == '\f') {
+                continue;
+            }
+            // ASCII 控制字符（0x00-0x1F）一律移除
+            if (c < 0x20) {
+                continue;
+            }
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 按可显示宽度截断行，避免超长行超出页面宽度导致渲染异常。
+     * 中文字符按 2 个单位宽度估算，英文按 1。
+     */
+    private String truncateByWidth(String s, int maxWidthUnits) {
+        if (s == null) return "";
+        int width = 0;
+        int end = s.length();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            width += (c > 0x7F) ? 2 : 1;
+            if (width > maxWidthUnits) {
+                end = i;
+                break;
+            }
+        }
+        return s.substring(0, end);
+    }
+
+    /**
+     * 将多行文本渲染到 PDF，自动分页。
+     * 解决原实现"全部内容塞进单页 A4 导致越界异常"的问题。
+     *
+     * @param pdf      PDF 文档
+     * @param font     字体
+     * @param fontSize 字号
+     * @param lines    要渲染的文本行
+     */
+    private void renderLinesToPdf(org.apache.pdfbox.pdmodel.PDDocument pdf,
+                                   org.apache.pdfbox.pdmodel.font.PDFont font,
+                                   float fontSize, java.util.List<String> lines) throws Exception {
+        org.apache.pdfbox.pdmodel.common.PDRectangle pageSize = org.apache.pdfbox.pdmodel.common.PDRectangle.A4;
+        float margin = 40f;
+        float lineGap = fontSize * 1.4f;          // 行距
+        float startY = pageSize.getHeight() - margin;
+        float bottomLimit = margin;               // 页面底部边界
+        // A4 宽度 595pt，减去左右边距，按字号估算每行可容纳的宽度单位
+        int maxWidthUnits = (int) ((pageSize.getWidth() - margin * 2) / (fontSize * 0.5));
+
+        float y = startY;
+        org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage(pageSize);
+        pdf.addPage(page);
+        org.apache.pdfbox.pdmodel.PDPageContentStream cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(pdf, page);
+        cs.setFont(font, fontSize);
+        boolean inText = false;
+
+        for (String rawLine : lines) {
+            String line = sanitizeText(rawLine);
+            line = truncateByWidth(line, maxWidthUnits);
+            if (line.isEmpty()) {
+                line = " "; // 空行占位，保持段落间距
+            }
+
+            // 超出底部边界则分页
+            if (y < bottomLimit) {
+                if (inText) {
+                    cs.endText();
+                    inText = false;
+                }
+                cs.close();
+                page = new org.apache.pdfbox.pdmodel.PDPage(pageSize);
+                pdf.addPage(page);
+                cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(pdf, page);
+                cs.setFont(font, fontSize);
+                y = startY;
+            }
+
+            if (!inText) {
+                cs.beginText();
+                inText = true;
+            }
+            cs.newLineAtOffset(margin, y);
+            cs.showText(line);
+            y -= lineGap;
+        }
+        if (inText) {
+            cs.endText();
+        }
+        cs.close();
+    }
+
     private void convertDocxToPdf(Path sourcePath, Path pdfPath) throws Exception {
         try (java.io.InputStream is = java.nio.file.Files.newInputStream(sourcePath);
              org.apache.poi.xwpf.usermodel.XWPFDocument doc = new org.apache.poi.xwpf.usermodel.XWPFDocument(is);
              org.apache.pdfbox.pdmodel.PDDocument pdf = new org.apache.pdfbox.pdmodel.PDDocument();
              java.io.OutputStream os = java.nio.file.Files.newOutputStream(pdfPath)) {
-            
-            org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage(org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
-            pdf.addPage(page);
 
             org.apache.pdfbox.pdmodel.font.PDFont font = loadChineseFont(pdf);
-            try (org.apache.pdfbox.pdmodel.PDPageContentStream contentStream = new org.apache.pdfbox.pdmodel.PDPageContentStream(pdf, page)) {
-                contentStream.beginText();
-                contentStream.setFont(font, 10);
-                contentStream.newLineAtOffset(50, 750);
-
-                try (org.apache.poi.xwpf.extractor.XWPFWordExtractor extractor = new org.apache.poi.xwpf.extractor.XWPFWordExtractor(doc)) {
-                    String text = extractor.getText();
-                    String[] lines = text.split("\n");
-                    for (String line : lines) {
-                        if (line.length() > 80) line = line.substring(0, 80);
-                        contentStream.showText(line);
-                        contentStream.newLineAtOffset(0, -12);
-                    }
-                }
-                contentStream.endText();
+            java.util.List<String> lines = new java.util.ArrayList<>();
+            try (org.apache.poi.xwpf.extractor.XWPFWordExtractor extractor = new org.apache.poi.xwpf.extractor.XWPFWordExtractor(doc)) {
+                String text = extractor.getText();
+                lines.addAll(java.util.Arrays.asList(text.split("\n")));
             }
+            renderLinesToPdf(pdf, font, 10f, lines);
             pdf.save(os);
         }
     }
@@ -282,27 +372,14 @@ public class FileController {
              org.apache.poi.hwpf.HWPFDocument doc = new org.apache.poi.hwpf.HWPFDocument(is);
              org.apache.pdfbox.pdmodel.PDDocument pdf = new org.apache.pdfbox.pdmodel.PDDocument();
              java.io.OutputStream os = java.nio.file.Files.newOutputStream(pdfPath)) {
-            
-            org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage(org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
-            pdf.addPage(page);
 
             org.apache.pdfbox.pdmodel.font.PDFont font = loadChineseFont(pdf);
-            try (org.apache.pdfbox.pdmodel.PDPageContentStream contentStream = new org.apache.pdfbox.pdmodel.PDPageContentStream(pdf, page)) {
-                contentStream.beginText();
-                contentStream.setFont(font, 10);
-                contentStream.newLineAtOffset(50, 750);
-
-                try (org.apache.poi.hwpf.extractor.WordExtractor extractor = new org.apache.poi.hwpf.extractor.WordExtractor(doc)) {
-                    String text = extractor.getText();
-                    String[] lines = text.split("\n");
-                    for (String line : lines) {
-                        if (line.length() > 80) line = line.substring(0, 80);
-                        contentStream.showText(line);
-                        contentStream.newLineAtOffset(0, -12);
-                    }
-                }
-                contentStream.endText();
+            java.util.List<String> lines = new java.util.ArrayList<>();
+            try (org.apache.poi.hwpf.extractor.WordExtractor extractor = new org.apache.poi.hwpf.extractor.WordExtractor(doc)) {
+                String text = extractor.getText();
+                lines.addAll(java.util.Arrays.asList(text.split("\n")));
             }
+            renderLinesToPdf(pdf, font, 10f, lines);
             pdf.save(os);
         }
     }
@@ -312,32 +389,22 @@ public class FileController {
              org.apache.poi.ss.usermodel.Workbook workbook = org.apache.poi.ss.usermodel.WorkbookFactory.create(is);
              org.apache.pdfbox.pdmodel.PDDocument pdf = new org.apache.pdfbox.pdmodel.PDDocument();
              java.io.OutputStream os = java.nio.file.Files.newOutputStream(pdfPath)) {
-            
-            org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage(org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
-            pdf.addPage(page);
 
             org.apache.pdfbox.pdmodel.font.PDFont font = loadChineseFont(pdf);
-            try (org.apache.pdfbox.pdmodel.PDPageContentStream contentStream = new org.apache.pdfbox.pdmodel.PDPageContentStream(pdf, page)) {
-                contentStream.beginText();
-                contentStream.setFont(font, 8);
-                contentStream.newLineAtOffset(30, 770);
-
-                org.apache.poi.ss.usermodel.DataFormatter formatter = new org.apache.poi.ss.usermodel.DataFormatter();
-                for (org.apache.poi.ss.usermodel.Sheet sheet : workbook) {
-                    contentStream.showText("【" + sheet.getSheetName() + "】");
-                    contentStream.newLineAtOffset(0, -12);
-                    for (org.apache.poi.ss.usermodel.Row row : sheet) {
-                        StringBuilder line = new StringBuilder();
-                        for (org.apache.poi.ss.usermodel.Cell cell : row) {
-                            line.append(formatter.formatCellValue(cell)).append("\t");
-                        }
-                        contentStream.showText(line.toString());
-                        contentStream.newLineAtOffset(0, -10);
+            java.util.List<String> lines = new java.util.ArrayList<>();
+            org.apache.poi.ss.usermodel.DataFormatter formatter = new org.apache.poi.ss.usermodel.DataFormatter();
+            for (org.apache.poi.ss.usermodel.Sheet sheet : workbook) {
+                lines.add("【" + sheet.getSheetName() + "】");
+                for (org.apache.poi.ss.usermodel.Row row : sheet) {
+                    StringBuilder line = new StringBuilder();
+                    for (org.apache.poi.ss.usermodel.Cell cell : row) {
+                        line.append(formatter.formatCellValue(cell)).append("\t");
                     }
-                    contentStream.newLineAtOffset(0, -10);
+                    lines.add(line.toString());
                 }
-                contentStream.endText();
+                lines.add("");
             }
+            renderLinesToPdf(pdf, font, 8f, lines);
             pdf.save(os);
         }
     }
