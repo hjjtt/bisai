@@ -55,6 +55,10 @@
           <span>详细核查项</span>
           <div>
             <el-button type="info" @click="$router.push(`/teacher/submissions/${submissionId}/preview`)">预览文件</el-button>
+            <el-button type="warning" @click="$router.push(`/teacher/submissions/${submissionId}/score-review`)" v-if="submission?.scoreStatus === 'SCORED' || submission?.scoreStatus === 'TEACHER_CONFIRMED'">查看评分</el-button>
+            <el-button type="success" @click="handleScore" :loading="scoring" v-if="submission?.checkStatus === 'SUCCESS'">
+              {{ scoring ? '正在评分...' : '开始 AI 评分' }}
+            </el-button>
             <el-button type="primary" @click="handleRecheck" :loading="rechecking">
               {{ rechecking ? '正在核查...' : (submission?.checkStatus === 'SUCCESS' ? '重新核查' : '开始 AI 核查') }}
             </el-button>
@@ -93,13 +97,14 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getCheckResults, startCheck, getSubmission } from '@/api/task'
+import { getCheckResults, startCheck, startScore, getSubmission } from '@/api/task'
 import { getResultType, getResultLabel, getRiskType, getRiskLabel, getCheckStatusType, getCheckStatusLabel } from '@/utils/status'
 import type { CheckResult, Submission } from '@/types'
 
 const route = useRoute()
 const loading = ref(false)
 const rechecking = ref(false)
+const scoring = ref(false)
 const submission = ref<Submission | null>(null)
 const checkResults = ref<CheckResult[]>([])
 const polling = ref<number | null>(null)
@@ -139,6 +144,21 @@ async function handleRecheck() {
   } catch (e) {
     ElMessage.error('触发核查失败')
     rechecking.value = false
+  }
+}
+
+async function handleScore() {
+  scoring.value = true
+  try {
+    await startScore(submissionId.value)
+    ElMessage.success('AI 评分任务已启动')
+    // 跳转到评分复核页面
+    setTimeout(() => {
+      scoring.value = false
+    }, 1000)
+  } catch (e) {
+    ElMessage.error('触发评分失败')
+    scoring.value = false
   }
 }
 
