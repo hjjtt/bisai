@@ -223,48 +223,111 @@ public class FileController {
     }
 
     /**
-     * 加载中文 PDF 字体
+     * 加载中文 PDF 字体。
+     * 注意：.ttc 是 TrueType Collection（多字体合集），不能用 PDType0Font.load 直接加载
+     * （fontbox 找不到 head 表报 IOException: 'head' table is mandatory）。
+     * 必须用 TrueTypeCollection 取出其中的单字体。
      */
     private org.apache.pdfbox.pdmodel.font.PDFont loadChineseFont(org.apache.pdfbox.pdmodel.PDDocument pdf) throws Exception {
-        // 尝试常见系统字体路径
+        // 尝试常见系统字体路径（优先 .ttf 单字体，避免 .ttc 合集解析）
         String[] fontPaths = {
-                "C:/Windows/Fonts/simsun.ttc",      // Windows 宋体
-                "C:/Windows/Fonts/msyh.ttc",         // Windows 微软雅黑
-                "C:/Windows/Fonts/simhei.ttf",       // Windows 黑体
+                "C:/Windows/Fonts/simhei.ttf",       // Windows 黑体（单字体，优先）
+                "C:/Windows/Fonts/simsun.ttc",       // Windows 宋体（合集）
+                "C:/Windows/Fonts/msyh.ttc",         // Windows 微软雅黑（合集）
                 "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf", // Linux
                 "/usr/share/fonts/wqy-zenhei/wqy-zenhei.ttc"               // Linux 文泉驿
         };
 
         for (String path : fontPaths) {
             java.io.File fontFile = new java.io.File(path);
-            if (fontFile.exists()) {
-                return org.apache.pdfbox.pdmodel.font.PDType0Font.load(pdf, fontFile);
+            if (!fontFile.exists()) {
+                continue;
+            }
+            try {
+                if (path.toLowerCase().endsWith(".ttc")) {
+                    // .ttc 合集：PDFBox 3.x 的 TrueTypeCollection 用回调取字体
+                    try (org.apache.fontbox.ttf.TrueTypeCollection ttc = new org.apache.fontbox.ttf.TrueTypeCollection(fontFile)) {
+                        final org.apache.pdfbox.pdmodel.PDDocument docRef = pdf;
+                        final org.apache.pdfbox.pdmodel.font.PDFont[] holder = new org.apache.pdfbox.pdmodel.font.PDFont[1];
+                        ttc.processAllFonts(ttf -> {
+                            if (holder[0] == null) {
+                                try {
+                                    holder[0] = org.apache.pdfbox.pdmodel.font.PDType0Font.load(docRef, ttf, true);
+                                } catch (Exception ex) {
+                                    log.warn("从 ttc 加载字体失败: {}", ex.getMessage());
+                                }
+                            }
+                        });
+                        if (holder[0] != null) {
+                            return holder[0];
+                        }
+                    }
+                } else {
+                    // .ttf 单字体：直接加载
+                    return org.apache.pdfbox.pdmodel.font.PDType0Font.load(pdf, fontFile);
+                }
+            } catch (Exception e) {
+                log.warn("加载字体失败，尝试下一个: {} - {}", path, e.getMessage());
             }
         }
 
-        // 兜底：使用默认英文字体
-        log.warn("未找到系统中文字体，PDF 预览中文可能显示异常");
+        // 兜底：使用默认英文字体（中文会显示为方块，但至少不抛异常）
+        log.warn("未找到可用的系统中文字体，PDF 预览中文可能显示异常");
         return new org.apache.pdfbox.pdmodel.font.PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA);
     }
 
     /**
-     * 清洗文本：PDFBox showText 对控制字符/特殊符号会抛 IllegalArgumentException，
-     * 移除 ASCII 控制字符（保留 \t），并将无法显示的字符替换为空格。
+     * 清洗文本：PDFBox showText 对控制字符/字体缺失字符会抛 IllegalArgumentException 或 IOException，
+     * 移除 ASCII 控制字符、把特殊空白（&nbsp; 等）替换为普通空格。
      */
     private String sanitizeText(String s) {
         if (s == null) return "";
         StringBuilder sb = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            // 保留制表符、换行不在此处理（外部按行分割），移除其他控制字符
+            // 制表符保留为普通空格（PDF 文本流里 \t 可能引起对齐问题）
             if (c == '\t' || c == '\r' || c == '\f') {
                 continue;
             }
-            // ASCII 控制字符（0x00-0x1F）一律移除
-            if (c < 0x20) {
+            // 特殊空白类字符统一替换为普通空格：U+00A0(&nbsp;)、U+2000-U+200A、U+202F、U+205F、U+3000(全角空格)、U+FEFF(BOM)
+            if (c == 0x00A0 || c == 0x202F || c == 0x205F || c == 0x3000 || c == 0xFEFF
+                    || (c >= 0x2000 && c <= 0x200A)) {
+                sb.append(' ');
+                continue;
+            }
+            // ASCII 控制字符（0x00-0x1F）、DEL(0x7F) 一律移除
+            if (c < 0x20 || c == 0x7F) {
                 continue;
             }
             sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 剔除字体不支持的字符。PDFBox 的 showText 遇到字体缺失的字符会抛
+     * IOException("could not find the glyphId")，导致整个转换失败。
+     * 用 getStringWidth 探测：不支持的字符会抛异常或返回 0，据此过滤。
+     */
+    private String filterSupportedChars(String s, org.apache.pdfbox.pdmodel.font.PDFont font) {
+        if (s == null || s.isEmpty()) return s;
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            // 普通空格一定保留（排版需要）
+            if (c == ' ') {
+                sb.append(c);
+                continue;
+            }
+            try {
+                // getStringWidth 对字体缺失的字符抛 IllegalArgumentException 或返回异常宽度
+                float w = font.getStringWidth(String.valueOf(c));
+                if (w > 0) {
+                    sb.append(c);
+                }
+            } catch (Exception e) {
+                // 字体不支持该字符，丢弃
+            }
         }
         return sb.toString();
     }
@@ -318,6 +381,8 @@ public class FileController {
         for (String rawLine : lines) {
             String line = sanitizeText(rawLine);
             line = truncateByWidth(line, maxWidthUnits);
+            // 剔除字体不支持的字符，避免 showText 抛 IOException(glyphId not found)
+            line = filterSupportedChars(line, font);
             if (line.isEmpty()) {
                 line = " "; // 空行占位，保持段落间距
             }
