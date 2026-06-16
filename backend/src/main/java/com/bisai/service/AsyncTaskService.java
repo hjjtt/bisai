@@ -120,9 +120,9 @@ public class AsyncTaskService {
      * 清理并重置长时间卡在 RUNNING 状态的任务（双阈值策略）
      */
     private void cleanupStuckTasks() {
-        // 普通任务 10 分钟，Agent 任务 30 分钟
-        LocalDateTime normalThreshold = LocalDateTime.now().minusMinutes(10);
-        LocalDateTime agentThreshold = LocalDateTime.now().minusMinutes(30);
+        // 普通任务 3 分钟，Agent 任务 10 分钟（缩短阈值，加快回收）
+        LocalDateTime normalThreshold = LocalDateTime.now().minusMinutes(3);
+        LocalDateTime agentThreshold = LocalDateTime.now().minusMinutes(10);
 
         // 先清理普通任务僵尸
         List<AsyncTask> stuckNormal = asyncTaskMapper.selectList(
@@ -132,7 +132,9 @@ public class AsyncTaskService {
                         .lt(AsyncTask::getUpdatedAt, normalThreshold)
         );
         for (AsyncTask task : stuckNormal) {
-            log.warn("检测到僵尸任务（普通），执行重置: id={}, type={}, bizId={}", task.getId(), task.getTaskType(), task.getBizId());
+            log.warn("检测到僵尸任务（普通），执行重置: id={}, type={}, bizId={}, stuckMinutes={}",
+                    task.getId(), task.getTaskType(), task.getBizId(),
+                    java.time.Duration.between(task.getUpdatedAt(), LocalDateTime.now()).toMinutes());
             handleTaskFailure(task, "任务执行超时或意外中断（僵尸任务清理）");
         }
 
@@ -144,8 +146,56 @@ public class AsyncTaskService {
                         .lt(AsyncTask::getUpdatedAt, agentThreshold)
         );
         for (AsyncTask task : stuckAgent) {
-            log.warn("检测到僵尸任务（Agent），执行重置: id={}, type={}, bizId={}", task.getId(), task.getTaskType(), task.getBizId());
-            handleTaskFailure(task, "Agent 评分执行超时（僵尸任务清理，阈值30分钟）");
+            log.warn("检测到僵尸任务（Agent），执行重置: id={}, type={}, bizId={}, stuckMinutes={}",
+                    task.getId(), task.getTaskType(), task.getBizId(),
+                    java.time.Duration.between(task.getUpdatedAt(), LocalDateTime.now()).toMinutes());
+            handleTaskFailure(task, "Agent 评分执行超时（僵尸任务清理，阈值10分钟）");
+        }
+
+        // 清理 SUCCESS 但 submission 状态不一致的任务（兜底修复）
+        fixInconsistentTasks();
+    }
+
+    /**
+     * 修复状态不一致的任务：async_task 是 SUCCESS 但 submission 状态仍为中间态
+     * 例如：CHECK SUCCESS 但 checkStatus 仍是 CHECKING
+     */
+    private void fixInconsistentTasks() {
+        // 查找 SUCCESS 的 CHECK 任务，但 submission.checkStatus 不是 SUCCESS 的
+        List<AsyncTask> successChecks = asyncTaskMapper.selectList(
+                new LambdaQueryWrapper<AsyncTask>()
+                        .eq(AsyncTask::getTaskType, "CHECK")
+                        .eq(AsyncTask::getStatus, "SUCCESS")
+                        .last("LIMIT 50")
+        );
+        for (AsyncTask task : successChecks) {
+            Submission sub = submissionMapper.selectById(task.getBizId());
+            if (sub != null && !"SUCCESS".equals(sub.getCheckStatus()) && !"CHECK_FAILED".equals(sub.getCheckStatus())) {
+                log.warn("修复不一致状态: submissionId={}, checkStatus={}, 强制设为 CHECK_FAILED",
+                        sub.getId(), sub.getCheckStatus());
+                sub.setCheckStatus("CHECK_FAILED");
+                submissionMapper.updateById(sub);
+            }
+        }
+
+        // 查找 SUCCESS 的 SCORE 任务，但 submission.scoreStatus 不是终态的
+        List<AsyncTask> successScores = asyncTaskMapper.selectList(
+                new LambdaQueryWrapper<AsyncTask>()
+                        .in(AsyncTask::getTaskType, "SCORE", "SCORE_AGENT")
+                        .eq(AsyncTask::getStatus, "SUCCESS")
+                        .last("LIMIT 50")
+        );
+        for (AsyncTask task : successScores) {
+            Submission sub = submissionMapper.selectById(task.getBizId());
+            if (sub != null && !"AI_SCORED".equals(sub.getScoreStatus())
+                    && !"TEACHER_CONFIRMED".equals(sub.getScoreStatus())
+                    && !"PUBLISHED".equals(sub.getScoreStatus())
+                    && !"SCORE_FAILED".equals(sub.getScoreStatus())) {
+                log.warn("修复不一致状态: submissionId={}, scoreStatus={}, 强制设为 SCORE_FAILED",
+                        sub.getId(), sub.getScoreStatus());
+                sub.setScoreStatus("SCORE_FAILED");
+                submissionMapper.updateById(sub);
+            }
         }
     }
 
@@ -325,25 +375,56 @@ public class AsyncTaskService {
     }
 
     /**
-     * 取消正在执行的任务
+     * 取消正在执行的任务（支持 RUNNING 状态强制取消）
      */
     public boolean cancelTask(Long taskId) {
         AsyncTask task = asyncTaskMapper.selectById(taskId);
         if (task == null) {
             return false;
         }
+        // 支持取消 PENDING、RUNNING、RETRYING 状态的任务
         if (!"PENDING".equals(task.getStatus()) && !"RUNNING".equals(task.getStatus())
                 && !"RETRYING".equals(task.getStatus())) {
             return false;
         }
 
         task.setStatus("CANCELLED");
+        task.setCurrentStep("已手动取消");
         task.setUpdatedAt(LocalDateTime.now());
         asyncTaskMapper.updateById(task);
-        log.info("任务已取消: id={}, type={}, bizId={}", task.getId(), task.getTaskType(), task.getBizId());
+        log.info("任务已取消: id={}, type={}, bizId={}, 原状态={}", task.getId(), task.getTaskType(), task.getBizId(), task.getStatus());
 
         // 释放 submission 锁定状态
         updateSubmissionStatusOnCancel(task);
+        return true;
+    }
+
+    /**
+     * 强制重置任务为 FAILED（允许教师重新触发）
+     * 适用于：RUNNING 僵尸任务、SUCCESS 但结果异常的任务
+     */
+    public boolean forceResetTask(Long taskId) {
+        AsyncTask task = asyncTaskMapper.selectById(taskId);
+        if (task == null) {
+            return false;
+        }
+        // 只允许重置非 PENDING/RETRYING 的任务（这两种状态可以直接重试）
+        if ("PENDING".equals(task.getStatus()) || "RETRYING".equals(task.getStatus())) {
+            return false;
+        }
+
+        String oldStatus = task.getStatus();
+        task.setStatus("FAILED");
+        task.setErrorMessage("手动强制重置（原状态: " + oldStatus + "）");
+        task.setCurrentStep("已重置，等待重新触发");
+        task.setRetryCount(0);
+        task.setUpdatedAt(LocalDateTime.now());
+        asyncTaskMapper.updateById(task);
+
+        // 重置 submission 状态
+        updateSubmissionStatusOnFailure(task);
+
+        log.info("任务已强制重置: id={}, type={}, bizId={}, 原状态={}", task.getId(), task.getTaskType(), task.getBizId(), oldStatus);
         return true;
     }
 

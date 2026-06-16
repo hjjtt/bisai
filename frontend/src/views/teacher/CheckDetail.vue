@@ -68,6 +68,17 @@
 
       <el-alert v-if="rechecking" title="AI 核查进行中，系统正在对比任务要求与提交内容，请耐心等待..." type="info" :closable="false" show-icon style="margin-bottom: 16px" />
 
+      <!-- 僵尸任务提示 -->
+      <template v-for="task in stuckTasks" :key="task.id">
+        <el-alert type="warning" :closable="false" show-icon style="margin-bottom: 12px">
+          <template #title>
+            <span>{{ task.taskType }} 任务卡在执行中（ID: {{ task.id }}），可能已超时。
+              <el-button type="warning" size="small" link @click="handleForceReset(task.id)" style="margin-left: 8px">点击重置</el-button>
+            </span>
+          </template>
+        </el-alert>
+      </template>
+
       <template v-if="checkResults.length > 0">
         <el-table :data="checkResults" stripe>
           <el-table-column prop="checkType" label="核查维度" width="130" />
@@ -97,9 +108,9 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getCheckResults, startCheck, startScore, getSubmission } from '@/api/task'
+import { getCheckResults, startCheck, startScore, getSubmission, getAsyncTasksByBizId, forceResetAsyncTask } from '@/api/task'
 import { getResultType, getResultLabel, getRiskType, getRiskLabel, getCheckStatusType, getCheckStatusLabel } from '@/utils/status'
-import type { CheckResult, Submission } from '@/types'
+import type { CheckResult, Submission, AsyncTask } from '@/types'
 
 const route = useRoute()
 const loading = ref(false)
@@ -107,6 +118,7 @@ const rechecking = ref(false)
 const scoring = ref(false)
 const submission = ref<Submission | null>(null)
 const checkResults = ref<CheckResult[]>([])
+const asyncTasks = ref<AsyncTask[]>([])
 const polling = ref<number | null>(null)
 
 const submissionId = computed(() => Number(route.params.id) || 0)
@@ -115,16 +127,21 @@ const highRiskCount = computed(() => checkResults.value.filter(r => r.riskLevel 
 const mediumRiskCount = computed(() => checkResults.value.filter(r => r.riskLevel === 'MEDIUM').length)
 const lowRiskCount = computed(() => checkResults.value.filter(r => r.riskLevel === 'LOW').length)
 
+// 卡在 RUNNING 的僵尸任务
+const stuckTasks = computed(() => asyncTasks.value.filter(t => t.status === 'RUNNING'))
+
 async function loadData() {
   if (!submissionId.value) return
   loading.value = true
   try {
-    const [subRes, checkRes] = await Promise.all([
+    const [subRes, checkRes, asyncRes] = await Promise.all([
       getSubmission(submissionId.value),
-      getCheckResults(submissionId.value)
+      getCheckResults(submissionId.value),
+      getAsyncTasksByBizId(submissionId.value).catch(() => ({ data: [] }))
     ])
     submission.value = subRes.data
     checkResults.value = checkRes.data
+    asyncTasks.value = asyncRes.data || []
     if (submission.value.checkStatus === 'CHECKING') {
       startPolling()
     }
@@ -152,13 +169,22 @@ async function handleScore() {
   try {
     await startScore(submissionId.value)
     ElMessage.success('AI 评分任务已启动')
-    // 跳转到评分复核页面
     setTimeout(() => {
       scoring.value = false
     }, 1000)
   } catch (e) {
     ElMessage.error('触发评分失败')
     scoring.value = false
+  }
+}
+
+async function handleForceReset(taskId: number) {
+  try {
+    await forceResetAsyncTask(taskId)
+    ElMessage.success('任务已重置，请重新触发')
+    await loadData()
+  } catch (e) {
+    ElMessage.error('重置失败')
   }
 }
 

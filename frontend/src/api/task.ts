@@ -149,6 +149,10 @@ export function cancelAsyncTask(taskId: number) {
   return post<void>(`/async-tasks/${taskId}/cancel`)
 }
 
+export function forceResetAsyncTask(taskId: number) {
+  return post<void>(`/async-tasks/${taskId}/force-reset`)
+}
+
 // 学生查看已发布成绩
 export function getStudentScores(submissionId: number) {
   return get<ScoreResult[]>(`/submissions/${submissionId}/student-scores`)

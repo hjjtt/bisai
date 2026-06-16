@@ -108,6 +108,27 @@ public class AsyncTaskController {
         return success ? Result.ok() : Result.error("任务不存在或无法取消");
     }
 
+    @PostMapping("/{taskId}/force-reset")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<Void> forceResetTask(@PathVariable Long taskId, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        String role = auth.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        if (!permissionService.isAdmin(role)) {
+            AsyncTask task = asyncTaskService.getTaskStatus(taskId);
+            if (task == null) {
+                return Result.error(40401, "任务不存在");
+            }
+            if (!permissionService.isTeacherOwnerOfSubmission(task.getBizId(), userId)) {
+                return Result.error(40301, "无权操作该任务");
+            }
+        }
+        boolean success = asyncTaskService.forceResetTask(taskId);
+        return success ? Result.ok() : Result.error("任务不存在或当前状态无法重置");
+    }
+
     @PostMapping("/batch-status")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Map<String, Long>> getBatchStatus(@RequestBody List<Long> taskIds, Authentication auth) {
