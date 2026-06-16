@@ -53,9 +53,14 @@ export function getSubmission(id: number) {
   return get<Submission>(`/submissions/${id}`)
 }
 
-// 文件预览
+// 文件预览（后端可能转码，如 doc→PDF）
 export function getFilePreview(fileId: number) {
   return service.get(`/files/${fileId}/preview`, { responseType: 'blob' })
+}
+
+// 获取原始文件（不转码，用于 doc/docx 前端自行解析）
+export function getFileRaw(fileId: number) {
+  return service.get(`/files/${fileId}/download`, { responseType: 'blob' })
 }
 
 export function getFileList(submissionId: number) {

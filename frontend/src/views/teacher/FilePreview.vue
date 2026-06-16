@@ -14,8 +14,10 @@
           <div class="preview-area">
             <!-- PDF 预览 -->
             <iframe v-if="isPdf(file) && blobUrls[file.id]" :src="blobUrls[file.id]" class="preview-iframe" />
-            <!-- Office(doc/docx/xls/xlsx) 后端转 PDF 后用 iframe 预览 -->
-            <iframe v-else-if="isOfficeConvertible(file) && blobUrls[file.id] && blobUrls[file.id] !== '__NO_PREVIEW__'" :src="blobUrls[file.id]" class="preview-iframe" />
+            <!-- docx: mammoth 前端转 HTML / doc: 后端 WordToHtmlConverter 转 HTML -->
+            <div v-else-if="(isDocx(file) || isDocOld(file)) && docHtmls[file.id]" class="doc-html-content" v-html="docHtmls[file.id]" />
+            <!-- Excel(xls/xlsx) 后端转 PDF 后用 iframe 预览 -->
+            <iframe v-else-if="isExcel(file) && blobUrls[file.id] && blobUrls[file.id] !== '__NO_PREVIEW__'" :src="blobUrls[file.id]" class="preview-iframe" />
             <!-- 图片预览 -->
             <el-image v-else-if="isImage(file) && blobUrls[file.id]" :src="blobUrls[file.id]" fit="contain" class="preview-image" />
             <!-- 其他文件 -->
@@ -36,15 +38,17 @@ import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Document } from '@element-plus/icons-vue'
-import { getFileList, getFilePreview } from '@/api/task'
+import { getFileList, getFilePreview, getFileRaw } from '@/api/task'
 import { downloadFile as downloadFileApi } from '@/api/system'
 import type { FileInfo } from '@/types'
+import mammoth from 'mammoth'
 
 const route = useRoute()
 const loading = ref(false)
 const files = ref<FileInfo[]>([])
 const activeTab = ref('')
 const blobUrls = reactive<Record<number, string>>({})
+const docHtmls = reactive<Record<number, string>>({})
 
 const submissionId = computed(() => Number(route.params.id) || 0)
 
@@ -52,10 +56,16 @@ function isPdf(file: FileInfo) {
   return file.fileType === 'PDF' || file.originalName.endsWith('.pdf')
 }
 
-// 后端 FileController 会把 doc/docx/xls/xlsx 转成 PDF 返回（Content-Type: application/pdf），
-// 因此这些 Office 类型也走 iframe 预览，而非显示"暂不支持"。
-function isOfficeConvertible(file: FileInfo) {
-  return ['DOC', 'DOCX', 'XLS', 'XLSX'].includes(file.fileType)
+function isDocx(file: FileInfo) {
+  return file.fileType === 'DOCX' || file.originalName.endsWith('.docx')
+}
+
+function isDocOld(file: FileInfo) {
+  return file.fileType === 'DOC' || file.originalName.endsWith('.doc')
+}
+
+function isExcel(file: FileInfo) {
+  return ['XLS', 'XLSX'].includes(file.fileType)
 }
 
 function isImage(file: FileInfo) {
@@ -64,14 +74,44 @@ function isImage(file: FileInfo) {
 
 async function loadBlob(file: FileInfo) {
   try {
+    // docx: 走下载接口拿原始文件，mammoth 前端解析（保留格式）
+    if (isDocx(file)) {
+      try {
+        const res = await getFileRaw(file.id)
+        const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
+        const arrayBuffer = await blob.arrayBuffer()
+        const result = await mammoth.convertToHtml({ arrayBuffer })
+        docHtmls[file.id] = result.value || '<p style="color:#909399">文档内容为空</p>'
+      } catch (e) {
+        console.error('mammoth 解析失败:', e)
+        docHtmls[file.id] = '<p style="color:#F56C6C">文档解析失败，请下载后查看</p>'
+      }
+      return
+    }
+
+    // doc(旧格式): 后端 WordToHtmlConverter 转 HTML，text 接收
+    if (isDocOld(file)) {
+      try {
+        const res = await getFilePreview(file.id)
+        // 后端返回 HTML 文本
+        const html = typeof res.data === 'string' ? res.data : await (res.data as Blob).text()
+        docHtmls[file.id] = html || '<p style="color:#909399">文档内容为空</p>'
+      } catch (e) {
+        console.error('doc HTML 预览失败:', e)
+        docHtmls[file.id] = '<p style="color:#F56C6C">文档解析失败，请下载后查看</p>'
+      }
+      return
+    }
+
+    // Excel/PDF/图片: 走预览接口
     const res = await getFilePreview(file.id)
     const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
-    // 后端对 Office 文件转 PDF：若转换失败会回退返回原二进制（非 PDF），
-    // 此时 blob.type 不是 application/pdf，标记为不可预览，避免 iframe 空白。
-    if (isOfficeConvertible(file) && blob.type && !blob.type.includes('pdf')) {
+
+    if (isExcel(file) && blob.type && !blob.type.includes('pdf')) {
       blobUrls[file.id] = '__NO_PREVIEW__'
       return
     }
+
     blobUrls[file.id] = URL.createObjectURL(blob)
   } catch {
     ElMessage.error('文件预览加载失败')
@@ -130,6 +170,66 @@ onUnmounted(() => {
   .preview-image {
     max-width: 100%;
     max-height: 700px;
+  }
+
+  .doc-html-content {
+    width: 100%;
+    max-height: 750px;
+    overflow-y: auto;
+    padding: 24px 32px;
+    line-height: 1.8;
+    font-size: 14px;
+    color: #303133;
+    background: #fff;
+
+    :deep(table) {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 12px 0;
+
+      th, td {
+        border: 1px solid #dcdfe6;
+        padding: 8px 12px;
+        text-align: left;
+      }
+
+      th {
+        background: #f5f7fa;
+        font-weight: 600;
+      }
+    }
+
+    :deep(img) {
+      max-width: 100%;
+      height: auto;
+    }
+
+    :deep(h1), :deep(h2), :deep(h3) {
+      margin: 16px 0 8px;
+      color: #1e293b;
+    }
+
+    :deep(p) {
+      margin: 6px 0;
+    }
+
+    :deep(ul), :deep(ol) {
+      padding-left: 24px;
+    }
+
+    :deep(pre), :deep(code) {
+      background: #f5f7fa;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    :deep(blockquote) {
+      border-left: 4px solid #409eff;
+      padding-left: 12px;
+      margin: 12px 0;
+      color: #606266;
+    }
   }
 
   .no-preview {

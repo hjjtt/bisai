@@ -46,7 +46,7 @@ public class FileController {
     });
 
     @GetMapping("/{fileId}/preview")
-    public ResponseEntity<Resource> preview(@PathVariable Long fileId, Authentication auth) {
+    public ResponseEntity<?> preview(@PathVariable Long fileId, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
         User user = userMapper.selectById(userId);
         if (user == null) {
@@ -76,11 +76,21 @@ public class FileController {
             return ResponseEntity.notFound().build();
         }
 
+        // doc(旧格式) 用 WordToHtmlConverter 转 HTML 返回，保留格式
+        if ("DOC".equalsIgnoreCase(fileEntity.getFileType())) {
+            String html = convertDocToHtml(path);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_HTML)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" +
+                            URLEncoder.encode(java.util.Objects.requireNonNullElse(fileEntity.getOriginalName(), "file"), StandardCharsets.UTF_8) + "\"")
+                    .body(html);
+        }
+
         FileSystemResource resource = new FileSystemResource(path);
         String contentTypeStr = getContentType(fileEntity.getFileType());
         String disposition = "inline";
 
-        // Word/Excel 转换为 PDF 预览
+        // docx/xls/xlsx 转换为 PDF 预览
         if (isOfficeFile(fileEntity.getFileType())) {
             Path pdfPath = convertToPdf(path, fileEntity);
             if (pdfPath != null && pdfPath.toFile().exists()) {
@@ -307,10 +317,14 @@ public class FileController {
     /**
      * 剔除字体不支持的字符。PDFBox 的 showText 遇到字体缺失的字符会抛
      * IOException("could not find the glyphId")，导致整个转换失败。
-     * 用 getStringWidth 探测：不支持的字符会抛异常或返回 0，据此过滤。
+     *
+     * 策略：只在 getStringWidth 抛异常时才丢弃字符；
+     * 返回 0 宽度不等于不支持（零宽字符、字体 metrics 问题都可能返回 0），
+     * 保留这些字符以避免误杀中文。
      */
     private String filterSupportedChars(String s, org.apache.pdfbox.pdmodel.font.PDFont font) {
         if (s == null || s.isEmpty()) return s;
+        int dropped = 0;
         StringBuilder sb = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
@@ -320,20 +334,23 @@ public class FileController {
                 continue;
             }
             try {
-                // getStringWidth 对字体缺失的字符抛 IllegalArgumentException 或返回异常宽度
-                float w = font.getStringWidth(String.valueOf(c));
-                if (w > 0) {
-                    sb.append(c);
-                }
+                // getStringWidth 对字体缺失的字符抛 IllegalArgumentException 或 IOException
+                // 只要不抛异常就保留（即使宽度返回 0 也不丢弃，避免误杀中文字）
+                font.getStringWidth(String.valueOf(c));
+                sb.append(c);
             } catch (Exception e) {
-                // 字体不支持该字符，丢弃
+                // 字体确实不支持该字符，丢弃
+                dropped++;
             }
+        }
+        if (dropped > 0) {
+            log.debug("filterSupportedChars: 丢弃 {} 个不支持的字符 (总 {} 个)", dropped, s.length());
         }
         return sb.toString();
     }
 
     /**
-     * 按可显示宽度截断行，避免超长行超出页面宽度导致渲染异常。
+     * 按可显示宽度截断行（兜底用）。
      * 中文字符按 2 个单位宽度估算，英文按 1。
      */
     private String truncateByWidth(String s, int maxWidthUnits) {
@@ -349,6 +366,33 @@ public class FileController {
             }
         }
         return s.substring(0, end);
+    }
+
+    /**
+     * 按可显示宽度将长行拆成多行（自动换行），避免内容被截断丢失。
+     * 中文字符按 2 个单位宽度估算，英文按 1。
+     */
+    private java.util.List<String> wrapByWidth(String s, int maxWidthUnits) {
+        java.util.List<String> result = new java.util.ArrayList<>();
+        if (s == null || s.isEmpty()) {
+            result.add("");
+            return result;
+        }
+        int width = 0;
+        int start = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            width += (c > 0x7F) ? 2 : 1;
+            if (width > maxWidthUnits) {
+                result.add(s.substring(start, i));
+                start = i;
+                width = (c > 0x7F) ? 2 : 1;
+            }
+        }
+        if (start < s.length()) {
+            result.add(s.substring(start));
+        }
+        return result;
     }
 
     /**
@@ -380,34 +424,44 @@ public class FileController {
 
         for (String rawLine : lines) {
             String line = sanitizeText(rawLine);
-            line = truncateByWidth(line, maxWidthUnits);
             // 剔除字体不支持的字符，避免 showText 抛 IOException(glyphId not found)
             line = filterSupportedChars(line, font);
-            if (line.isEmpty()) {
-                line = " "; // 空行占位，保持段落间距
-            }
+            // 长行自动换行（而非截断丢失内容）
+            java.util.List<String> wrappedLines = wrapByWidth(line, maxWidthUnits);
 
-            // 超出底部边界则分页
-            if (y < bottomLimit) {
-                if (inText) {
+            for (String subLine : wrappedLines) {
+                if (subLine.isEmpty()) {
+                    subLine = " "; // 空行占位，保持段落间距
+                }
+
+                // 超出底部边界则分页
+                if (y < bottomLimit) {
+                    if (inText) {
+                        cs.endText();
+                        inText = false;
+                    }
+                    cs.close();
+                    page = new org.apache.pdfbox.pdmodel.PDPage(pageSize);
+                    pdf.addPage(page);
+                    cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(pdf, page);
+                    cs.setFont(font, fontSize);
+                    y = startY;
+                }
+
+                if (!inText) {
+                    cs.beginText();
+                    inText = true;
+                }
+                cs.newLineAtOffset(margin, y);
+                try {
+                    cs.showText(subLine);
+                } catch (Exception e) {
+                    log.warn("showText 失败，跳过该行 (len={}): {}", subLine.length(), e.getMessage());
                     cs.endText();
                     inText = false;
                 }
-                cs.close();
-                page = new org.apache.pdfbox.pdmodel.PDPage(pageSize);
-                pdf.addPage(page);
-                cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(pdf, page);
-                cs.setFont(font, fontSize);
-                y = startY;
+                y -= lineGap;
             }
-
-            if (!inText) {
-                cs.beginText();
-                inText = true;
-            }
-            cs.newLineAtOffset(margin, y);
-            cs.showText(line);
-            y -= lineGap;
         }
         if (inText) {
             cs.endText();
@@ -423,13 +477,74 @@ public class FileController {
 
             org.apache.pdfbox.pdmodel.font.PDFont font = loadChineseFont(pdf);
             java.util.List<String> lines = new java.util.ArrayList<>();
-            try (org.apache.poi.xwpf.extractor.XWPFWordExtractor extractor = new org.apache.poi.xwpf.extractor.XWPFWordExtractor(doc)) {
-                String text = extractor.getText();
-                lines.addAll(java.util.Arrays.asList(text.split("\n")));
+
+            // 提取正文段落（保留表格结构）
+            extractDocxContent(doc, lines);
+
+            // 提取页眉
+            for (org.apache.poi.xwpf.usermodel.XWPFHeader header : doc.getHeaderList()) {
+                for (org.apache.poi.xwpf.usermodel.XWPFParagraph p : header.getParagraphs()) {
+                    String t = p.getText();
+                    if (t != null && !t.isBlank()) lines.add(t);
+                }
+            }
+            // 提取页脚
+            for (org.apache.poi.xwpf.usermodel.XWPFFooter footer : doc.getFooterList()) {
+                for (org.apache.poi.xwpf.usermodel.XWPFParagraph p : footer.getParagraphs()) {
+                    String t = p.getText();
+                    if (t != null && !t.isBlank()) lines.add(t);
+                }
+            }
+
+            log.info("DOCX→PDF 提取到 {} 行文本, source={}", lines.size(), sourcePath.getFileName());
+            if (lines.isEmpty()) {
+                lines.add("（文档内容为空）");
             }
             renderLinesToPdf(pdf, font, 10f, lines);
             pdf.save(os);
         }
+    }
+
+    /**
+     * 递归提取 DOCX 正文内容（段落 + 表格 + 表格嵌套表格），
+     * 按文档顺序输出，表格单元格用 " | " 分隔。
+     */
+    private void extractDocxContent(org.apache.poi.xwpf.usermodel.XWPFDocument doc, java.util.List<String> lines) {
+        // XWPFDocument.getBodyElements() 按文档顺序返回段落和表格
+        for (org.apache.poi.xwpf.usermodel.IBodyElement element : doc.getBodyElements()) {
+            if (element.getElementType() == org.apache.poi.xwpf.usermodel.BodyElementType.PARAGRAPH) {
+                org.apache.poi.xwpf.usermodel.XWPFParagraph p = (org.apache.poi.xwpf.usermodel.XWPFParagraph) element;
+                String t = p.getText();
+                if (t != null) lines.add(t);
+            } else if (element.getElementType() == org.apache.poi.xwpf.usermodel.BodyElementType.TABLE) {
+                org.apache.poi.xwpf.usermodel.XWPFTable table = (org.apache.poi.xwpf.usermodel.XWPFTable) element;
+                extractDocxTable(table, lines);
+            }
+        }
+    }
+
+    private void extractDocxTable(org.apache.poi.xwpf.usermodel.XWPFTable table, java.util.List<String> lines) {
+        for (org.apache.poi.xwpf.usermodel.XWPFTableRow row : table.getRows()) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < row.getTableCells().size(); i++) {
+                org.apache.poi.xwpf.usermodel.XWPFTableCell cell = row.getTableCells().get(i);
+                if (i > 0) sb.append(" | ");
+                // 单元格内可能有多个段落
+                boolean first = true;
+                for (org.apache.poi.xwpf.usermodel.XWPFParagraph p : cell.getParagraphs()) {
+                    String t = p.getText();
+                    if (t != null && !t.isBlank()) {
+                        if (!first) sb.append(" ");
+                        sb.append(t.trim());
+                        first = false;
+                    }
+                }
+            }
+            if (sb.length() > 0) {
+                lines.add(sb.toString());
+            }
+        }
+        lines.add(""); // 表格后空行
     }
 
     private void convertDocToPdf(Path sourcePath, Path pdfPath) throws Exception {
@@ -440,12 +555,90 @@ public class FileController {
 
             org.apache.pdfbox.pdmodel.font.PDFont font = loadChineseFont(pdf);
             java.util.List<String> lines = new java.util.ArrayList<>();
+
+            // WordExtractor.getText() 已经包含正文+表格文本，但也提取页眉/页脚
             try (org.apache.poi.hwpf.extractor.WordExtractor extractor = new org.apache.poi.hwpf.extractor.WordExtractor(doc)) {
-                String text = extractor.getText();
-                lines.addAll(java.util.Arrays.asList(text.split("\n")));
+                // 正文文本（含表格）
+                String bodyText = extractor.getText();
+                if (bodyText != null && !bodyText.isBlank()) {
+                    lines.addAll(java.util.Arrays.asList(bodyText.split("\n")));
+                }
+                // 页眉
+                String headerText = extractor.getHeaderText();
+                if (headerText != null && !headerText.isBlank()) {
+                    lines.addAll(java.util.Arrays.asList(headerText.split("\n")));
+                }
+                // 页脚
+                String footerText = extractor.getFooterText();
+                if (footerText != null && !footerText.isBlank()) {
+                    lines.addAll(java.util.Arrays.asList(footerText.split("\n")));
+                }
+            }
+
+            // 如果 WordExtractor 提取的正文为空，尝试用 Range API 递归提取
+            if (lines.isEmpty()) {
+                log.warn("WordExtractor 未提取到文本，尝试 Range API 提取, source={}", sourcePath.getFileName());
+                extractDocRange(doc.getRange(), lines);
+            }
+
+            log.info("DOC→PDF 提取到 {} 行文本, source={}", lines.size(), sourcePath.getFileName());
+            if (lines.isEmpty()) {
+                lines.add("（文档内容为空或包含不支持的格式）");
             }
             renderLinesToPdf(pdf, font, 10f, lines);
             pdf.save(os);
+        }
+    }
+
+    /**
+     * 将 .doc 文件转换为 HTML（保留格式、表格、图片）。
+     * 使用 POI 的 WordToHtmlConverter，比纯文本提取效果好得多。
+     */
+    private String convertDocToHtml(Path sourcePath) {
+        try (java.io.InputStream is = java.nio.file.Files.newInputStream(sourcePath)) {
+            org.apache.poi.hwpf.HWPFDocument doc = new org.apache.poi.hwpf.HWPFDocument(is);
+
+            javax.xml.parsers.DocumentBuilderFactory factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            javax.xml.parsers.DocumentBuilder builder = factory.newDocumentBuilder();
+            org.w3c.dom.Document htmlDoc = builder.newDocument();
+
+            org.apache.poi.hwpf.converter.WordToHtmlConverter converter =
+                    new org.apache.poi.hwpf.converter.WordToHtmlConverter(htmlDoc);
+
+            converter.processDocument(doc);
+
+            // 将 DOM 转为 HTML 字符串
+            javax.xml.transform.TransformerFactory tf = javax.xml.transform.TransformerFactory.newInstance();
+            javax.xml.transform.Transformer transformer = tf.newTransformer();
+            transformer.setOutputProperty(javax.xml.transform.OutputKeys.OMIT_XML_DECLARATION, "yes");
+            transformer.setOutputProperty(javax.xml.transform.OutputKeys.METHOD, "html");
+            transformer.setOutputProperty(javax.xml.transform.OutputKeys.INDENT, "no");
+            transformer.setOutputProperty(javax.xml.transform.OutputKeys.ENCODING, "UTF-8");
+            java.io.StringWriter sw = new java.io.StringWriter();
+            transformer.transform(new javax.xml.transform.dom.DOMSource(converter.getDocument()),
+                    new javax.xml.transform.stream.StreamResult(sw));
+            return sw.toString();
+        } catch (Exception e) {
+            log.warn("DOC→HTML 转换失败: {}", e.getMessage(), e);
+            return "<html><body><p style='color:red'>文档转换失败: " + e.getMessage() + "</p></body></html>";
+        }
+    }
+
+    /**
+     * 用 HWPF Range API 递归提取 .doc 文本（段落 + 表格）。
+     * Range.numParagraphs() 遍历文档所有段落（包括表格单元格内的段落）。
+     */
+    private void extractDocRange(org.apache.poi.hwpf.usermodel.Range range, java.util.List<String> lines) {
+        for (int i = 0; i < range.numParagraphs(); i++) {
+            org.apache.poi.hwpf.usermodel.Paragraph para = range.getParagraph(i);
+            String text = para.text();
+            if (text != null) {
+                // 去掉 HWPF 段落末尾的 \r（paragraph mark）
+                text = text.endsWith("\r") ? text.substring(0, text.length() - 1) : text;
+                if (!text.isBlank()) {
+                    lines.add(text);
+                }
+            }
         }
     }
 
