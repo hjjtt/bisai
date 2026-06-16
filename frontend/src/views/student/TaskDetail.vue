@@ -28,7 +28,7 @@
           <el-descriptions-item label="提交状态">已提交（版本 {{ mySubmission.version }}）</el-descriptions-item>
           <el-descriptions-item label="提交时间">{{ formatDate(mySubmission.submitTime) }}</el-descriptions-item>
           <el-descriptions-item label="评分状态">
-            <el-tag :type="getScoreStatusType(mySubmission.scoreStatus)" size="small">{{ getScoreStatusLabel(mySubmission.scoreStatus) }}</el-tag>
+            <el-tag :type="getScoreStatusType(mySubmission.scoreStatus)" size="small">{{ getScoreStatusLabel(mySubmission.scoreStatus, mySubmission.parseStatus) }}</el-tag>
           </el-descriptions-item>
         </el-descriptions>
         <div style="margin-top: 16px; text-align: right">

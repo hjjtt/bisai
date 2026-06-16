@@ -10,7 +10,7 @@
         <el-descriptions-item label="提交版本">V{{ submission.version }}</el-descriptions-item>
         <el-descriptions-item label="核查状态">
           <el-tag :type="getCheckStatusType(submission.checkStatus)" size="small">
-            {{ getCheckStatusLabel(submission.checkStatus) }}
+            {{ getCheckStatusLabel(submission.checkStatus, submission.parseStatus) }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="风险概览">

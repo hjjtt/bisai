@@ -44,8 +44,8 @@
           <template #default="{ row }">
             <div class="status-chain">
               <el-tag :type="getParseStatusType(row.parseStatus)" effect="light">{{ getParseStatusLabel(row.parseStatus) }}</el-tag>
-              <el-tag :type="getCheckStatusType(row.checkStatus)" effect="light">{{ getCheckStatusLabel(row.checkStatus) }}</el-tag>
-              <el-tag :type="getScoreStatusType(row.scoreStatus)" effect="light">{{ getScoreStatusLabel(row.scoreStatus) }}</el-tag>
+              <el-tag :type="getCheckStatusType(row.checkStatus)" effect="light">{{ getCheckStatusLabel(row.checkStatus, row.parseStatus) }}</el-tag>
+              <el-tag :type="getScoreStatusType(row.scoreStatus)" effect="light">{{ getScoreStatusLabel(row.scoreStatus, row.parseStatus) }}</el-tag>
             </div>
           </template>
         </el-table-column>

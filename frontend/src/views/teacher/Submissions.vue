@@ -28,21 +28,27 @@
         </el-table-column>
         <el-table-column label="核查状态" min-width="110" align="center">
           <template #default="{ row }">
-            <el-tag :type="getCheckStatusType(row.checkStatus)" size="small">{{ getCheckStatusLabel(row.checkStatus) }}</el-tag>
+            <el-tag :type="getCheckStatusType(row.checkStatus)" size="small">{{ getCheckStatusLabel(row.checkStatus, row.parseStatus) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="评分状态" min-width="110" align="center">
           <template #default="{ row }">
-            <el-tag :type="getScoreStatusType(row.scoreStatus)" size="small">{{ getScoreStatusLabel(row.scoreStatus) }}</el-tag>
+            <el-tag :type="getScoreStatusType(row.scoreStatus)" size="small">{{ getScoreStatusLabel(row.scoreStatus, row.parseStatus) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="totalScore" label="总分" min-width="80" align="center" />
-        <el-table-column label="操作" min-width="260" align="center" fixed="right">
+        <el-table-column label="操作" min-width="280" align="center" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="$router.push(`/teacher/submissions/${row.id}/preview`)">预览</el-button>
-            <el-button type="info" size="small" @click="$router.push(`/teacher/submissions/${row.id}/parse`)">解析</el-button>
-            <el-button type="success" size="small" @click="$router.push(`/teacher/submissions/${row.id}/check`)">核查</el-button>
-            <el-button type="warning" size="small" @click="$router.push(`/teacher/submissions/${row.id}/score`)">评分</el-button>
+            <el-tooltip :content="parseBtnTip(row)" :disabled="!isParseDisabled(row)" placement="top">
+              <el-button type="info" size="small" :disabled="isParseDisabled(row)" @click="$router.push(`/teacher/submissions/${row.id}/parse`)">解析</el-button>
+            </el-tooltip>
+            <el-tooltip :content="checkBtnTip(row)" :disabled="!isCheckDisabled(row)" placement="top">
+              <el-button type="success" size="small" :disabled="isCheckDisabled(row)" @click="$router.push(`/teacher/submissions/${row.id}/check`)">核查</el-button>
+            </el-tooltip>
+            <el-tooltip :content="scoreBtnTip(row)" :disabled="!isScoreDisabled(row)" placement="top">
+              <el-button type="warning" size="small" :disabled="isScoreDisabled(row)" @click="$router.push(`/teacher/submissions/${row.id}/score`)">评分</el-button>
+            </el-tooltip>
             <el-button type="danger" size="small" @click="handleReturn(row.id)">退回</el-button>
           </template>
         </el-table-column>
@@ -95,6 +101,38 @@ async function loadData() {
 
 function hasRunningAiTask() {
   return submissions.value.some(item => item.parseStatus === 'PARSING' || item.checkStatus === 'CHECKING' || item.scoreStatus === 'SCORING')
+}
+
+// === 操作按钮智能禁用：新流程下解析自动、核查/评分需教师按序触发 ===
+// 已发布（PUBLISHED）为终态，解析/核查/评分均锁定；解析进行中时锁核查/评分。
+function isParseDisabled(row: Submission) {
+  return row.parseStatus === 'PARSING' || row.parseStatus === 'PENDING' || row.scoreStatus === 'PUBLISHED'
+}
+function isCheckDisabled(row: Submission) {
+  // 核查依赖解析完成
+  if (row.parseStatus !== 'SUCCESS') return true
+  if (row.checkStatus === 'CHECKING') return true
+  return row.scoreStatus === 'PUBLISHED'
+}
+function isScoreDisabled(row: Submission) {
+  // 评分依赖核查完成
+  if (row.checkStatus !== 'SUCCESS') return true
+  if (row.scoreStatus === 'SCORING') return true
+  return row.scoreStatus === 'PUBLISHED'
+}
+function parseBtnTip(row: Submission) {
+  if (row.scoreStatus === 'PUBLISHED') return '成绩已发布，不可重新解析'
+  return '解析进行中，请稍候'
+}
+function checkBtnTip(row: Submission) {
+  if (row.scoreStatus === 'PUBLISHED') return '成绩已发布，不可重新核查'
+  if (row.checkStatus === 'CHECKING') return '核查进行中，请稍候'
+  return '请先完成文档解析'
+}
+function scoreBtnTip(row: Submission) {
+  if (row.scoreStatus === 'PUBLISHED') return '成绩已发布，无需重复评分'
+  if (row.scoreStatus === 'SCORING') return '评分进行中，请稍候'
+  return '请先完成规范核查'
 }
 
 function startPolling() {

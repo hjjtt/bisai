@@ -27,14 +27,14 @@ export type FileType = 'DOC' | 'DOCX' | 'PDF' | 'JPG' | 'JPEG' | 'PNG' | 'XLS' |
 // 任务状态
 export type TaskStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED' | 'ARCHIVED'
 
-// 解析状态
-export type ParseStatus = 'PENDING' | 'PARSING' | 'SUCCESS' | 'FAILED' | 'CANCELLED'
+// 解析状态（含 RETRYING，与 utils/status.ts 映射对齐）
+export type ParseStatus = 'PENDING' | 'PARSING' | 'SUCCESS' | 'FAILED' | 'RETRYING' | 'CANCELLED'
 
 // 评分状态
 export type ScoreStatus = 'NOT_SCORED' | 'SCORING' | 'AI_SCORED' | 'TEACHER_CONFIRMED' | 'PUBLISHED' | 'SCORE_FAILED' | 'RETURNED' | 'CANCELLED'
 
-// 核查状态
-export type CheckStatus = 'NOT_CHECKED' | 'CHECKING' | 'SUCCESS' | 'CHECK_FAILED' | 'CANCELLED'
+// 核查状态（含 RETRYING，与 utils/status.ts 映射对齐）
+export type CheckStatus = 'NOT_CHECKED' | 'CHECKING' | 'SUCCESS' | 'CHECK_FAILED' | 'RETRYING' | 'CANCELLED'
 
 // 异步任务状态
 export type AsyncTaskStatus = 'PENDING' | 'RUNNING' | 'RETRYING' | 'SUCCESS' | 'FAILED' | 'CANCELLED'

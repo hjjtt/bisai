@@ -37,12 +37,12 @@
             </el-table-column>
             <el-table-column label="核查状态" min-width="100" align="center">
               <template #default="{ row }">
-                <el-tag :type="getCheckStatusType(row.checkStatus)" size="small">{{ getCheckStatusLabel(row.checkStatus) }}</el-tag>
+                <el-tag :type="getCheckStatusType(row.checkStatus)" size="small">{{ getCheckStatusLabel(row.checkStatus, row.parseStatus) }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column label="评分状态" min-width="100" align="center">
               <template #default="{ row }">
-                <el-tag :type="getScoreStatusType(row.scoreStatus)" size="small">{{ getScoreStatusLabel(row.scoreStatus) }}</el-tag>
+                <el-tag :type="getScoreStatusType(row.scoreStatus)" size="small">{{ getScoreStatusLabel(row.scoreStatus, row.parseStatus) }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="totalScore" label="总分" min-width="80" align="center" />

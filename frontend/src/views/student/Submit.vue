@@ -66,7 +66,7 @@
         </el-table-column>
         <el-table-column label="评分状态" width="120" align="center">
           <template #default="{ row }">
-            <el-tag :type="getScoreStatusType(row.scoreStatus)" size="small">{{ getScoreStatusLabel(row.scoreStatus) }}</el-tag>
+            <el-tag :type="getScoreStatusType(row.scoreStatus)" size="small">{{ getScoreStatusLabel(row.scoreStatus, row.parseStatus) }}</el-tag>
           </template>
         </el-table-column>
       </el-table>

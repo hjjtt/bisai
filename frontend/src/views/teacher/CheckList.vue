@@ -22,7 +22,7 @@
         </el-table-column>
         <el-table-column label="核查状态" min-width="110" align="center">
           <template #default="{ row }">
-            <el-tag :type="getCheckStatusType(row.checkStatus)" size="small">{{ getCheckStatusLabel(row.checkStatus) }}</el-tag>
+            <el-tag :type="getCheckStatusType(row.checkStatus)" size="small">{{ getCheckStatusLabel(row.checkStatus, row.parseStatus) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" min-width="150" align="center" fixed="right">

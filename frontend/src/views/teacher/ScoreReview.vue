@@ -19,7 +19,7 @@
         </el-descriptions-item>
         <el-descriptions-item label="评分状态">
           <el-tag :type="getScoreStatusType(submission.scoreStatus)" size="small">
-            {{ getScoreStatusLabel(submission.scoreStatus) }}
+            {{ getScoreStatusLabel(submission.scoreStatus, submission.parseStatus) }}
           </el-tag>
         </el-descriptions-item>
       </el-descriptions>

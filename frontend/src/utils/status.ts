@@ -24,7 +24,14 @@ export function getCheckStatusType(status?: string): string {
   return map[status || 'NOT_CHECKED'] || 'info'
 }
 
-export function getCheckStatusLabel(status?: string): string {
+// 第二个可选参数 parseStatus 用于上下文感知：
+// 新流程下学生上传后只自动触发门禁+解析，核查/评分延后由教师触发。
+// 当解析已完成但核查未触发（NOT_CHECKED），表达成「待教师核查」而非「未核查」，
+// 避免给学生/教师"流程卡住"的误解。传 undefined 时保持原行为（向后兼容）。
+export function getCheckStatusLabel(status?: string, parseStatus?: string): string {
+  if (status === 'NOT_CHECKED' && parseStatus === 'SUCCESS') {
+    return '待教师核查'
+  }
   const map: Record<string, string> = {
     NOT_CHECKED: '未核查', CHECKING: '核查中', SUCCESS: '核查完成', CHECK_FAILED: '核查失败',
     RETRYING: '重试中', CANCELLED: '已取消',
@@ -40,7 +47,13 @@ export function getScoreStatusType(status: string): string {
   return map[status] || 'info'
 }
 
-export function getScoreStatusLabel(status: string): string {
+// 同 getCheckStatusLabel：解析完成后未评分表达成「待教师评分」，避免误解。
+// 评分依赖核查完成，但核查状态前端多处不展示，故此处仅以 parseStatus 为上下文锚点，
+// 教师侧展示更精确的「待评分」由 getScoreStatusLabel 的调用方按需处理。
+export function getScoreStatusLabel(status: string, parseStatus?: string): string {
+  if (status === 'NOT_SCORED' && parseStatus === 'SUCCESS') {
+    return '待教师评分'
+  }
   const map: Record<string, string> = {
     NOT_SCORED: '未评分', SCORING: '评分中', AI_SCORED: 'AI已评分', TEACHER_CONFIRMED: '教师已确认',
     PUBLISHED: '已发布', SCORE_FAILED: '评分失败', RETURNED: '已退回', CANCELLED: '已取消',
