@@ -424,8 +424,15 @@ public class AiService {
             boolean hasRedLineError = false;
             StringBuilder redLineReason = new StringBuilder();
             JsonNode items = result.path("items");
-            if (items.isArray()) {
-                for (JsonNode item : items) {
+            if (!items.isArray() || items.isEmpty()) {
+                log.warn("AI 核查返回空结果, submissionId={}, result={}", submissionId, result);
+                submission.setCheckStatus("CHECK_FAILED");
+                submissionMapper.updateById(submission);
+                updateTaskProgress(asyncTaskId, -1, "核查失败：AI 未返回有效结果");
+                saveCheckFailure(submissionId, "AI 返回的核查结果为空，请重试");
+                throw new RuntimeException("AI 核查返回空结果");
+            }
+            for (JsonNode item : items) {
                     CheckResult cr = new CheckResult();
                     cr.setSubmissionId(submissionId);
                     cr.setCheckType(item.path("checkType").asText("其他"));
@@ -445,7 +452,6 @@ public class AiService {
                         redLineReason.append(cr.getCheckType()).append(": ").append(cr.getDescription());
                     }
                 }
-            }
 
             // 红线熔断 — 存在严重问题（FAIL + HIGH）时终止流水线，不进入评分阶段
             // 不再使用 PARSE 完整度豁免：PARSE 的 completeness 也是 AI 自评，用它覆盖 CHECK 的红线判定不可靠
