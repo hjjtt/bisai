@@ -49,3 +49,10 @@ shannon/
 .playwright-mcp/
 .understand-anything/
 backend/src/test/
+
+# === 敏感配置文件（防止密钥泄露） ===
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
