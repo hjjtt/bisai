@@ -173,3 +173,11 @@ Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 ### Domain docs
 
 Single-context layout: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
+
+---
+
+## 关联
+
+- [[AGENTS]] — 项目主规则（以 AGENTS 为准）
+- [[CONTEXT]] — 领域语言与角色
+- [[docs/agents/domain|domain]] — 领域文档布局

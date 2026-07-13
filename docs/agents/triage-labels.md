@@ -15,3 +15,9 @@ This repo uses the default triage label vocabulary. Each label corresponds to a 
 ## Mapping
 
 No custom overrides — all labels use their default names.
+
+## 关联
+
+- [[docs/agents/issue-tracker|issue-tracker]] — Issue 工作流
+- [[docs/agents/domain|domain]] — 领域文档布局
+- [[AGENTS]] — 项目规则

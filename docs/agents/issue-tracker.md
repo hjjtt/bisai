@@ -22,3 +22,9 @@ Use `gh` CLI for all issue operations:
 2. Apply triage labels immediately (see `triage-labels.md`)
 3. Link related PRs to issues using `Fixes #<number>` in commit messages
 4. Close issues when merged PR is deployed
+
+## 关联
+
+- [[docs/agents/triage-labels|triage-labels]] — 分诊标签状态机
+- [[docs/agents/domain|domain]] — 领域文档布局
+- [[AGENTS]] — 项目规则

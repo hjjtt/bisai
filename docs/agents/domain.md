@@ -15,3 +15,10 @@ Single-context. The repo has one `CONTEXT.md` at the root and one `docs/adr/` di
 2. **Check `docs/adr/`** for past decisions that may affect your approach. Do not contradict established ADRs without proposing an update.
 3. **If `CONTEXT.md` is missing**, create it before starting work. Use the existing `CLAUDE.md` / `AGENTS.md` as a starting point.
 4. **If `docs/adr/` is empty**, create ADRs as you make significant architectural decisions. Use the format `NNNN-title.md`.
+
+## 关联
+
+- [[CONTEXT]] — 领域语言与角色定义
+- [[AGENTS]] — 项目规则
+- [[docs/agents/issue-tracker|issue-tracker]] — Issue 工作流
+- [[docs/agents/triage-labels|triage-labels]] — 分诊标签

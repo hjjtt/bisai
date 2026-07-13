@@ -30,8 +30,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
+import java.awt.Color;
 import java.awt.Font;
 import org.jfree.chart.StandardChartTheme;
+import org.jfree.chart.renderer.category.BarRenderer;
+import org.jfree.chart.renderer.category.StandardBarPainter;
 
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -212,8 +215,8 @@ public class ReportService {
              PdfDocument pdf = new PdfDocument(writer);
              Document document = new Document(pdf)) {
 
-            // 设置中文字体（使用内置字体）
-            PdfFont font = PdfFontFactory.createFont("STSong-Light", "UniGB-UCS2-H", PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+            // 设置中文字体（嵌入系统字体，兼容 Chrome/Edge）
+            PdfFont font = createCjkFont();
             document.setFont(font);
             document.setFontSize(10);
 
@@ -257,10 +260,14 @@ public class ReportService {
                     DefaultCategoryDataset dataset = new DefaultCategoryDataset();
                     for (ScoreResult sr : scores) {
                         String indName = indicatorNameMap.getOrDefault(sr.getIndicatorId(), "指标");
-                        double finalScore = sr.getFinalScore() != null ? sr.getFinalScore().doubleValue() : 0;
+                        double finalScore = sr.getFinalScore() != null ? sr.getFinalScore().doubleValue()
+                                : (sr.getAutoScore() != null ? sr.getAutoScore().doubleValue() : 0);
                         dataset.addValue(finalScore, "得分", indName);
                     }
                     JFreeChart chart = ChartFactory.createBarChart("得分对比图", "评价指标", "分数", dataset, PlotOrientation.VERTICAL, false, true, false);
+                    BarRenderer barRenderer = (BarRenderer) chart.getCategoryPlot().getRenderer();
+                    barRenderer.setSeriesPaint(0, new Color(79, 129, 189));
+                    barRenderer.setBarPainter(new StandardBarPainter());
                     ByteArrayOutputStream chartOut = new ByteArrayOutputStream();
                     ChartUtils.writeChartAsPNG(chartOut, chart, 500, 300);
                     Image chartImg = new Image(ImageDataFactory.create(chartOut.toByteArray())).setHorizontalAlignment(com.itextpdf.layout.properties.HorizontalAlignment.CENTER);
@@ -399,10 +406,14 @@ public class ReportService {
                     DefaultCategoryDataset dataset = new DefaultCategoryDataset();
                     for (ScoreResult sr : scores) {
                         String indName = indicatorNameMap.getOrDefault(sr.getIndicatorId(), "指标");
-                        double finalScore = sr.getFinalScore() != null ? sr.getFinalScore().doubleValue() : 0;
+                        double finalScore = sr.getFinalScore() != null ? sr.getFinalScore().doubleValue()
+                                : (sr.getAutoScore() != null ? sr.getAutoScore().doubleValue() : 0);
                         dataset.addValue(finalScore, "得分", indName);
                     }
                     JFreeChart chart = ChartFactory.createBarChart("得分对比图", "评价指标", "分数", dataset, PlotOrientation.VERTICAL, false, true, false);
+                    BarRenderer barRenderer = (BarRenderer) chart.getCategoryPlot().getRenderer();
+                    barRenderer.setSeriesPaint(0, new Color(79, 129, 189));
+                    barRenderer.setBarPainter(new StandardBarPainter());
                     ByteArrayOutputStream chartOut = new ByteArrayOutputStream();
                     ChartUtils.writeChartAsPNG(chartOut, chart, 500, 300);
                     
@@ -617,6 +628,42 @@ public class ReportService {
                 .sheet("班级统计")
                 .doWrite(data);
 
+        // 插入可视化图表（各指标平均达成度柱状图）
+        try {
+            DefaultCategoryDataset chartDataset = new DefaultCategoryDataset();
+            for (Indicator ind : indicators) {
+                double indAvg = allScores.stream()
+                        .filter(s -> s.getIndicatorId().equals(ind.getId()))
+                        .mapToDouble(s -> s.getFinalScore() != null ? s.getFinalScore().doubleValue()
+                                : (s.getAutoScore() != null ? s.getAutoScore().doubleValue() : 0))
+                        .average().orElse(0);
+                chartDataset.addValue(indAvg, "平均分", ind.getName());
+            }
+            JFreeChart chart = ChartFactory.createBarChart("各指标平均达成度", "指标名称", "平均分数",
+                    chartDataset, PlotOrientation.VERTICAL, false, true, false);
+            BarRenderer renderer = (BarRenderer) chart.getCategoryPlot().getRenderer();
+            renderer.setSeriesPaint(0, new Color(79, 129, 189));
+            renderer.setBarPainter(new StandardBarPainter());
+            ByteArrayOutputStream chartOut = new ByteArrayOutputStream();
+            ChartUtils.writeChartAsPNG(chartOut, chart, 600, 350);
+
+            // 用 Apache POI 打开 Excel 并插入图表图片
+            try (org.apache.poi.xssf.usermodel.XSSFWorkbook wb =
+                         new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.FileInputStream(filePath.toFile()))) {
+                org.apache.poi.xssf.usermodel.XSSFSheet sheet = wb.getSheet("班级统计");
+                int imgRow = sheet.getLastRowNum() + 2;
+                int pictureIdx = wb.addPicture(chartOut.toByteArray(), org.apache.poi.ss.usermodel.Workbook.PICTURE_TYPE_PNG);
+                org.apache.poi.ss.usermodel.Drawing<?> drawing = sheet.createDrawingPatriarch();
+                org.apache.poi.ss.usermodel.ClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 0, imgRow, 10, imgRow + 18);
+                drawing.createPicture(anchor, pictureIdx);
+                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(filePath.toFile())) {
+                    wb.write(fos);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Excel图表插入失败: {}", e.getMessage());
+        }
+
         return fileName;
     }
 
@@ -663,7 +710,7 @@ public class ReportService {
              PdfDocument pdf = new PdfDocument(writer);
              Document document = new Document(pdf)) {
 
-            PdfFont font = PdfFontFactory.createFont("STSong-Light", "UniGB-UCS2-H", PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+            PdfFont font = createCjkFont();
             document.setFont(font);
             document.setFontSize(10);
 
@@ -749,11 +796,15 @@ public class ReportService {
                     for (Indicator ind : indicators) {
                         double indAvg = allScores.stream()
                                 .filter(s -> s.getIndicatorId().equals(ind.getId()))
-                                .mapToDouble(s -> s.getFinalScore() != null ? s.getFinalScore().doubleValue() : 0)
+                                .mapToDouble(s -> s.getFinalScore() != null ? s.getFinalScore().doubleValue()
+                                        : (s.getAutoScore() != null ? s.getAutoScore().doubleValue() : 0))
                                 .average().orElse(0);
                         barDataset.addValue(indAvg, "平均分", ind.getName());
                     }
                     JFreeChart barChart = ChartFactory.createBarChart("各指标平均达成度", "指标名称", "平均分数", barDataset, PlotOrientation.VERTICAL, false, true, false);
+                    BarRenderer classBarRenderer = (BarRenderer) barChart.getCategoryPlot().getRenderer();
+                    classBarRenderer.setSeriesPaint(0, new Color(79, 129, 189));
+                    classBarRenderer.setBarPainter(new StandardBarPainter());
                     ByteArrayOutputStream barOut = new ByteArrayOutputStream();
                     ChartUtils.writeChartAsPNG(barOut, barChart, 500, 300);
                     Image barImg = new Image(ImageDataFactory.create(barOut.toByteArray())).setHorizontalAlignment(com.itextpdf.layout.properties.HorizontalAlignment.CENTER);
@@ -814,6 +865,28 @@ public class ReportService {
         }
 
         return fileName;
+    }
+
+    /**
+     * 创建嵌入中文字体的 PdfFont（跨平台）
+     * 优先使用系统字体并强制嵌入，避免 Chrome/Edge 等浏览器因缺少 CJK 字体显示空白
+     */
+    private PdfFont createCjkFont() throws java.io.IOException {
+        String[] fontPaths = {
+            "C:/Windows/Fonts/simhei.ttf",
+            "C:/Windows/Fonts/simsun.ttc,0",
+            "C:/Windows/Fonts/msyh.ttc,0",
+            "/usr/share/fonts/wqy-microhei/wqy-microhei.ttc",
+            "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"
+        };
+        for (String path : fontPaths) {
+            try {
+                return PdfFontFactory.createFont(path, PdfFontFactory.EmbeddingStrategy.FORCE_EMBEDDED);
+            } catch (Exception ignored) {
+            }
+        }
+        // 兜底：iText 内置 CJK 引用字体（不嵌入，需查看器支持）
+        return PdfFontFactory.createFont("STSong-Light", "UniGB-UCS2-H", PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
     }
 
     /**
