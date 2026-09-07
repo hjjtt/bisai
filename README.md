@@ -19,7 +19,7 @@
 - **批量处理** — 批量解析/核查/评分/发布，教师可一键处理整班提交，支持漏填分数自动跳过
 - **可视化报表** — ECharts 图表展示班级成绩分布、指标达成度等统计数据
 - **评分一致性看板** — Pearson/Spearman 相关系数、MAE/RMSE 统计，AI vs 教师评分差异可视化
-- **动态模型配置** — 管理后台可实时切换 AI 模型（支持 ModelScope 平台所有模型），无需重启
+- **动态模型配置** — 管理后台可实时切换 AI 模型（支持火山引擎 ARK 兼容 OpenAI 接口的模型），无需重启
 - **三角色权限体系** — 学生/教师/管理员严格的数据隔离与多层权限控制
 
 ## 技术栈
@@ -27,7 +27,7 @@
 | 层级 | 技术 |
 |------|------|
 | **后端** | Spring Boot 3.4.3 · Spring Security (JWT) · MyBatis-Plus 3.5.9 |
-| **AI** | Spring AI 1.0 · ModelScope (Qwen / DeepSeek / Kimi 等可切换) · RAG 检索增强 |
+| **AI** | Spring AI 1.0 · 火山引擎 ARK (doubao-seed-2.0-lite) · RAG 检索增强 |
 | **文档** | PDFBox 3.0 · POI 5.3 · docx4j 11.4 · iText 8.0 |
 | **数据库** | MySQL 8.0 (utf8mb4) |
 | **前端** | Vue 3.5 · TypeScript 6 · Vite 8 · Element Plus 2.13 · Pinia 3.0 · ECharts 6.0 |
@@ -49,7 +49,7 @@
 │                                                        │
 │  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │
 │  │ Security     │  │ AI 服务层     │  │ AsyncTask   │  │
-│  │ JWT + CORS   │  │ ModelScope   │  │ Scheduler   │  │
+│  │ JWT + CORS   │  │ 火山引擎 ARK  │  │ Scheduler   │  │
 │  │ @PreAuthorize│  │ RAG 检索     │  │ (5s 轮询)   │  │
 │  └──────────────┘  └──────────────┘  └─────────────┘  │
 │                       │                                │
@@ -101,7 +101,7 @@ bisai/
 │       ├── controller/               # 17 个 REST 控制器
 │       ├── service/                  # 23 个业务服务
 │       │   ├── AiService             #   AI 解析/核查/评分核心
-│       │   ├── ModelScopeClient      #   ModelScope API 调用封装
+│       │   ├── ModelScopeClient      #   AI API 调用封装（OpenAI 兼容）
 │       │   ├── KnowledgeService      #   知识库（文档→分块→向量化）
 │       │   ├── KnowledgeRetrievalService  # RAG 两阶段检索
 │       │   └── ...
@@ -165,18 +165,18 @@ npm run dev            # 端口 3000，自动代理 /api → localhost:8080
 |--------|------|--------|
 | `DB_PASSWORD` | 数据库密码 | `123456` |
 | `JWT_SECRET` | JWT 签名密钥 | 内置默认值 |
-| `AI_API_KEY` | ModelScope API Key | 内置开发用 Key |
+| `AI_API_KEY` | AI 平台 API Key | 内置开发用 Key |
 
 ### AI 模型配置
 
 系统支持动态切换 AI 模型，在管理后台 **模型配置** 页面可实时修改：
 
-- **聊天模型** — 默认 `Qwen/Qwen3.5-35B-A3B`，可切换为 ModelScope 平台任意模型
-- **向量化模型** — `damo/nlp_corom_sentence-embedding_chinese-base`
+- **聊天模型** — 默认 `doubao-seed-2.0-lite`（火山引擎 ARK），可切换为兼容 OpenAI 接口的任意模型
+- **向量化模型** — `damo/nlp_corom_sentence-embedding_chinese-base`（ModelScope）
 - **参数调节** — 温度参数、最大 Token 数、超时时间等均可在线调整
 - **连通性测试** — 修改后可即时测试模型是否可用
 
-> 模型 ID 需使用 ModelScope 平台完整格式，如 `moonshotai/Kimi-K2.6:DashScope`
+> 模型 ID 需使用火山引擎 ARK 平台的模型标识，如 `doubao-seed-2.0-lite`
 
 ### 异步任务配置
 

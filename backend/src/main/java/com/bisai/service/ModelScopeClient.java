@@ -154,6 +154,8 @@ public class ModelScopeClient {
                             .model(model)
                             .maxTokens(aiConfig.getMaxTokens())
                             .temperature(temperature)
+                            // 小米 MiMo 为推理模型：关闭内置思考链（提示词自带 CoT），避免思考链吃掉 max_tokens
+                            .reasoningEffort("none")
                             .build()
             ));
             if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
@@ -236,7 +238,9 @@ public class ModelScopeClient {
             OpenAiChatOptions.Builder optionsBuilder = OpenAiChatOptions.builder()
                     .model(model)
                     .maxTokens(aiConfig.getMaxTokens())
-                    .temperature(aiConfig.getTemperature());
+                    .temperature(aiConfig.getTemperature())
+                    // 小米 MiMo：关闭内置思考链，ReAct 循环里由提示词控制推理
+                    .reasoningEffort("none");
 
             if (toolNames != null && !toolNames.isEmpty()) {
                 optionsBuilder.toolNames(new java.util.HashSet<>(toolNames));
@@ -343,6 +347,7 @@ public class ModelScopeClient {
                             .model(aiConfig.getVisionModel())
                             .maxTokens(aiConfig.getMaxTokens())
                             .temperature(aiConfig.getTemperature())
+                            .reasoningEffort("none")
                             .build()
             ));
             if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
@@ -399,6 +404,7 @@ public class ModelScopeClient {
                     .model(testModel)
                     .maxTokens(100)
                     .temperature(0.1)
+                    .reasoningEffort("none")
                     .build();
             ChatResponse response = chatModel.call(new Prompt(
                     List.of(new SystemMessage("你是一个测试助手。"), new org.springframework.ai.chat.messages.UserMessage("请回复：连接成功")),

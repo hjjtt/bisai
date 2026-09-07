@@ -33,9 +33,9 @@
       </el-tabs>
 
       <el-table :data="users" stripe v-loading="loading">
-        <el-table-column prop="username" label="用户名" min-width="120" align="center" />
-        <el-table-column prop="realName" label="姓名" min-width="120" align="center" />
-        <el-table-column label="角色" min-width="100" align="center">
+        <el-table-column prop="username" label="用户名" min-width="110" align="center" />
+        <el-table-column prop="realName" label="姓名" min-width="100" align="center" />
+        <el-table-column label="角色" min-width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="getRoleType(row.role)">{{ getRoleLabel(row.role) }}</el-tag>
           </template>
@@ -43,7 +43,7 @@
         <el-table-column
           v-if="showClassColumn"
           label="班级"
-          min-width="150"
+          min-width="110"
           align="center"
           show-overflow-tooltip
         >
@@ -54,7 +54,7 @@
         <el-table-column
           v-if="showCourseColumn"
           label="授课课程"
-          min-width="220"
+          min-width="150"
           align="center"
           show-overflow-tooltip
         >
@@ -62,14 +62,14 @@
             {{ getCourseDisplay(row) }}
           </template>
         </el-table-column>
-        <el-table-column label="状态" min-width="90" align="center">
+        <el-table-column label="状态" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getEnableStatusType(row.status)" size="small">
               {{ getEnableStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right" align="center">
+        <el-table-column label="操作" width="170" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-actions">
               <el-button class="edit-btn" type="primary" plain :icon="EditPen" @click="showDialog(row)">
@@ -308,8 +308,12 @@ async function toggleStatus(user: UserInfo) {
 async function resetPwd(user: UserInfo) {
   try {
     await ElMessageBox.confirm(`确定重置用户 ${user.realName} 的密码？`, '重置密码')
-    await resetPassword(user.id)
-    ElMessage.success('密码已重置')
+    const res: any = await resetPassword(user.id)
+    await ElMessageBox.alert(
+      `新初始密码：${res?.data?.tempPassword ?? '（见服务端日志）'}\n请转告用户，首次登录后需修改密码。`,
+      '重置成功',
+      { confirmButtonText: '知道了' }
+    )
   } catch (error) {
     // 用户取消
   }

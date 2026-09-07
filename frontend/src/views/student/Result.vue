@@ -31,20 +31,20 @@
         <el-row :gutter="16" style="margin-bottom: 16px">
           <el-col :span="8">
             <el-card shadow="never" body-style="padding: 10px; text-align: center">
-              <div style="font-size: 28px; font-weight: 700; color: #67c23a">{{ lowRiskCount }}</div>
-              <div style="font-size: 13px; color: #909399">低风险</div>
+              <div style="font-size: 28px; font-weight: 700; color: var(--el-color-success)">{{ lowRiskCount }}</div>
+              <div style="font-size: 13px; color: var(--el-color-info)">低风险</div>
             </el-card>
           </el-col>
           <el-col :span="8">
             <el-card shadow="never" body-style="padding: 10px; text-align: center">
-              <div style="font-size: 28px; font-weight: 700; color: #e6a23c">{{ mediumRiskCount }}</div>
-              <div style="font-size: 13px; color: #909399">中风险</div>
+              <div style="font-size: 28px; font-weight: 700; color: var(--el-color-warning)">{{ mediumRiskCount }}</div>
+              <div style="font-size: 13px; color: var(--el-color-info)">中风险</div>
             </el-card>
           </el-col>
           <el-col :span="8">
             <el-card shadow="never" body-style="padding: 10px; text-align: center">
-              <div style="font-size: 28px; font-weight: 700; color: #f56c6c">{{ highRiskCount }}</div>
-              <div style="font-size: 13px; color: #909399">高风险</div>
+              <div style="font-size: 28px; font-weight: 700; color: var(--el-color-danger)">{{ highRiskCount }}</div>
+              <div style="font-size: 13px; color: var(--el-color-info)">高风险</div>
             </el-card>
           </el-col>
         </el-row>
@@ -160,13 +160,13 @@ onMounted(loadData)
   .score-label {
     display: block;
     font-size: 14px;
-    color: #909399;
+    color: var(--el-color-info);
   }
 
   .score-value {
     font-size: 48px;
     font-weight: bold;
-    color: #409eff;
+    color: var(--el-color-primary);
 
     &.score-ai {
       color: #6366f1;
@@ -177,7 +177,7 @@ onMounted(loadData)
 
 .comment-block {
   &.returned {
-    h4 { color: #e6a23c; }
+    h4 { color: var(--el-color-warning); }
     .comment-text {
       padding: 12px 16px;
       border-radius: 6px;

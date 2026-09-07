@@ -81,10 +81,10 @@ async function loadBlob(file: FileInfo) {
         const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
         const arrayBuffer = await blob.arrayBuffer()
         const result = await mammoth.convertToHtml({ arrayBuffer })
-        docHtmls[file.id] = result.value || '<p style="color:#909399">文档内容为空</p>'
+        docHtmls[file.id] = result.value || '<p style="color:var(--el-color-info)">文档内容为空</p>'
       } catch (e) {
         console.error('mammoth 解析失败:', e)
-        docHtmls[file.id] = '<p style="color:#F56C6C">文档解析失败，请下载后查看</p>'
+        docHtmls[file.id] = '<p style="color:var(--el-color-danger)">文档解析失败，请下载后查看</p>'
       }
       return
     }
@@ -95,10 +95,10 @@ async function loadBlob(file: FileInfo) {
         const res = await getFilePreview(file.id)
         // 后端返回 HTML 文本
         const html = typeof res.data === 'string' ? res.data : await (res.data as Blob).text()
-        docHtmls[file.id] = html || '<p style="color:#909399">文档内容为空</p>'
+        docHtmls[file.id] = html || '<p style="color:var(--el-color-info)">文档内容为空</p>'
       } catch (e) {
         console.error('doc HTML 预览失败:', e)
-        docHtmls[file.id] = '<p style="color:#F56C6C">文档解析失败，请下载后查看</p>'
+        docHtmls[file.id] = '<p style="color:var(--el-color-danger)">文档解析失败，请下载后查看</p>'
       }
       return
     }
@@ -179,7 +179,7 @@ onUnmounted(() => {
     padding: 24px 32px;
     line-height: 1.8;
     font-size: 14px;
-    color: #303133;
+    color: var(--el-text-color-primary);
     background: #fff;
 
     :deep(table) {
@@ -225,7 +225,7 @@ onUnmounted(() => {
     }
 
     :deep(blockquote) {
-      border-left: 4px solid #409eff;
+      border-left: 4px solid var(--el-color-primary);
       padding-left: 12px;
       margin: 12px 0;
       color: #606266;
@@ -237,7 +237,7 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: center;
     gap: 16px;
-    color: #909399;
+    color: var(--el-color-info);
   }
 }
 </style>

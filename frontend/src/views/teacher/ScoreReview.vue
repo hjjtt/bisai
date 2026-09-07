@@ -15,7 +15,7 @@
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="总分">
-          <span style="font-weight: bold; color: #f56c6c">{{ submission.totalScore ?? '--' }}</span> 分
+          <span style="font-weight: bold; color: var(--el-color-danger)">{{ submission.totalScore ?? '--' }}</span> 分
         </el-descriptions-item>
         <el-descriptions-item label="评分状态">
           <el-tag :type="getScoreStatusType(submission.scoreStatus)" size="small">
@@ -185,7 +185,7 @@
           {{ score }} 分
         </el-descriptions-item>
         <el-descriptions-item label="总分">
-          <span style="font-weight: bold; color: #f56c6c; font-size: 18px">{{ objectiveScore.total }}</span> 分
+          <span style="font-weight: bold; color: var(--el-color-danger); font-size: 18px">{{ objectiveScore.total }}</span> 分
         </el-descriptions-item>
       </el-descriptions>
       <el-empty v-else description="暂无客观评分数据" />
@@ -456,7 +456,7 @@ onBeforeUnmount(stopScorePolling)
 
 <style scoped>
 .auto-score {
-  color: #409eff;
+  color: var(--el-color-primary);
   font-weight: bold;
 }
 .auto-score-cell {

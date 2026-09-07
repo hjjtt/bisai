@@ -16,7 +16,7 @@
 }
 .not-found h1 {
   font-size: 72px;
-  color: #409eff;
+  color: var(--el-color-primary);
   margin-bottom: 16px;
 }
 .not-found p {

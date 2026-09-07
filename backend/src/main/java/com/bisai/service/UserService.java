@@ -152,15 +152,26 @@ public class UserService {
         return Result.ok(updated);
     }
 
-    public Result<Void> resetPassword(Long id) {
+    public Result<Map<String, String>> resetPassword(Long id) {
         User user = userMapper.selectById(id);
         if (user == null) {
             return Result.error(40401, "用户不存在");
         }
-        user.setPassword(passwordEncoder.encode("123456"));
+        String tempPassword = generateTempPassword();
+        user.setPassword(passwordEncoder.encode(tempPassword));
         user.setMustChangePassword(true);
         userMapper.updateById(user);
-        return Result.ok();
+        return Result.ok(Map.of("tempPassword", tempPassword));
+    }
+
+    private String generateTempPassword() {
+        String chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        StringBuilder sb = new StringBuilder(10);
+        for (int i = 0; i < 10; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
 
     public Result<Void> toggleStatus(Long id, String status) {

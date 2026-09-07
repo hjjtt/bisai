@@ -26,7 +26,7 @@
       <el-col :span="8">
         <el-card shadow="never" class="risk-card" body-style="padding: 10px">
           <div class="risk-stat">
-            <span class="risk-number" style="color: #67c23a">{{ lowRiskCount }}</span>
+            <span class="risk-number" style="color: var(--el-color-success)">{{ lowRiskCount }}</span>
             <span class="risk-label">低风险</span>
           </div>
         </el-card>
@@ -34,7 +34,7 @@
       <el-col :span="8">
         <el-card shadow="never" class="risk-card" body-style="padding: 10px">
           <div class="risk-stat">
-            <span class="risk-number" style="color: #e6a23c">{{ mediumRiskCount }}</span>
+            <span class="risk-number" style="color: var(--el-color-warning)">{{ mediumRiskCount }}</span>
             <span class="risk-label">中风险</span>
           </div>
         </el-card>
@@ -42,7 +42,7 @@
       <el-col :span="8">
         <el-card shadow="never" class="risk-card" body-style="padding: 10px">
           <div class="risk-stat">
-            <span class="risk-number" style="color: #f56c6c">{{ highRiskCount }}</span>
+            <span class="risk-number" style="color: var(--el-color-danger)">{{ highRiskCount }}</span>
             <span class="risk-label">高风险</span>
           </div>
         </el-card>
@@ -55,9 +55,9 @@
           <span>详细核查项</span>
           <div>
             <el-button type="info" @click="$router.push(`/teacher/submissions/${submissionId}/preview`)">预览文件</el-button>
-            <el-button type="warning" @click="$router.push(`/teacher/submissions/${submissionId}/score-review`)" v-if="submission?.scoreStatus === 'SCORED' || submission?.scoreStatus === 'TEACHER_CONFIRMED'">查看评分</el-button>
-            <el-button type="success" @click="handleScore" :loading="scoring" v-if="submission?.checkStatus === 'SUCCESS'">
-              {{ scoring ? '正在评分...' : '开始 AI 评分' }}
+            <el-button type="success" @click="$router.push(`/teacher/submissions/${submissionId}/score`)" v-if="submission?.checkStatus === 'SUCCESS'">
+              去 AI 评分
+              <el-icon style="margin-left: 4px"><ArrowRight /></el-icon>
             </el-button>
             <el-button type="primary" @click="handleRecheck" :loading="rechecking">
               {{ rechecking ? '正在核查...' : (submission?.checkStatus === 'SUCCESS' ? '重新核查' : '开始 AI 核查') }}
@@ -108,14 +108,14 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getCheckResults, startCheck, startScore, getSubmission, getAsyncTasksByBizId, forceResetAsyncTask } from '@/api/task'
+import { ArrowRight } from '@element-plus/icons-vue'
+import { getCheckResults, startCheck, getSubmission, getAsyncTasksByBizId, forceResetAsyncTask } from '@/api/task'
 import { getResultType, getResultLabel, getRiskType, getRiskLabel, getCheckStatusType, getCheckStatusLabel } from '@/utils/status'
 import type { CheckResult, Submission, AsyncTask } from '@/types'
 
 const route = useRoute()
 const loading = ref(false)
 const rechecking = ref(false)
-const scoring = ref(false)
 const submission = ref<Submission | null>(null)
 const checkResults = ref<CheckResult[]>([])
 const asyncTasks = ref<AsyncTask[]>([])
@@ -161,20 +161,6 @@ async function handleRecheck() {
   } catch (e) {
     ElMessage.error('触发核查失败')
     rechecking.value = false
-  }
-}
-
-async function handleScore() {
-  scoring.value = true
-  try {
-    await startScore(submissionId.value)
-    ElMessage.success('AI 评分任务已启动')
-    setTimeout(() => {
-      scoring.value = false
-    }, 1000)
-  } catch (e) {
-    ElMessage.error('触发评分失败')
-    scoring.value = false
   }
 }
 
@@ -235,7 +221,7 @@ onBeforeUnmount(stopPolling)
 .risk-label {
   display: block;
   font-size: 13px;
-  color: #909399;
+  color: var(--el-color-info);
   margin-top: 4px;
 }
 </style>

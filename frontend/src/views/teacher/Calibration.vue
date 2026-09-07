@@ -296,7 +296,7 @@ onMounted(() => {
 }
 .calibration-score {
   font-weight: bold;
-  color: #f56c6c;
+  color: var(--el-color-danger);
 }
 .text-ellipsis {
   display: inline-block;

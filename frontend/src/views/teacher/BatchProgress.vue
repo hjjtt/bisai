@@ -81,7 +81,7 @@
           </el-table-column>
           <el-table-column prop="totalScore" label="总分" min-width="80" align="center">
             <template #default="{ row }">
-              <span v-if="row.totalScore != null" style="font-weight: 600; color: #409eff">
+              <span v-if="row.totalScore != null" style="font-weight: 600; color: var(--el-color-primary)">
                 {{ row.totalScore }}
               </span>
               <span v-else style="color: #c0c4cc">-</span>

@@ -4,7 +4,7 @@ server:
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/bisai?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-    username: root
+    username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
   servlet:
@@ -26,14 +26,20 @@ spring:
       enabled: false
   ai:
     openai:
-      base-url: https://api-inference.modelscope.cn
-      api-key: ${ai.api-key:YOUR_MODELSCOPE_API_KEY}
+      # 全局默认：小米 MiMo（OpenAI 兼容接口），用于 Chat（同 aiwechat 项目的接法）
+      base-url: ${AI_BASE_URL:https://api.xiaomimimo.com/v1}
+      api-key: ${AI_API_KEY:YOUR_XIAOMIMIMO_API_KEY}
       chat:
+        # base-url 已含 /v1，去掉默认的 /v1 前缀避免路径重复
+        completions-path: /chat/completions
         options:
-          model: Qwen/Qwen3.5-35B-A3B
+          model: ${AI_CHAT_MODEL:mimo-v2.5}
           max-tokens: 2048
           temperature: 0.3
       embedding:
+        # Embedding 保留 ModelScope（小米 MiMo 端点不提供 embedding）
+        base-url: https://api-inference.modelscope.cn
+        api-key: ${AI_EMBEDDING_API_KEY:YOUR_MODELSCOPE_API_KEY}
         options:
           model: damo/nlp_corom_sentence-embedding_chinese-base
 
@@ -70,14 +76,14 @@ jwt:
   secret: ${JWT_SECRET:bisai-smart-evaluation-system-jwt-secret-key-2024}
   expiration: 86400000
 
-# AI 模型配置 (ModelScope)
+# AI 模型配置 (小米 MiMo)
 ai:
-  base-url: https://api-inference.modelscope.cn/v1
-  api-key: ${AI_API_KEY:YOUR_MODELSCOPE_API_KEY}
-  model: Qwen/Qwen3.5-35B-A3B
-  fallback-model: stepfun-ai/Step-3.7-Flash
+  base-url: https://api.xiaomimimo.com/v1
+  api-key: ${AI_API_KEY:YOUR_XIAOMIMIMO_API_KEY}
+  model: mimo-v2.5
+  fallback-model:
   embedding-model: damo/nlp_corom_sentence-embedding_chinese-base
-  vision-model: Qwen/Qwen3.5-35B-A3B
+  vision-model: mimo-v2.5
   max-tokens: 2048
   temperature: 0.3
   daily-token-limit: ${AI_DAILY_TOKEN_LIMIT:500000}

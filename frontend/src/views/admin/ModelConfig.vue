@@ -5,14 +5,14 @@
         <div class="card-header">
           <span>模型配置</span>
           <div>
-            <el-tag type="success">主模型: {{ form.model || 'Qwen/Qwen3.5-35B-A3B' }}</el-tag>
+            <el-tag type="success">主模型: {{ form.model || 'mimo-v2.5' }}</el-tag>
             <el-tag type="warning" style="margin-left: 8px">备用: {{ form.fallbackModels || '未配置' }}</el-tag>
           </div>
         </div>
       </template>
 
       <el-alert
-        title="当前系统已接入 ModelScope AI 平台，使用已配置的大语言模型提供智能解析、核查和评分服务。"
+        title="当前系统已接入小米 MiMo 开放平台，使用已配置的大语言模型提供智能解析、核查和评分服务。"
         type="info"
         :closable="false"
         show-icon
@@ -22,17 +22,17 @@
       <el-form :model="form" label-width="140px" style="max-width: 600px" v-loading="loading">
         <el-divider content-position="left">文本大模型（核心）</el-divider>
         <el-form-item label="API 地址">
-          <el-input v-model="form.textModelApiUrl" placeholder="https://api-inference.modelscope.cn/v1" />
+          <el-input v-model="form.textModelApiUrl" placeholder="https://api.xiaomimimo.com/v1" />
         </el-form-item>
         <el-form-item label="密钥">
-          <el-input v-model="form.textModelApiKey" type="password" show-password placeholder="ms-xxxxx" />
+          <el-input v-model="form.textModelApiKey" type="password" show-password placeholder="API Key" />
         </el-form-item>
         <el-form-item label="模型名称">
-          <el-input v-model="form.model" placeholder="Qwen/Qwen3.5-35B-A3B" />
+          <el-input v-model="form.model" placeholder="mimo-v2.5" />
         </el-form-item>
         <el-form-item label="备用模型">
-          <el-input v-model="form.fallbackModels" placeholder="stepfun-ai/Step-3.7-Flash,XiaomiMiMo/MiMo-V2-Flash:xiaomi" />
-          <div class="el-form-item__tip" style="color: #909399; font-size: 12px; margin-top: 4px">
+          <el-input v-model="form.fallbackModels" placeholder="备用模型用逗号分隔，可留空" />
+          <div class="el-form-item__tip" style="color: var(--el-color-info); font-size: 12px; margin-top: 4px">
             多个备用模型用逗号分隔，按顺序尝试。配额耗尽自动跳过，留空则不启用备用
           </div>
         </el-form-item>
@@ -83,10 +83,10 @@ const saving = ref(false)
 const testing = ref(false)
 
 const form = reactive({
-  textModelApiUrl: 'https://api-inference.modelscope.cn/v1',
+  textModelApiUrl: 'https://api.xiaomimimo.com/v1',
   textModelApiKey: '',
-  model: 'Qwen/Qwen3.5-35B-A3B',
-  fallbackModels: 'stepfun-ai/Step-3.7-Flash',
+  model: 'mimo-v2.5',
+  fallbackModels: '',
   timeout: 30000,
   temperature: 0.3,
   maxTokens: 4096,
@@ -114,7 +114,7 @@ async function loadConfig() {
 async function handleTest() {
   testing.value = true
   try {
-    const model = form.model || 'Qwen/Qwen3.5-35B-A3B'
+    const model = form.model || 'mimo-v2.5'
     const res = await testModelConnection({ apiUrl: form.textModelApiUrl, apiKey: form.textModelApiKey, model })
     if (res.data.success) {
       ElMessage.success(res.data.message || '连通性测试通过')
@@ -134,7 +134,7 @@ async function handleSave() {
     const payload: Partial<SystemConfigMap> = {
       textModelApiUrl: form.textModelApiUrl,
       textModelApiKey: form.textModelApiKey,
-      model: form.model || 'Qwen/Qwen3.5-35B-A3B',
+      model: form.model || 'mimo-v2.5',
       fallbackModels: form.fallbackModels || '',
       timeout: String(form.timeout),
       temperature: String(form.temperature),

@@ -120,7 +120,6 @@
           <el-form-item prop="role">
             <el-select v-model="registerForm.role" placeholder="选择角色" size="large" class="form-input" style="width: 100%">
               <el-option label="学生" value="STUDENT" />
-              <el-option label="教师" value="TEACHER" />
             </el-select>
           </el-form-item>
           <el-form-item v-if="registerForm.role === 'STUDENT'" prop="classId">

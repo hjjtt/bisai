@@ -1,5 +1,6 @@
 package com.bisai.service;
 
+import com.bisai.config.AiConfig;
 import com.bisai.dto.DashboardStats;
 import com.bisai.entity.*;
 import com.bisai.mapper.*;
@@ -27,6 +28,7 @@ public class DashboardService {
     private final AsyncTaskMapper asyncTaskMapper;
     private final AiCallLogMapper aiCallLogMapper;
     private final ScoreConsistencyService scoreConsistencyService;
+    private final AiConfig aiConfig;
 
     public DashboardStats.StudentStats getStudentStats(Long userId) {
         DashboardStats.StudentStats stats = new DashboardStats.StudentStats();
@@ -275,13 +277,13 @@ public class DashboardService {
         long aiTotalToday = aiCallLogMapper.selectCount(
                 new LambdaQueryWrapper<AiCallLog>().ge(AiCallLog::getCreatedAt, todayStart));
         if (aiTotalToday == 0) {
-            statusList.add(buildStatus("AI 模型服务", "Qwen3.5-35B（今日无调用）"));
+            statusList.add(buildStatus("AI 模型服务", aiConfig.getModel() + "（今日无调用）"));
         } else {
             long aiSuccessToday = aiCallLogMapper.selectCount(
                     new LambdaQueryWrapper<AiCallLog>().ge(AiCallLog::getCreatedAt, todayStart).eq(AiCallLog::getSuccess, true));
             double aiRate = (double) aiSuccessToday / aiTotalToday * 100;
             if (aiRate >= 90) {
-                statusList.add(buildStatus("AI 模型服务", String.format("Qwen3.5-35B（成功率 %.0f%%）", aiRate)));
+                statusList.add(buildStatus("AI 模型服务", String.format("%s（成功率 %.0f%%）", aiConfig.getModel(), aiRate)));
             } else {
                 statusList.add(buildErrorStatus("AI 模型服务", String.format("成功率 %.0f%%", aiRate)));
             }

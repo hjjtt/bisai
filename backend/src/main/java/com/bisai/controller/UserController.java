@@ -51,7 +51,7 @@ public class UserController {
 
     @PostMapping("/{id}/reset-password")
     @PreAuthorize("hasRole('ADMIN')")
-    public Result<Void> resetPassword(@PathVariable Long id) {
+    public Result<Map<String, String>> resetPassword(@PathVariable Long id) {
         return userService.resetPassword(id);
     }
 }

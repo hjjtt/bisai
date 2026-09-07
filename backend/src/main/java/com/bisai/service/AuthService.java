@@ -147,10 +147,10 @@ public class AuthService {
      * 用户注册
      */
     public Result<Void> register(RegisterRequest request) {
-        // 角色校验：只允许注册学生或教师
+        // 角色校验：注册仅开放学生；教师账号由管理员在用户管理中创建
         String role = request.getRole();
-        if (!"STUDENT".equals(role) && !"TEACHER".equals(role)) {
-            return Result.error(40004, "注册仅支持学生或教师角色");
+        if (!"STUDENT".equals(role)) {
+            return Result.error(40004, "注册仅支持学生角色，教师账号请联系管理员创建");
         }
 
         // 学生必须选择班级

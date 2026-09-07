@@ -29,13 +29,13 @@ Spring Boot 3.4.3 + Spring AI 1.0.0 + Vue 3 + Vite 8 单体应用。三角色（
 - 核心 Service: `AiService`(解析/核查/评分)、`ModelScopeClient`(AI调用+fallback)、`KnowledgeService`(RAG)、`AsyncTaskService`(@Scheduled 5s 轮询，非消息队列)
 - 异步任务: 最多重试 3 次（递增延迟），僵尸任务 10 分钟清理
 - RAG: 文档→分块(1200字符)→向量化；`KnowledgeRetrievalService` 向量 Top-20 + 可选 Rerank Top-5
-- AI 调用通过 Spring AI OpenAI 兼容接口连 ModelScope，日限 50 万 token / 2000 次
+- AI Chat 调用通过 Spring AI OpenAI 兼容接口连火山引擎 ARK（doubao-seed-2.0-lite）；Embedding 连 ModelScope；日限 50 万 token / 2000 次
 
 ### AI 模型与 fallback
 - 主模型和备用模型可在管理后台动态切换（`system_config` 表），无需重启
-- `ModelScopeClient` 自动构建 fallback 链：主模型 → `ai.fallback-model` 逗号分隔的模型列表
+- `ModelScopeClient` 自动构建 fallback 链：主模型 → `ai.fallback-model` 逗号分隔的模型列表（火山引擎 coding plan 仅 `doubao-seed-2.0-lite` 一个模型，当前 fallback 为空）
 - 429 限流时标记模型耗尽并自动 fallback 到下一个模型
-- **思考模式处理**：Qwen 系列模型，`doChat` 自动在 system prompt 前追加 `/no_think` 禁用思考；`stripThinkingTags()` 兜底剥离 `<think...</think` 标签。修改 AI 调用逻辑时注意这两个机制
+- **思考模式处理**：Qwen 系列模型，`doChat` 自动在 system prompt 前追加 `/no_think` 禁用思考；`stripThinkingTags()` 兜底剥离 `<think...</think` 标签。修改 AI 调用逻辑时注意这两个机制。doubao-seed-2.0-lite 返回 `reasoning_content` 思考链，但 Spring AI 仅取 `content` 字段，业务不受影响
 
 ### 前端 (`frontend/src`)
 - 三套独立路由: `studentRoutes`/`teacherRoutes`/`adminRoutes`，守卫在 `router/guards.ts`
@@ -49,10 +49,12 @@ Spring Boot 3.4.3 + Spring AI 1.0.0 + Vue 3 + Vite 8 单体应用。三角色（
 ## Key config
 - **数据库**: `root` / `${DB_PASSWORD:123456}`，`localhost:3306/bisai`
 - **JWT**: `${JWT_SECRET:bisai-smart-evaluation-system-jwt-secret-key-2024}`，过期 24h
-- **AI**: `${AI_API_KEY:YOUR_MODELSCOPE_API_KEY}`，默认 Chat=`Qwen/Qwen3.5-35B-A3B`（yml 覆盖 Java 默认 `stepfun-ai/Step-3.7-Flash`），Embedding=`damo/nlp_corom_sentence-embedding_chinese-base`
+- **AI Chat**: 小米 MiMo（OpenAI 兼容），`${AI_API_KEY:YOUR_XIAOMIMIMO_API_KEY}`，Base URL=`https://api.xiaomimimo.com/v1`，Chat 模型=`mimo-v2.5`（推理模型，代码中已统一 `reasoningEffort=none` 关闭内置思考链）
+- **AI Embedding**: 保留 ModelScope（小米 MiMo 端点不提供 embedding），`${AI_EMBEDDING_API_KEY:YOUR_MODELSCOPE_API_KEY}`，`base-url=https://api-inference.modelscope.cn`，模型=`damo/nlp_corom_sentence-embedding_chinese-base`
+- **真实密钥通过环境变量注入**（服务器 systemd `AI_API_KEY` / `AI_EMBEDDING_API_KEY`），仓库中只保留占位符
 - **Rerank**: 当前未启用（`ai.rerank-model` 为空）
 - 默认值在 `application.yml`，无需环境变量即可运行
-- 管理后台可通过 `SystemService.updateConfig()` 热更新 AI 配置，立即生效
+- 管理后台可通过 `SystemService.updateConfig()` 热更新 AI 配置，立即生效（仅影响 Chat，Embedding 固定在 yml）
 
 ## Conventions
 - API 响应统一 `Result<T>`，分页 `PageQuery` → `PageResult<T>`

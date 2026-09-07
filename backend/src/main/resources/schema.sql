@@ -570,12 +570,12 @@ CREATE TABLE `system_config`  (
 -- ----------------------------
 -- Records of system_config
 -- ----------------------------
-INSERT INTO `system_config` VALUES (1, 'textModelApiUrl', 'https://api-inference.modelscope.cn/v1', NULL, '2026-05-03 00:55:21');
-INSERT INTO `system_config` VALUES (2, 'textModelApiKey', 'YOUR_MODELSCOPE_API_KEY', NULL, '2026-05-03 00:55:21');
-INSERT INTO `system_config` VALUES (3, 'model', 'Qwen/Qwen3.5-35B-A3B', NULL, '2026-05-03 00:55:21');
-INSERT INTO `system_config` VALUES (4, 'timeout', '30000', NULL, '2026-05-03 00:55:21');
-INSERT INTO `system_config` VALUES (5, 'temperature', '0.3', NULL, '2026-05-03 00:55:21');
-INSERT INTO `system_config` VALUES (6, 'maxTokens', '4096', NULL, '2026-05-03 00:55:21');
+INSERT INTO `system_config` VALUES (1, 'ai.api-url', 'https://api.xiaomimimo.com/v1', 'AI Chat Base URL（小米 MiMo OpenAI 兼容）', '2026-05-03 00:55:21');
+INSERT INTO `system_config` VALUES (2, 'ai.api-key', 'YOUR_XIAOMIMIMO_API_KEY', 'AI API Key', '2026-05-03 00:55:21');
+INSERT INTO `system_config` VALUES (3, 'ai.chat-model', 'mimo-v2.5', 'AI Chat 模型（小米 MiMo）', '2026-05-03 00:55:21');
+INSERT INTO `system_config` VALUES (4, 'ai.timeout', '30000', 'API 超时（毫秒）', '2026-05-03 00:55:21');
+INSERT INTO `system_config` VALUES (5, 'ai.temperature', '0.3', '生成温度', '2026-05-03 00:55:21');
+INSERT INTO `system_config` VALUES (6, 'ai.max-tokens', '4096', '最大 token 数', '2026-05-03 00:55:21');
 
 -- ----------------------------
 -- Table structure for training_task

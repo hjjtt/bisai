@@ -8,13 +8,13 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "ai")
 public class AiConfig {
-    private String baseUrl = "https://api-inference.modelscope.cn/v1";
+    private String baseUrl = "https://api.xiaomimimo.com/v1";
     private String apiKey;
-    private String model = "stepfun-ai/Step-3.7-Flash";
-    /** 备用模型链：主模型失败时按顺序尝试，用逗号分隔 */
-    private String fallbackModels = "stepfun-ai/Step-3.5-Flash,deepseek-ai/DeepSeek-V4-Flash,Qwen/Qwen3.5-35B-A3B";
+    private String model = "mimo-v2.5";
+    /** 备用模型链：主模型失败时按顺序尝试，用逗号分隔。小米 MiMo 端点暂无其他可用模型，无 fallback */
+    private String fallbackModels = "";
     private String embeddingModel = "damo/nlp_corom_sentence-embedding_chinese-base";
-    private String visionModel = "Qwen/Qwen3.5-35B-A3B";
+    private String visionModel = "mimo-v2.5";
     private int maxTokens = 4096;
     private double temperature = 0.3;
     private int dailyTokenLimit = 200000;

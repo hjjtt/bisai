@@ -6,6 +6,30 @@ $text-main: #1e293b;
 $text-muted: #64748b;
 $border-color: #e2e8f0;
 
+// ===== Element Plus 主题变量覆盖（全局统一色板）=====
+// 不再依赖 Element 默认 #409eff，所有 el-tag/el-link/el-switch/el-button 等自动用此色板
+:root {
+  --el-color-primary: #2563eb;
+  --el-color-primary-light-3: #6692f1;
+  --el-color-primary-light-5: #92b1f5;
+  --el-color-primary-light-7: #bdd0f9;
+  --el-color-primary-light-8: #d4e0fb;
+  --el-color-primary-light-9: #eaf0fd;
+  --el-color-primary-dark-2: #1d50bc;
+
+  --el-color-success: #059669;
+  --el-color-success-light-9: #e6f4f0;
+
+  --el-color-warning: #d97706;
+  --el-color-warning-light-9: #fbf0e0;
+
+  --el-color-danger: #dc2626;
+  --el-color-danger-light-9: #f4e6e6;
+
+  --el-color-info: #64748b;
+  --el-color-info-light-9: #f0f1f3;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -64,9 +88,13 @@ h1, h2, h3, h4 {
   border-right: none !important;
 }
 
-.el-button--primary {
+// 实心主按钮统一品牌色；plain/link/text 变体保持半透明底+彩字，避免被刷成实心后文字隐形
+.el-button--primary:not(.is-plain):not(.is-link):not(.is-text) {
   background-color: $primary-color !important;
   border-color: $primary-color !important;
+}
+
+.el-button--primary {
   border-radius: 6px !important;
   font-weight: 500 !important;
 }

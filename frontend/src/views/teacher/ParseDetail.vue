@@ -212,8 +212,8 @@ onBeforeUnmount(stopPolling)
 }
 .info-section h4 {
   margin: 0 0 12px 0;
-  color: #303133;
-  border-left: 4px solid #409eff;
+  color: var(--el-text-color-primary);
+  border-left: 4px solid var(--el-color-primary);
   padding-left: 10px;
 }
 .summary-text {
@@ -236,6 +236,6 @@ onBeforeUnmount(stopPolling)
 .parsing-state {
   padding: 40px 0;
   text-align: center;
-  color: #909399;
+  color: var(--el-color-info);
 }
 </style>

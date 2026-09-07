@@ -248,7 +248,7 @@ public class SubmissionService {
                         zis.closeEntry();
                     }
                 } catch (Exception e) {
-                    return Result.error(40001, "ZIP 文件格式异常: " + e.getMessage());
+                    return Result.error(40001, "ZIP 文件格式异常，无法解析");
                 }
             }
 
