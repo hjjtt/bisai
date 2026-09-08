@@ -571,7 +571,7 @@ CREATE TABLE `system_config`  (
 -- Records of system_config
 -- ----------------------------
 INSERT INTO `system_config` VALUES (1, 'ai.api-url', 'https://api.xiaomimimo.com/v1', 'AI Chat Base URL（小米 MiMo OpenAI 兼容）', '2026-05-03 00:55:21');
-INSERT INTO `system_config` VALUES (2, 'ai.api-key', 'YOUR_XIAOMIMIMO_API_KEY', 'AI API Key', '2026-05-03 00:55:21');
+-- 注意：不种子 ai.api-key（占位符会在新库启动时经 SystemService.loadAiConfigOnStartup 覆盖环境变量里的真实 key）。新库请通过环境变量 AI_API_KEY 或管理后台"模型配置"页设置。
 INSERT INTO `system_config` VALUES (3, 'ai.chat-model', 'mimo-v2.5', 'AI Chat 模型（小米 MiMo）', '2026-05-03 00:55:21');
 INSERT INTO `system_config` VALUES (4, 'ai.timeout', '30000', 'API 超时（毫秒）', '2026-05-03 00:55:21');
 INSERT INTO `system_config` VALUES (5, 'ai.temperature', '0.3', '生成温度', '2026-05-03 00:55:21');
