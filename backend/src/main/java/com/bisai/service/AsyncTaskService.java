@@ -310,6 +310,12 @@ public class AsyncTaskService {
                     log.info("门禁未通过（scoreStatus=RETURNED），跳过级联, submissionId={}", submission.getId());
                     return;
                 }
+                // 教师手动触发的 PARSE 可能先于 PRECHECK 完成（PRECHECK 有 10s 延迟），
+                // 此时不能把已成功的 parse_status 打回 PARSING，否则状态永久卡死
+                if ("SUCCESS".equals(submission.getParseStatus())) {
+                    log.info("解析已完成（先于门禁），保留 SUCCESS 状态, submissionId={}", submission.getId());
+                    return;
+                }
                 submission.setParseStatus("PARSING");
                 submissionMapper.updateById(submission);
                 createTaskIfAbsent("PARSE", task.getBizId());

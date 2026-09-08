@@ -404,7 +404,7 @@ public class AiService {
                     "4. 技术准确性 — 技术内容是否正确\n" +
                     "5. 任务匹配度 — 是否与任务要求相关\n\n" +
                     "判定标准：PASS=符合要求, WARNING=有小问题但可接受, FAIL=严重不达标。每维度至少1条，总计5-10条。\n" +
-                    "返回 JSON：{\"items\":[{\"checkType\":\"维度\",\"result\":\"PASS/WARNING/FAIL\",\"description\":\"说明\",\"evidence\":\"证据\",\"suggestion\":\"建议\",\"riskLevel\":\"LOW/MEDIUM/HIGH\"}]}";
+                    "返回 JSON：{\"items\":[{\"checkType\":\"维度\",\"checkItem\":\"具体检查项\",\"result\":\"PASS/WARNING/FAIL\",\"description\":\"说明\",\"evidence\":\"证据\",\"suggestion\":\"建议\",\"riskLevel\":\"LOW/MEDIUM/HIGH\"}]}";
 
             String userMessage = "## 任务要求\n标题：" + taskTitle + "\n要求：" + taskRequirements
                     + contextBlock
@@ -436,7 +436,7 @@ public class AiService {
                     CheckResult cr = new CheckResult();
                     cr.setSubmissionId(submissionId);
                     cr.setCheckType(item.path("checkType").asText("其他"));
-                    cr.setCheckItem("");
+                    cr.setCheckItem(item.path("checkItem").asText(item.path("checkType").asText("")));
                     cr.setResult(item.path("result").asText("PASS"));
                     cr.setDescription(item.path("description").asText(""));
                     cr.setEvidence(item.path("evidence").asText(""));
