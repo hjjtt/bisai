@@ -99,7 +99,7 @@
             <el-input
               v-model="registerForm.password"
               type="password"
-              placeholder="密码（至少8位，含字母和数字）"
+              placeholder="密码（8位以上，含大写、小写、数字中至少3类）"
               prefix-icon="Lock"
               size="large"
               show-password
@@ -248,8 +248,12 @@ const registerRules: FormRules = {
   realName: [{ required: true, message: '请输入真实姓名', trigger: 'blur' }],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 8, message: '密码至少 8 位', trigger: 'blur' },
-    { pattern: /^(?=.*[A-Za-z])(?=.*\d)/, message: '密码需包含字母和数字', trigger: 'blur' },
+    { min: 8, max: 64, message: '密码长度 8-64 位', trigger: 'blur' },
+    {
+      pattern: /^(?=.*[A-Za-z])(?=.*\d)(?=.*[A-Z])[A-Za-z\d!@#$%^&*()_+\-=[\]{};:,.?/~]*$/,
+      message: '密码需包含字母和数字，且大写、小写、数字、特殊字符中至少 3 类',
+      trigger: 'blur',
+    },
   ],
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'blur' },
