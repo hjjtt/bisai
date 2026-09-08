@@ -127,22 +127,8 @@ import {
   Warning,
 } from '@element-plus/icons-vue'
 import { getTeacherStats } from '@/api/dashboard'
-import type { Submission } from '@/types'
+import type { ReviewSubmission, TeacherStats } from '@/types'
 import { formatDate } from '@/utils/date'
-
-type ReviewSubmission = Submission & {
-  title?: string
-  riskReason?: string
-}
-
-interface TeacherStats {
-  pendingScore: number
-  pendingReview: number
-  highRisk: number
-  completed: number
-  pendingReviews: ReviewSubmission[]
-  highRiskSubmissions: ReviewSubmission[]
-}
 
 const router = useRouter()
 const loading = ref(true)

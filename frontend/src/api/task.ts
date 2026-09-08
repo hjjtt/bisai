@@ -2,7 +2,7 @@ import { get, post, put, upload } from '@/utils/request'
 import service from '@/utils/request'
 import type { TrainingTask, Submission, ScoreResult, CheckResult, FileInfo, PageResponse, PageRequest, AsyncTask } from '@/types'
 
-// 创建/更新任务的请求参数
+// 创建/更新任务的请求参数（allowedFileTypes 为逗号分隔字符串，与后端 TrainingTask 一致）
 export interface TaskFormData {
   courseId?: number
   templateId?: number
@@ -11,8 +11,8 @@ export interface TaskFormData {
   startTime?: string
   endTime?: string
   allowResubmit?: boolean
-  allowedFileTypes?: string[]
-  maxFileSize?: number
+  allowedFileTypes?: string
+  maxFileSize?: number | null
 }
 
 // 实训任务

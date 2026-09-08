@@ -1,3 +1,5 @@
+import type { ConsistencyData } from './dashboard'
+
 // 统一响应结构
 export interface ApiResponse<T = any> {
   code: number
@@ -80,6 +82,7 @@ export interface BaseStats {
   submissions?: number[]
   parsed?: number[]
   scored?: number[]
+  consistency?: ConsistencyData
 }
 
 export interface SystemStatusItem {

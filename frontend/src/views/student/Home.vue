@@ -160,20 +160,7 @@ import { useUserStore } from '@/store/user'
 import { getStudentStats } from '@/api/dashboard'
 import { getSubmitStatusType, getRoleLabel } from '@/utils/status'
 import { formatDateShort, getDaysLeft, getDeadlineTone } from '@/utils/date'
-import type { TrainingTask } from '@/types'
-
-type StudentTask = TrainingTask & {
-  submitStatus?: string
-  score?: number | string | null
-}
-
-interface StudentStats {
-  ongoingTasks: number
-  submittedCount: number
-  pendingFeedback: number
-  unreadMessages: number
-  recentTasks: StudentTask[]
-}
+import type { StudentStats, StudentTask } from '@/types'
 
 const router = useRouter()
 const userStore = useUserStore()

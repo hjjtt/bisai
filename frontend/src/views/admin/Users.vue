@@ -75,7 +75,7 @@
               <el-button class="edit-btn" type="primary" plain :icon="EditPen" @click="showDialog(row)">
                 编辑
               </el-button>
-              <el-dropdown trigger="click" @command="(command) => handleMoreCommand(command, row)">
+              <el-dropdown trigger="click" @command="(command: string | number | object) => handleMoreCommand(command, row)">
                 <el-button class="more-btn" plain>
                   更多
                   <el-icon class="el-icon--right"><ArrowDown /></el-icon>

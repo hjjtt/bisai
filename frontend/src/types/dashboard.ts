@@ -1,4 +1,18 @@
 // 仪表盘统计类型（与后端 DashboardStats 对应）
+import type { SystemStatusItem } from './common'
+import type { TrainingTask, Submission } from './task'
+
+// 学生最近任务：训练任务 + 提交侧展示字段
+export type StudentTask = TrainingTask & {
+  submitStatus?: string
+  score?: number | string | null
+}
+
+// 教师待复核条目：提交记录 + 列表展示字段
+export type ReviewSubmission = Submission & {
+  title?: string
+  riskReason?: string
+}
 
 // 学生首页统计
 export interface StudentStats {
@@ -6,7 +20,7 @@ export interface StudentStats {
   submittedCount: number
   pendingFeedback: number
   unreadMessages: number
-  recentTasks: Record<string, unknown>[]
+  recentTasks: StudentTask[]
 }
 
 // 教师首页统计
@@ -15,8 +29,8 @@ export interface TeacherStats {
   pendingReview: number
   highRisk: number
   completed: number
-  pendingReviews: Record<string, unknown>[]
-  highRiskSubmissions: Record<string, unknown>[]
+  pendingReviews: ReviewSubmission[]
+  highRiskSubmissions: ReviewSubmission[]
 }
 
 // 管理员首页统计
@@ -32,7 +46,7 @@ export interface AdminStats {
   todayError: number
   errorTrend: number
   recentLogs: Record<string, unknown>[]
-  systemStatus: Record<string, unknown>[]
+  systemStatus: SystemStatusItem[]
   apiUsage: number
   serverLoad: number
   dates: string[]

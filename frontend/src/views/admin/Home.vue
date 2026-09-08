@@ -240,7 +240,7 @@ async function loadStats() {
     initChart(d)
     // P2.9: 提取一致性数据
     if (d.consistency) {
-      consistencyData.value = d.consistency as unknown as ConsistencyData
+      consistencyData.value = d.consistency
       initConsistencyChart()
     }
   } catch {
@@ -376,7 +376,7 @@ async function refreshConsistency() {
     const res = await getAdminStats(timeRange.value === '30d' ? 30 : 7)
     const d = res.data as BaseStats
     if (d.consistency) {
-      consistencyData.value = d.consistency as unknown as ConsistencyData
+      consistencyData.value = d.consistency
       initConsistencyChart()
     }
   } catch { /* ignored */ } finally {
