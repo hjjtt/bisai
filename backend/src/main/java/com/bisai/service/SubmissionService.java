@@ -2,6 +2,7 @@ package com.bisai.service;
 
 import com.bisai.common.PageResult;
 import com.bisai.common.Result;
+import com.bisai.util.FileValidationUtil;
 import com.bisai.dto.PageQuery;
 import com.bisai.entity.Course;
 import com.bisai.entity.Submission;
@@ -211,13 +212,18 @@ public class SubmissionService {
             }
 
             String originalName = file.getOriginalFilename();
-            String ext = originalName != null && originalName.contains(".")
-                    ? originalName.substring(originalName.lastIndexOf(".")) : "";
-            String extUpper = ext.replace(".", "").toUpperCase();
 
-            // 全局扩展名校验 (FILE-002)
-            if (extUpper.isEmpty() || !ALLOWED_EXTENSIONS.contains(extUpper)) {
-                return Result.error(40001, "不支持的文件类型: " + ext);
+            // 文件名与扩展名安全校验：单扩展名、白名单、拒绝双扩展名/路径分隔符 (FILE-002)
+            String nameError = FileValidationUtil.validateFileName(originalName, ALLOWED_EXTENSIONS);
+            if (nameError != null) {
+                return Result.error(40001, nameError);
+            }
+            String extUpper = originalName.substring(originalName.lastIndexOf('.') + 1).toUpperCase();
+
+            // 文件头校验，防伪造扩展名
+            String magicError = FileValidationUtil.verifyMagicNumber(file, extUpper);
+            if (magicError != null) {
+                return Result.error(40001, magicError + ": " + originalName);
             }
 
             // 任务级 allowedFileTypes 校验 (FILE-007)
@@ -255,7 +261,7 @@ public class SubmissionService {
             // 校验 MIME 类型
             String contentType = file.getContentType();
             if (contentType != null && !isValidMimeType(contentType, extUpper)) {
-                log.warn("文件MIME类型不匹配: originalName={}, contentType={}, ext={}", originalName, contentType, ext);
+                log.warn("文件MIME类型不匹配: originalName={}, contentType={}, ext={}", originalName, contentType, extUpper);
             }
         }
 

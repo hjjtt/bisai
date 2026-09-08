@@ -25,7 +25,27 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final CaptchaService captchaService;
 
-    private static final Pattern PASSWORD_PATTERN = Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{8,}$");
+    // 至少 8 位、最长 64 位；字母+数字为基础，允许常用特殊字符；需满足大小写/数字/特殊字符 4 类中至少 3 类
+    private static final Pattern PASSWORD_PATTERN = Pattern.compile("^[A-Za-z\\d!@#$%^&*()_+\\-=\\[\\]{};:,.?/~]{8,64}$");
+    private static final String PASSWORD_RULE_HINT = "密码需 8 位以上，且包含大写字母、小写字母、数字、特殊字符中至少 3 类";
+
+    // 常见弱密码黑名单（小写比对），命中直接拒绝
+    private static final java.util.Set<String> WEAK_PASSWORDS = java.util.Set.of(
+            "password", "password1", "password123", "passwd123", "admin123", "admin888",
+            "root123", "user123", "test123", "guest123", "login123", "qwer1234", "qwerty123",
+            "1qaz2wsx", "1q2w3e4r", "qazwsx123", "abcd1234", "abc12345", "abc123456",
+            "a1234567", "aa123456", "aaa123456", "12345678", "123456789", "1234567890",
+            "12345678a", "123456789a", "11111111", "00000000", "12121212", "11223344",
+            "654321ab", "66666666", "88888888", "88888888a", "5201314a", "1314520a",
+            "iloveyou1", "letmein123", "welcome123", "monkey123", "dragon123",
+            "sunshine1", "princess1", "football1", "baseball1", "shadow123",
+            "super123", "master123", "hello123", "freedom123", "whatever1",
+            "zaq12wsx", "!qaz2wsx", "p@ssw0rd", "p@ssword123", "trustno1x",
+            "abcdefg1", "abcdefg123", "abcdef123", "abcdefgh1", "abcdefghij",
+            "qwertyui1", "qwertyuiop", "asdfghjk1", "zxcvbnm12", "1234qwer",
+            "1qaz@wsx", "1qaz2wsx3", "qq123456a", "taobao123", "alibaba123",
+            "huawei123", "xiaomi123", "baidu1234", "wang123456", "li1234567"
+    );
 
     public Result<Map<String, Object>> login(LoginRequest request) {
         String username = request.getUsername();
@@ -122,7 +142,7 @@ public class AuthService {
         }
 
         if (!validatePassword(newPassword)) {
-            return Result.error(40002, "密码必须包含字母和数字，且长度至少8位");
+            return Result.error(40002, PASSWORD_RULE_HINT);
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -134,10 +154,21 @@ public class AuthService {
     }
 
     /**
-     * 密码复杂度校验
+     * 密码复杂度校验：长度 8-64；字符合法；4 类字符（大写/小写/数字/特殊）至少含 3 类；不得命中常见弱密码黑名单
      */
     public static boolean validatePassword(String password) {
-        return password != null && PASSWORD_PATTERN.matcher(password).matches();
+        if (password == null || !PASSWORD_PATTERN.matcher(password).matches()) {
+            return false;
+        }
+        if (WEAK_PASSWORDS.contains(password.toLowerCase(java.util.Locale.ROOT))) {
+            return false;
+        }
+        int classes = 0;
+        if (password.chars().anyMatch(Character::isUpperCase)) classes++;
+        if (password.chars().anyMatch(Character::isLowerCase)) classes++;
+        if (password.chars().anyMatch(Character::isDigit)) classes++;
+        if (password.chars().anyMatch(c -> "!@#$%^&*()_+-=[]{};:,.?/~".indexOf(c) >= 0)) classes++;
+        return classes >= 3;
     }
 
     private static final int MAX_FAILURES = 5;
@@ -147,14 +178,11 @@ public class AuthService {
      * 用户注册
      */
     public Result<Void> register(RegisterRequest request) {
-        // 角色校验：注册仅开放学生；教师账号由管理员在用户管理中创建
-        String role = request.getRole();
-        if (!"STUDENT".equals(role)) {
-            return Result.error(40004, "注册仅支持学生角色，教师账号请联系管理员创建");
-        }
+        // 注册仅开放学生：角色一律硬编码 STUDENT，忽略客户端传入的 role 字段（防止越权注册教师/管理员）
+        final String role = "STUDENT";
 
         // 学生必须选择班级
-        if ("STUDENT".equals(role) && request.getClassId() == null) {
+        if (request.getClassId() == null) {
             return Result.error(40005, "学生请选择所属班级");
         }
 
@@ -168,7 +196,7 @@ public class AuthService {
 
         // 密码复杂度
         if (!validatePassword(request.getPassword())) {
-            return Result.error(40002, "密码必须包含字母和数字，且长度至少8位");
+            return Result.error(40002, PASSWORD_RULE_HINT);
         }
 
         // 创建用户
@@ -177,7 +205,7 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRealName(request.getRealName());
         user.setRole(role);
-        user.setClassId("STUDENT".equals(role) ? request.getClassId() : null);
+        user.setClassId(request.getClassId());
         user.setStatus("ENABLED");
         user.setMustChangePassword(false);
         userMapper.insert(user);

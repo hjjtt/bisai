@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.bisai.common.PageResult;
 import com.bisai.common.Result;
+import com.bisai.util.FileValidationUtil;
 import com.bisai.dto.PageQuery;
 import com.bisai.entity.KnowledgeBase;
 import com.bisai.entity.KnowledgeDocument;
@@ -163,19 +164,22 @@ public class KnowledgeService {
     public Result<KnowledgeDocument> uploadDocument(MultipartFile file, Long courseId, Long taskId) {
         try {
             String originalName = file.getOriginalFilename();
-            if (originalName == null || originalName.isBlank()) {
-                return Result.error("文件名不能为空");
-            }
 
-            String ext = originalName.contains(".")
-                    ? originalName.substring(originalName.lastIndexOf(".") + 1).toUpperCase()
-                    : "";
-            if (!ALLOWED_EXTENSIONS.contains(ext)) {
-                return Result.error("不支持的文件类型，允许: " + String.join(", ", ALLOWED_EXTENSIONS));
+            // 文件名与扩展名安全校验：单扩展名、白名单、拒绝双扩展名/路径分隔符
+            String nameError = FileValidationUtil.validateFileName(originalName, ALLOWED_EXTENSIONS);
+            if (nameError != null) {
+                return Result.error(40001, nameError);
+            }
+            String ext = originalName.substring(originalName.lastIndexOf(".") + 1).toUpperCase();
+
+            // 文件头校验，防伪造扩展名
+            String magicError = FileValidationUtil.verifyMagicNumber(file, ext);
+            if (magicError != null) {
+                return Result.error(40001, magicError + ": " + originalName);
             }
 
             if (file.getSize() > MAX_FILE_SIZE) {
-                return Result.error("文件大小不能超过 50MB");
+                return Result.error(40001, "文件大小不能超过 50MB");
             }
 
             KnowledgeBase kb = resolveKnowledgeBase(courseId, taskId);
@@ -233,7 +237,7 @@ public class KnowledgeService {
     public Result<Void> toggleDocumentStatus(Long id, Boolean enabled) {
         KnowledgeDocument doc = documentMapper.selectById(id);
         if (doc == null) {
-            return Result.error("文档不存在");
+            return Result.error(40401, "文档不存在");
         }
         doc.setEnabled(enabled != null && enabled);
         doc.setUpdatedAt(LocalDateTime.now());
@@ -244,7 +248,7 @@ public class KnowledgeService {
     public Result<KnowledgeDocument> updateDocument(Long id, String newName, Long newTaskId) {
         KnowledgeDocument doc = documentMapper.selectById(id);
         if (doc == null) {
-            return Result.error("文档不存在");
+            return Result.error(40401, "文档不存在");
         }
 
         if (newName != null && !newName.trim().isEmpty()) {

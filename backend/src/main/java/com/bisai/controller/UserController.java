@@ -19,7 +19,8 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    // 教师仅允许查询教师名单（课程管理选用），全量用户列表（含 ADMIN/STUDENT）仅管理员可见
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('TEACHER') and 'TEACHER'.equals(#role))")
     public Result<PageResult<User>> list(PageQuery query,
                                          @RequestParam(required = false) String role) {
         return userService.listUsers(query, role);
