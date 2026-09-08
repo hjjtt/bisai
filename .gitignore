@@ -56,3 +56,7 @@ backend/src/test/
 .env.*.local
 *.pem
 *.key
+
+# 部署产物与凭据（含真实密码/密钥的文档、jar、dist、DB 备份）
+deploy/
+!deploy/nginx-bisai.conf
