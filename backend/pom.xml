@@ -14,7 +14,7 @@
     <groupId>com.bisai</groupId>
     <artifactId>backend</artifactId>
     <version>1.0.0</version>
-    <name>backend</name>
+    <name>shixunHeCha</name>
     <description>实训成果智能核查与评价系统后端</description>
 
     <properties>

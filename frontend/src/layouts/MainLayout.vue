@@ -8,7 +8,7 @@
         </div>
         <div v-show="!sidebarCollapsed" class="logo-text">
           <h1>实训成果核查</h1>
-          <span>BisAI Evaluation</span>
+          <span>shixunHeCha</span>
         </div>
       </div>
       <el-menu

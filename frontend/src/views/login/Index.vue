@@ -8,7 +8,7 @@
             <rect width="32" height="32" rx="8" fill="#2563eb" />
             <path d="M8 16.5l4 4 12-12" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
-          <span class="logo-text">实训成果智能核查与评价系统</span>
+          <span class="logo-text">shixunHeCha</span>
         </div>
         <!-- Tab 切换 -->
         <div class="auth-tabs">
@@ -142,7 +142,7 @@
       </template>
 
       <div class="login-footer">
-        <span>实训成果智能核查与评价系统</span>
+        <span>shixunHeCha · 实训成果智能核查与评价系统</span>
       </div>
     </div>
   </div>

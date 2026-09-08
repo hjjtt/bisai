@@ -42,7 +42,7 @@ const whiteList = ['/login']
 
 router.beforeEach((to, _from, next) => {
   NProgress.start()
-  document.title = (to.meta.title as string) || '实训成果智能核查与评价系统'
+  document.title = (to.meta.title as string) || 'shixunHeCha - 实训成果智能核查与评价系统'
 
   const token = getToken()
 
