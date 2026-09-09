@@ -65,6 +65,7 @@ public class CourseService {
             course.setTeacherId(userId);
         }
         course.setStatus("ENABLED");
+        course.setDeleted(null);
         courseMapper.insert(course);
         Course created = courseMapper.selectById(course.getId());
         fillTeacherAndClassName(java.util.List.of(created));
@@ -72,10 +73,17 @@ public class CourseService {
     }
 
     public Result<Course> updateCourse(Long id, Course course, Long userId, String role) {
-        if (!permissionService.isAdmin(role) && !permissionService.isTeacherOwnerOfCourse(id, userId)) {
+        boolean isAdmin = permissionService.isAdmin(role);
+        if (!isAdmin && !permissionService.isTeacherOwnerOfCourse(id, userId)) {
             return Result.error(40301, "无权操作该课程");
         }
         course.setId(id);
+        // 防字段注入：非管理员不可转移课程归属；状态/逻辑删除一律不收客户端值
+        if (!isAdmin) {
+            course.setTeacherId(null);
+        }
+        course.setStatus(null);
+        course.setDeleted(null);
         courseMapper.updateById(course);
         Course updated = courseMapper.selectById(id);
         fillTeacherAndClassName(java.util.List.of(updated));
