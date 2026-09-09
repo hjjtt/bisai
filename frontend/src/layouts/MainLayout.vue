@@ -8,7 +8,7 @@
         </div>
         <div v-show="!sidebarCollapsed" class="logo-text">
           <h1>实训成果核查</h1>
-          <span>shixunHeCha</span>
+          <span>实训成果智能核查与评价系统</span>
         </div>
       </div>
       <el-menu
