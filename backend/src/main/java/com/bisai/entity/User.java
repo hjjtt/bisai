@@ -1,7 +1,7 @@
 package com.bisai.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -12,7 +12,8 @@ public class User {
     @TableId(type = IdType.AUTO)
     private Long id;
     private String username;
-    @JsonIgnore
+    // WRITE_ONLY：创建/更新请求可携带密码，但任何响应都不回传（原 @JsonIgnore 导致管理员建用户时密码被丢弃）
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
     private String role;
     private String realName;
