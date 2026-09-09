@@ -81,7 +81,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleMessageNotReadable(HttpMessageNotReadableException e) {
-        return Result.error(40001, "请求体格式错误，请提交合法的 JSON");
+        // 空 body 与格式错误分开提示；编码类错误明确指出需 UTF-8（GBK 编码的中文 JSON 是历史踩坑点）
+        String msg = e.getMessage() != null ? e.getMessage() : "";
+        Throwable cause = e.getCause();
+        String causeMsg = cause != null && cause.getMessage() != null ? cause.getMessage() : "";
+        if (msg.startsWith("Required request body is missing")) {
+            return Result.error(40001, "请求体不能为空");
+        }
+        if (causeMsg.contains("UTF-8") || causeMsg.contains("encoding")) {
+            return Result.error(40001, "请求体编码错误：请提交 UTF-8 编码的 JSON（不支持 GBK）");
+        }
+        return Result.error(40001, "请求体格式错误：请提交 UTF-8 编码的合法 JSON");
     }
 
     @ExceptionHandler(MultipartException.class)
