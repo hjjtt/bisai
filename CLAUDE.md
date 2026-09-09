@@ -17,17 +17,17 @@ mvn clean package -DskipTests         # 生产构建 (target/backend-1.0.0.jar)
 cd frontend
 npm install                 # 安装依赖
 npm run dev                 # 开发服务器 (端口 3000，代理 /api → localhost:8080)
-npm run build               # 生产构建 (vue-tsc + vite build)
-npx vue-tsc --noEmit        # 仅类型检查（无 lint 脚本）
+npm run build               # 生产构建（vue-tsc -b 类型检查 + vite build，2026-09-08 修复全部 TS 错误后可用）
+npx vue-tsc -b              # 仅类型检查（无 lint 脚本；勿用 --noEmit——因 tsconfig files:[] 实际检查 0 个文件，假阴性）
 ```
 
 ### 无测试套件
-前后端均无真实测试。`backend/src/test/` 中只有一个反射工具类（非 `@Test`），前端无 `*.test.*` / `*.spec.*`。**不要用 `mvn test` 或 `npm test` 验证**，用 `mvn compile` 和 `vue-tsc --noEmit` 代替。
+前后端均无真实测试。`backend/src/test/` 中只有一个反射工具类（非 `@Test`），前端无 `*.test.*` / `*.spec.*`。**不要用 `mvn test` 或 `npm test` 验证**，用 `mvn compile` 和 `npx vue-tsc -b` 代替。
 - `@` 别名映射到 `src/`（`@/api/xxx` = `src/api/xxx`），配置在 `tsconfig.app.json` 的 `paths` 和 `vite.config.ts` 的 `resolve.alias`
 - Vite 开发代理：`/api` → `http://localhost:8080`，无需在前端配置后端地址
 
 ### Database
-MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema.sql`，包含增量迁移 SQL。默认管理员账号 `admin` / `admin123`。
+MySQL 8（生产为 8.4），数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema.sql`，包含增量迁移 SQL。默认管理员账号 `admin`（口令已于 2026-09-08 轮换，见本地 `deploy/部署指南.md`，该目录不入 git）。
 
 **前置条件**：需先创建空数据库 `CREATE DATABASE bisai`，然后导入 `schema.sql`。应用启动时不会自动建表。
 
@@ -42,7 +42,7 @@ MySQL 8.0，数据库名 `bisai`。Schema 在 `backend/src/main/resources/schema
 - **后端**: Spring Boot 3.4.3 + Spring Security (JWT) + MyBatis-Plus 3.5.9 + Spring AI (ModelScope)
 - **前端**: Vue 3 + TypeScript + Vite 8 + Element Plus + Pinia + ECharts + Axios
 - **文档解析**: PDFBox 3.0.3, POI 5.3.0, docx4j 11.4.11, iText 8.0.4
-- **AI**: ModelScope 平台，主模型 Qwen/Qwen3.5-35B-A3B（yml 配置），备用链（逗号分隔）自动切换，支持 RAG 知识库检索增强。Embedding 模型：`damo/nlp_corom_sentence-embedding_chinese-base`
+- **AI**: Chat/视觉走小米 MiMo（OpenAI 兼容，`https://api.xiaomimimo.com/v1`，yml 默认模型 `mimo-v2.5`，代码统一 `reasoningEffort("none")` 关闭思考链防空回复），Embedding 走 ModelScope：`damo/nlp_corom_sentence-embedding_chinese-base`。备用链（逗号分隔）自动切换，支持 RAG 知识库检索增强
 
 ### 后端包结构 (`com.bisai`)
 - `controller/` — REST API（16个），使用 `@PreAuthorize` 做角色控制

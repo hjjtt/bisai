@@ -13,7 +13,7 @@ cd frontend && npm run dev
 ## Verification
 ```bash
 cd backend && mvn compile            # 后端编译
-cd frontend && npx vue-tsc --noEmit  # 前端类型检查（无 lint 脚本）
+cd frontend && npx vue-tsc -b        # 前端类型检查（无 lint 脚本；--noEmit 因 tsconfig files:[] 假阴性，勿用）
 cd frontend && npm run build         # 前端生产构建 (vue-tsc + vite build)
 ```
 **无测试套件**：前后端均无真实测试。`backend/src/test/` 中只有一个反射工具类（非 `@Test`），前端无 `*.test.*` / `*.spec.*`。不要假设可以 `mvn test` 或 `npm test`。
@@ -29,13 +29,13 @@ Spring Boot 3.4.3 + Spring AI 1.0.0 + Vue 3 + Vite 8 单体应用。三角色（
 - 核心 Service: `AiService`(解析/核查/评分)、`ModelScopeClient`(AI调用+fallback)、`KnowledgeService`(RAG)、`AsyncTaskService`(@Scheduled 5s 轮询，非消息队列)
 - 异步任务: 最多重试 3 次（递增延迟），僵尸任务 10 分钟清理
 - RAG: 文档→分块(1200字符)→向量化；`KnowledgeRetrievalService` 向量 Top-20 + 可选 Rerank Top-5
-- AI Chat 调用通过 Spring AI OpenAI 兼容接口连火山引擎 ARK（doubao-seed-2.0-lite）；Embedding 连 ModelScope；日限 50 万 token / 2000 次
+- AI Chat 调用通过 Spring AI OpenAI 兼容接口连小米 MiMo（`mimo-v2.5`）；Embedding 连 ModelScope；日限 20 万 token / 1000 次（`AiConfig.java:20-21`）
 
 ### AI 模型与 fallback
 - 主模型和备用模型可在管理后台动态切换（`system_config` 表），无需重启
-- `ModelScopeClient` 自动构建 fallback 链：主模型 → `ai.fallback-model` 逗号分隔的模型列表（火山引擎 coding plan 仅 `doubao-seed-2.0-lite` 一个模型，当前 fallback 为空）
+- `ModelScopeClient` 自动构建 fallback 链：主模型 → `ai.fallback-model` 逗号分隔的模型列表（小米 MiMo 端点暂无其他可用模型，当前 fallback 为空，与 `AiConfig.java` 注释一致）
 - 429 限流时标记模型耗尽并自动 fallback 到下一个模型
-- **思考模式处理**：Qwen 系列模型，`doChat` 自动在 system prompt 前追加 `/no_think` 禁用思考；`stripThinkingTags()` 兜底剥离 `<think...</think` 标签。修改 AI 调用逻辑时注意这两个机制。doubao-seed-2.0-lite 返回 `reasoning_content` 思考链，但 Spring AI 仅取 `content` 字段，业务不受影响
+- **思考模式处理**：Qwen 系列模型，`doChat` 自动在 system prompt 前追加 `/no_think` 禁用思考；`stripThinkingTags()` 兜底剥离 `<think...</think>` 标签。修改 AI 调用逻辑时注意这两个机制。当前主模型小米 MiMo（`mimo-v2.5`）是推理模型，代码已统一传 `reasoningEffort("none")` 关闭思考链（`ModelScopeClient` 多处），防止空回复
 
 ### 前端 (`frontend/src`)
 - 三套独立路由: `studentRoutes`/`teacherRoutes`/`adminRoutes`，守卫在 `router/guards.ts`
@@ -69,7 +69,7 @@ Spring Boot 3.4.3 + Spring AI 1.0.0 + Vue 3 + Vite 8 单体应用。三角色（
 ## Gotchas
 
 ### 无测试
-前后端均无测试。不要写 `mvn test` 或 `npm test` 验证，用 `mvn compile` 和 `vue-tsc --noEmit` 代替。
+前后端均无测试。不要写 `mvn test` 或 `npm test` 验证，用 `mvn compile` 和 `vue-tsc -b` 代替。
 
 ### 实体类命名
 - 班级实体叫 `ClassEntity`，不是 `ClassInfo`
