@@ -53,7 +53,7 @@ public class SubmissionService {
     private int maxVersions;
 
     private static final java.util.Set<String> ALLOWED_EXTENSIONS = java.util.Set.of(
-            "DOC", "DOCX", "PDF", "JPG", "JPEG", "PNG", "XLS", "XLSX", "ZIP"
+            "DOC", "DOCX", "PDF", "JPG", "JPEG", "PNG", "XLS", "XLSX", "ZIP", "MD", "TXT"
     );
 
     public Result<PageResult<Submission>> listSubmissions(PageQuery query, Long taskId, Long studentId, Long userId, String role) {
@@ -175,6 +175,16 @@ public class SubmissionService {
             return Result.error(40901, "任务尚未开始，开始时间：" + task.getStartTime());
         }
         if (task.getEndTime() != null && now.isAfter(task.getEndTime())) {
+            // 区分"退回待修改"场景给出准确文案（仍拒绝，不改截止规则）
+            List<Submission> mine = submissionMapper.selectList(
+                    new LambdaQueryWrapper<Submission>()
+                            .eq(Submission::getTaskId, taskId)
+                            .eq(Submission::getStudentId, studentId)
+                            .eq(Submission::getScoreStatus, "RETURNED"));
+            if (!mine.isEmpty()) {
+                return Result.error(40905, "你的提交已被教师退回待修改，但任务已截止（" + task.getEndTime()
+                        + "），请联系教师顺延截止时间后重新提交");
+            }
             return Result.error(40901, "任务已截止，截止时间：" + task.getEndTime());
         }
 
@@ -239,7 +249,7 @@ public class SubmissionService {
             // 任务级 maxFileSize 校验 (FILE-003)
             if (task.getMaxFileSize() != null && file.getSize() > task.getMaxFileSize()) {
                 return Result.error(40001, "文件大小超过限制: " + originalName
-                        + "（最大 " + (task.getMaxFileSize() / 1024 / 1024) + "MB）");
+                        + "（最大 " + humanSize(task.getMaxFileSize()) + "）");
             }
 
             // ZIP 文件路径穿越基础检查 (FILE-006)
@@ -414,5 +424,13 @@ public class SubmissionService {
         );
         java.util.List<String> valid = mimeMap.get(ext);
         return valid != null && valid.stream().anyMatch(contentType::startsWith);
+    }
+
+    /** 文件大小人性化展示：<1MB 显示 KB，避免"最大 0MB"这类误导文案 */
+    private static String humanSize(long bytes) {
+        if (bytes >= 1024 * 1024) {
+            return String.format("%dMB", bytes / 1024 / 1024);
+        }
+        return String.format("%dKB", Math.max(1, bytes / 1024));
     }
 }

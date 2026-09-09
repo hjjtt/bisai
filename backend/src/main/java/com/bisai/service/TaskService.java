@@ -126,6 +126,12 @@ public class TaskService {
         if (task.getStartTime() == null || task.getEndTime() == null) {
             return Result.error(40001, "缺少必填字段: startTime/endTime");
         }
+        // maxFileSize 契约为字节（前端以 MB 输入后换算）；过小的值（如把 MB 数当字节传入）必然拒绝所有真实文件
+        if (task.getMaxFileSize() != null
+                && (task.getMaxFileSize() < 1024 * 1024 || task.getMaxFileSize() > 200L * 1024 * 1024)) {
+            return Result.error(40001, "maxFileSize 需为字节且介于 1MB~200MB（1048576~209715200），当前值: "
+                    + task.getMaxFileSize());
+        }
         if (task.getCourseId() != null && !permissionService.isTeacherOwnerOfCourse(task.getCourseId(), userId)) {
             return Result.error(40301, "无权在该课程下创建任务");
         }
@@ -147,6 +153,11 @@ public class TaskService {
         if (task.getStartTime() != null && task.getEndTime() != null
                 && !task.getEndTime().isAfter(task.getStartTime())) {
             return Result.error(40001, "截止时间必须晚于开始时间");
+        }
+        if (task.getMaxFileSize() != null
+                && (task.getMaxFileSize() < 1024 * 1024 || task.getMaxFileSize() > 200L * 1024 * 1024)) {
+            return Result.error(40001, "maxFileSize 需为字节且介于 1MB~200MB（1048576~209715200），当前值: "
+                    + task.getMaxFileSize());
         }
         task.setId(id);
         task.setCourseId(null);

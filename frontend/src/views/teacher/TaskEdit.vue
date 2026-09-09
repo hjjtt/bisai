@@ -36,10 +36,12 @@
             <el-checkbox label="XLS" value="XLS" />
             <el-checkbox label="XLSX" value="XLSX" />
             <el-checkbox label="ZIP" value="ZIP" />
+            <el-checkbox label="MD" value="MD" />
+            <el-checkbox label="TXT" value="TXT" />
           </el-checkbox-group>
         </el-form-item>
         <el-form-item label="最大文件大小(MB)">
-          <el-input-number v-model="form.maxFileSize" :min="1" :max="500" :step="10" />
+          <el-input-number v-model="form.maxFileSize" :min="1" :max="200" :step="10" />
         </el-form-item>
         <el-form-item label="允许重新提交">
           <el-switch v-model="form.allowResubmit" />

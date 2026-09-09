@@ -24,7 +24,7 @@ export interface PageResponse<T> {
 }
 
 // 文件类型
-export type FileType = 'DOC' | 'DOCX' | 'PDF' | 'JPG' | 'JPEG' | 'PNG' | 'XLS' | 'XLSX' | 'ZIP'
+export type FileType = 'DOC' | 'DOCX' | 'PDF' | 'JPG' | 'JPEG' | 'PNG' | 'XLS' | 'XLSX' | 'ZIP' | 'MD' | 'TXT'
 
 // 任务状态
 export type TaskStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED' | 'ARCHIVED'
