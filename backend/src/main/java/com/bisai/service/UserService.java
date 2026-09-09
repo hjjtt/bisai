@@ -160,6 +160,8 @@ public class UserService {
         String tempPassword = generateTempPassword();
         user.setPassword(passwordEncoder.encode(tempPassword));
         user.setMustChangePassword(true);
+        // 重置密码同时推进密码版本，使该用户所有已签发 token 立即失效
+        user.setLastPasswordChangeAt(java.time.LocalDateTime.now());
         userMapper.updateById(user);
         return Result.ok(Map.of("tempPassword", tempPassword));
     }

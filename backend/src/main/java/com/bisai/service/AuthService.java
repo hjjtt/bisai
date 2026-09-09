@@ -107,7 +107,7 @@ public class AuthService {
         boolean mustChangePassword = Boolean.TRUE.equals(user.getMustChangePassword());
 
         // 生成 token
-        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
+        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole(), user.getLastPasswordChangeAt());
 
         // 构建返回数据
         Map<String, Object> data = new HashMap<>();

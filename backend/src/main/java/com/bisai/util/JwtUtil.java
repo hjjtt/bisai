@@ -31,10 +31,19 @@ public class JwtUtil {
     }
 
     public String generateToken(Long userId, String username, String role) {
+        return generateToken(userId, username, role, null);
+    }
+
+    /**
+     * 签发携带密码版本（pwd claim = lastPasswordChangeAt 毫秒值）的 token；
+     * 用户改密/管理员重置密码后，旧 token 的 pwd 版本落后即失效（无需 Redis 黑名单）。
+     */
+    public String generateToken(Long userId, String username, String role, java.time.LocalDateTime pwdChangedAt) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
         claims.put("role", role);
+        claims.put("pwd", pwdVersion(pwdChangedAt));
 
         return Jwts.builder()
                 .claims(claims)
@@ -43,6 +52,19 @@ public class JwtUtil {
                 .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSigningKey())
                 .compact();
+    }
+
+    /** 密码版本统一计算口径（签发与校验两侧共用），空视为 0 */
+    public static long pwdVersion(java.time.LocalDateTime pwdChangedAt) {
+        return pwdChangedAt == null ? 0L
+                : pwdChangedAt.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+    }
+
+    /** 读取 token 内的密码版本；无该 claim 的旧 token 返回 0 */
+    public long getTokenPwdVersion(String token) {
+        Claims claims = parseToken(token);
+        Object v = claims.get("pwd");
+        return v == null ? 0L : ((Number) v).longValue();
     }
 
     public Claims parseToken(String token) {

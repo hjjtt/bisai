@@ -1,5 +1,7 @@
 package com.bisai.interceptor;
 
+import com.bisai.entity.User;
+import com.bisai.mapper.UserMapper;
 import com.bisai.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -21,9 +23,11 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final UserMapper userMapper;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil) {
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, UserMapper userMapper) {
         this.jwtUtil = jwtUtil;
+        this.userMapper = userMapper;
     }
 
     @Override
@@ -33,7 +37,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = resolveToken(request);
 
         if (StringUtils.hasText(token)) {
-            if (!jwtUtil.isTokenExpired(token)) {
+            if (!jwtUtil.isTokenExpired(token) && isPasswordVersionValid(token)) {
                 Long userId = jwtUtil.getUserId(token);
                 String username = jwtUtil.getUsername(token);
                 String role = jwtUtil.getRole(token);
@@ -66,5 +70,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return bearerToken.substring(7);
         }
         return null;
+    }
+
+    /**
+     * 密码版本校验：token 内 pwd claim 必须不落后于用户当前 lastPasswordChangeAt，
+     * 改密/管理员重置密码后旧 token 立即失效；顺带拒绝已禁用/已删除的账号。
+     */
+    private boolean isPasswordVersionValid(String token) {
+        try {
+            Long userId = jwtUtil.getUserId(token);
+            User user = userMapper.selectById(userId);
+            if (user == null || "DISABLED".equals(user.getStatus())) {
+                return false;
+            }
+            return jwtUtil.getTokenPwdVersion(token) >= JwtUtil.pwdVersion(user.getLastPasswordChangeAt());
+        } catch (Exception e) {
+            log.debug("JWT 密码版本校验失败: {}", e.getMessage());
+            return false;
+        }
     }
 }

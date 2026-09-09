@@ -110,6 +110,22 @@ public class TaskService {
     }
 
     public Result<TrainingTask> createTask(TrainingTask task, Long userId) {
+        // 必填字段前置校验（与表 NOT NULL 约束对齐），避免缺字段落入 500
+        if (task.getTitle() == null || task.getTitle().isBlank()) {
+            return Result.error(40001, "缺少必填字段: title");
+        }
+        if (task.getCourseId() == null) {
+            return Result.error(40001, "缺少必填字段: courseId");
+        }
+        if (task.getTemplateId() == null) {
+            return Result.error(40001, "缺少必填字段: templateId");
+        }
+        if (task.getRequirements() == null || task.getRequirements().isBlank()) {
+            return Result.error(40001, "缺少必填字段: requirements");
+        }
+        if (task.getStartTime() == null || task.getEndTime() == null) {
+            return Result.error(40001, "缺少必填字段: startTime/endTime");
+        }
         if (task.getCourseId() != null && !permissionService.isTeacherOwnerOfCourse(task.getCourseId(), userId)) {
             return Result.error(40301, "无权在该课程下创建任务");
         }

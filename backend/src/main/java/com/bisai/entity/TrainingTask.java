@@ -17,6 +17,7 @@ public class TrainingTask {
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private Boolean allowResubmit;
+    @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.bisai.util.FlexibleStringDeserializer.class)
     private String allowedFileTypes;
     private Long maxFileSize;
     private String status;
