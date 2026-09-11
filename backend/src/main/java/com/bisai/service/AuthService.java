@@ -21,6 +21,7 @@ import java.util.regex.Pattern;
 public class AuthService {
 
     private final UserMapper userMapper;
+    private final com.bisai.mapper.ClassMapper classMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final CaptchaService captchaService;
@@ -181,9 +182,12 @@ public class AuthService {
         // 注册仅开放学生：角色一律硬编码 STUDENT，忽略客户端传入的 role 字段（防止越权注册教师/管理员）
         final String role = "STUDENT";
 
-        // 学生必须选择班级
+        // 学生必须选择班级，且班级必须真实存在（防脏数据：此前未校验存在性，可写入任意 class_id）
         if (request.getClassId() == null) {
             return Result.error(40005, "学生请选择所属班级");
+        }
+        if (classMapper.selectById(request.getClassId()) == null) {
+            return Result.error(40005, "所选班级不存在");
         }
 
         // 用户名唯一性
