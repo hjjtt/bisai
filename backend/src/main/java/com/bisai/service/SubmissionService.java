@@ -236,6 +236,12 @@ public class SubmissionService {
                 return Result.error(40001, magicError + ": " + originalName);
             }
 
+            // zip 容器炸弹防御（DOCX/XLSX/PPTX/ZIP）
+            String zipError = FileValidationUtil.verifyZipSafety(file, extUpper);
+            if (zipError != null) {
+                return Result.error(40001, zipError + ": " + originalName);
+            }
+
             // 任务级 allowedFileTypes 校验 (FILE-007)
             if (task.getAllowedFileTypes() != null && !task.getAllowedFileTypes().isEmpty()) {
                 String[] allowedTypes = task.getAllowedFileTypes().split(",");

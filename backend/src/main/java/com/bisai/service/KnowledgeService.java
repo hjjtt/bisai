@@ -178,6 +178,12 @@ public class KnowledgeService {
                 return Result.error(40001, magicError + ": " + originalName);
             }
 
+            // zip 容器炸弹防御（DOCX/XLSX/PPTX/ZIP），防超解压比文件进入异步解析管线
+            String zipError = FileValidationUtil.verifyZipSafety(file, ext);
+            if (zipError != null) {
+                return Result.error(40001, zipError + ": " + originalName);
+            }
+
             if (file.getSize() > MAX_FILE_SIZE) {
                 return Result.error(40001, "文件大小不能超过 50MB");
             }

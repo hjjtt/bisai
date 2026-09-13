@@ -30,6 +30,10 @@ public final class FileValidationUtil {
         if (originalName == null || originalName.isBlank()) {
             return "文件名不能为空";
         }
+        // 长度上限：对齐文件系统 255 字节上限，防止超长文件名穿透到落盘/DB
+        if (originalName.length() > 255) {
+            return "文件名过长（上限 255 字符）";
+        }
         // 去掉浏览器可能带的路径部分后校验原始串，任何路径分隔符都拒绝
         if (originalName.contains("/") || originalName.contains("\\")) {
             return "文件名不允许包含路径分隔符";
@@ -97,6 +101,54 @@ public final class FileValidationUtil {
             }
         }
         return null;
+    }
+
+    /**
+     * zip 类容器安全校验（DOCX/XLSX/PPTX/ZIP）：只读中央目录元数据、不解压，
+     * 拦截 zip 炸弹（如 634KB 压缩 → 161MB 解压的 DOCX）。规则：
+     * 单条目解压后 >100MB、总解压量 >200MB、或压缩比 >100:1（压缩侧≥64KB 时）即拒绝。
+     *
+     * @return null 表示通过，否则为错误信息
+     */
+    public static String verifyZipSafety(MultipartFile file, String extUpper) {
+        switch (extUpper) {
+            case "DOCX", "XLSX", "PPTX", "ZIP" -> { /* 需要检查 */ }
+            default -> { return null; }
+        }
+        java.io.File temp = null;
+        try {
+            temp = java.io.File.createTempFile("zipguard-", ".tmp");
+            // 用流拷贝而非 transferTo：后者会移动 servlet 临时文件，导致后续落盘/MD5 读取失败
+            java.nio.file.Files.copy(file.getInputStream(), temp.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            long total = 0;
+            try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(temp)) {
+                var entries = zf.entries();
+                while (entries.hasMoreElements()) {
+                    var e = entries.nextElement();
+                    long size = e.getSize();
+                    long csize = e.getCompressedSize();
+                    if (size > 100L * 1024 * 1024) {
+                        return "压缩包内文件解压后过大（>100MB）: " + e.getName();
+                    }
+                    total += Math.max(0, size);
+                    if (total > 200L * 1024 * 1024) {
+                        return "压缩包总解压量过大（>200MB）";
+                    }
+                    if (csize > 64L * 1024 && size > csize * 100) {
+                        return "压缩比异常（>100:1），疑似压缩炸弹: " + e.getName();
+                    }
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            return "压缩包读取失败: " + e.getMessage();
+        } finally {
+            if (temp != null && temp.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                temp.delete();
+            }
+        }
     }
 
     private static boolean startsWith(byte[] data, int len, byte... prefix) {

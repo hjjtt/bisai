@@ -70,6 +70,10 @@ public class UserService {
         if (user.getPassword() == null || user.getPassword().isBlank()) {
             return Result.error(40001, "密码不能为空");
         }
+        // 密码长度上限：防对超长输入执行 BCrypt 哈希烧 CPU
+        if (user.getPassword().length() > 128) {
+            return Result.error(40001, "密码长度超出限制（128 字符）");
+        }
         if (!isValidRole(user.getRole())) {
             return Result.error(40001, "无效的角色");
         }

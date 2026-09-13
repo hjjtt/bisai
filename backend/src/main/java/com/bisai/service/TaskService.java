@@ -114,6 +114,9 @@ public class TaskService {
         if (task.getTitle() == null || task.getTitle().isBlank()) {
             return Result.error(40001, "缺少必填字段: title");
         }
+        if (task.getTitle().length() > 128) {
+            return Result.error(40001, "任务名称过长（上限 128 字符）");
+        }
         if (task.getCourseId() == null) {
             return Result.error(40001, "缺少必填字段: courseId");
         }
