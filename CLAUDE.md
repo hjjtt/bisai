@@ -42,7 +42,7 @@ MySQL 8（生产为 8.4），数据库名 `bisai`。Schema 在 `backend/src/main
 - **后端**: Spring Boot 3.4.3 + Spring Security (JWT) + MyBatis-Plus 3.5.9 + Spring AI (ModelScope)
 - **前端**: Vue 3 + TypeScript + Vite 8 + Element Plus + Pinia + ECharts + Axios
 - **文档解析**: PDFBox 3.0.3, POI 5.3.0, docx4j 11.4.11, iText 8.0.4
-- **AI**: Chat/视觉走小米 MiMo（OpenAI 兼容，`https://api.xiaomimimo.com/v1`，yml 默认模型 `mimo-v2.5`，代码统一 `reasoningEffort("none")` 关闭思考链防空回复），Embedding 走 ModelScope：`damo/nlp_corom_sentence-embedding_chinese-base`。备用链（逗号分隔）自动切换，支持 RAG 知识库检索增强
+- **AI**: Chat/视觉走小米 MiMo（OpenAI 兼容，`https://api.xiaomimimo.com/v1`，yml 默认模型 `mimo-v2.6-flash`，代码统一 `reasoningEffort("none")` 关闭思考链防空回复），Embedding 走 ModelScope：`damo/nlp_corom_sentence-embedding_chinese-base`。备用链（逗号分隔）自动切换，支持 RAG 知识库检索增强
 
 ### 后端包结构 (`com.bisai`)
 - `controller/` — REST API（16个），使用 `@PreAuthorize` 做角色控制

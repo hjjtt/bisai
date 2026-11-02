@@ -33,7 +33,7 @@ spring:
         # base-url 已含 /v1，去掉默认的 /v1 前缀避免路径重复
         completions-path: /chat/completions
         options:
-          model: ${AI_CHAT_MODEL:mimo-v2.5}
+          model: ${AI_CHAT_MODEL:mimo-v2.6-flash}
           max-tokens: 2048
           temperature: 0.3
       embedding:
@@ -80,10 +80,10 @@ jwt:
 ai:
   base-url: https://api.xiaomimimo.com/v1
   api-key: ${AI_API_KEY:YOUR_XIAOMIMIMO_API_KEY}
-  model: mimo-v2.5
+  model: mimo-v2.6-flash
   fallback-model:
   embedding-model: damo/nlp_corom_sentence-embedding_chinese-base
-  vision-model: mimo-v2.5
+  vision-model: mimo-v2.6-flash
   max-tokens: 2048
   temperature: 0.3
   daily-token-limit: ${AI_DAILY_TOKEN_LIMIT:500000}

@@ -27,7 +27,7 @@
 | 层级 | 技术 |
 |------|------|
 | **后端** | Spring Boot 3.4.3 · Spring Security (JWT) · MyBatis-Plus 3.5.9 |
-| **AI** | Spring AI 1.0 · 小米 MiMo (mimo-v2.5) · ModelScope Embedding · RAG 检索增强 |
+| **AI** | Spring AI 1.0 · 小米 MiMo (mimo-v2.6-flash) · ModelScope Embedding · RAG 检索增强 |
 | **文档** | PDFBox 3.0 · POI 5.3 · docx4j 11.4 · iText 8.0 |
 | **数据库** | MySQL 8.0 (utf8mb4) |
 | **前端** | Vue 3.5 · TypeScript 6 · Vite 8 · Element Plus 2.13 · Pinia 3.0 · ECharts 6.0 |
@@ -171,12 +171,12 @@ npm run dev            # 端口 3000，自动代理 /api → localhost:8080
 
 系统支持动态切换 AI 模型，在管理后台 **模型配置** 页面可实时修改：
 
-- **聊天 / 视觉模型** — 默认 `mimo-v2.5`（小米 MiMo，OpenAI 兼容接口 `https://api.xiaomimimo.com/v1`），可切换为兼容 OpenAI 接口的任意模型
+- **聊天 / 视觉模型** — 默认 `mimo-v2.6-flash`（小米 MiMo，OpenAI 兼容接口 `https://api.xiaomimimo.com/v1`），可切换为兼容 OpenAI 接口的任意模型
 - **向量化模型** — `damo/nlp_corom_sentence-embedding_chinese-base`（ModelScope）
 - **参数调节** — 温度参数、最大 Token 数、超时时间等均可在线调整
 - **连通性测试** — 修改后可即时测试模型是否可用
 
-> 模型 ID 需使用对应平台的模型标识，如 `mimo-v2.5`。`mimo-v2.5` 为推理模型，代码中统一传 `reasoningEffort("none")` 关闭思考链，避免空回复。
+> 模型 ID 需使用对应平台的模型标识，如 `mimo-v2.6-flash`。该模型为推理模型，代码中统一传 `reasoningEffort("none")` 关闭思考链，避免空回复。
 
 ### 异步任务配置
 

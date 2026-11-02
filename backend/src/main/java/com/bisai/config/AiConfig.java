@@ -10,11 +10,11 @@ import org.springframework.context.annotation.Configuration;
 public class AiConfig {
     private String baseUrl = "https://api.xiaomimimo.com/v1";
     private String apiKey;
-    private String model = "mimo-v2.5";
-    /** 备用模型链：主模型失败时按顺序尝试，用逗号分隔。小米 MiMo 端点暂无其他可用模型，无 fallback */
+    private String model = "mimo-v2.6-flash";
+    /** 备用模型链：主模型失败时按顺序尝试，用逗号分隔。备用 mimo-v2.6-pro（同端点，性能更强但单价更高） */
     private String fallbackModels = "";
     private String embeddingModel = "damo/nlp_corom_sentence-embedding_chinese-base";
-    private String visionModel = "mimo-v2.5";
+    private String visionModel = "mimo-v2.6-flash";
     private int maxTokens = 4096;
     private double temperature = 0.3;
     private int dailyTokenLimit = 200000;

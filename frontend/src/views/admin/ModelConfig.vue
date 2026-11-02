@@ -5,7 +5,7 @@
         <div class="card-header">
           <span>模型配置</span>
           <div>
-            <el-tag type="success">主模型: {{ form.model || 'mimo-v2.5' }}</el-tag>
+            <el-tag type="success">主模型: {{ form.model || 'mimo-v2.6-flash' }}</el-tag>
             <el-tag type="warning" style="margin-left: 8px">备用: {{ form.fallbackModels || '未配置' }}</el-tag>
           </div>
         </div>
@@ -28,7 +28,7 @@
           <el-input v-model="form.textModelApiKey" type="password" show-password placeholder="API Key" />
         </el-form-item>
         <el-form-item label="模型名称">
-          <el-input v-model="form.model" placeholder="mimo-v2.5" />
+          <el-input v-model="form.model" placeholder="mimo-v2.6-flash" />
         </el-form-item>
         <el-form-item label="备用模型">
           <el-input v-model="form.fallbackModels" placeholder="备用模型用逗号分隔，可留空" />
@@ -85,7 +85,7 @@ const testing = ref(false)
 const form = reactive({
   textModelApiUrl: 'https://api.xiaomimimo.com/v1',
   textModelApiKey: '',
-  model: 'mimo-v2.5',
+  model: 'mimo-v2.6-flash',
   fallbackModels: '',
   timeout: 30000,
   temperature: 0.3,
@@ -114,7 +114,7 @@ async function loadConfig() {
 async function handleTest() {
   testing.value = true
   try {
-    const model = form.model || 'mimo-v2.5'
+    const model = form.model || 'mimo-v2.6-flash'
     const res = await testModelConnection({ apiUrl: form.textModelApiUrl, apiKey: form.textModelApiKey, model })
     if (res.data.success) {
       ElMessage.success(res.data.message || '连通性测试通过')
@@ -134,7 +134,7 @@ async function handleSave() {
     const payload: Partial<SystemConfigMap> = {
       textModelApiUrl: form.textModelApiUrl,
       textModelApiKey: form.textModelApiKey,
-      model: form.model || 'mimo-v2.5',
+      model: form.model || 'mimo-v2.6-flash',
       fallbackModels: form.fallbackModels || '',
       timeout: String(form.timeout),
       temperature: String(form.temperature),
