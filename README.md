@@ -19,7 +19,7 @@
 - **批量处理** — 批量解析/核查/评分/发布，教师可一键处理整班提交，支持漏填分数自动跳过
 - **可视化报表** — ECharts 图表展示班级成绩分布、指标达成度等统计数据
 - **评分一致性看板** — Pearson/Spearman 相关系数、MAE/RMSE 统计，AI vs 教师评分差异可视化
-- **动态模型配置** — 管理后台可实时切换 AI 模型（支持火山引擎 ARK 兼容 OpenAI 接口的模型），无需重启
+- **动态模型配置** — 管理后台可实时切换 AI 模型（支持任意 OpenAI 兼容接口的模型），无需重启
 - **三角色权限体系** — 学生/教师/管理员严格的数据隔离与多层权限控制
 
 ## 技术栈
@@ -27,7 +27,7 @@
 | 层级 | 技术 |
 |------|------|
 | **后端** | Spring Boot 3.4.3 · Spring Security (JWT) · MyBatis-Plus 3.5.9 |
-| **AI** | Spring AI 1.0 · 火山引擎 ARK (doubao-seed-2.0-lite) · RAG 检索增强 |
+| **AI** | Spring AI 1.0 · 小米 MiMo (mimo-v2.5) · ModelScope Embedding · RAG 检索增强 |
 | **文档** | PDFBox 3.0 · POI 5.3 · docx4j 11.4 · iText 8.0 |
 | **数据库** | MySQL 8.0 (utf8mb4) |
 | **前端** | Vue 3.5 · TypeScript 6 · Vite 8 · Element Plus 2.13 · Pinia 3.0 · ECharts 6.0 |
@@ -49,7 +49,7 @@
 │                                                        │
 │  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │
 │  │ Security     │  │ AI 服务层     │  │ AsyncTask   │  │
-│  │ JWT + CORS   │  │ 火山引擎 ARK  │  │ Scheduler   │  │
+│  │ JWT + CORS   │  │ 小米 MiMo     │  │ Scheduler   │  │
 │  │ @PreAuthorize│  │ RAG 检索     │  │ (5s 轮询)   │  │
 │  └──────────────┘  └──────────────┘  └─────────────┘  │
 │                       │                                │
@@ -171,12 +171,12 @@ npm run dev            # 端口 3000，自动代理 /api → localhost:8080
 
 系统支持动态切换 AI 模型，在管理后台 **模型配置** 页面可实时修改：
 
-- **聊天模型** — 默认 `doubao-seed-2.0-lite`（火山引擎 ARK），可切换为兼容 OpenAI 接口的任意模型
+- **聊天 / 视觉模型** — 默认 `mimo-v2.5`（小米 MiMo，OpenAI 兼容接口 `https://api.xiaomimimo.com/v1`），可切换为兼容 OpenAI 接口的任意模型
 - **向量化模型** — `damo/nlp_corom_sentence-embedding_chinese-base`（ModelScope）
 - **参数调节** — 温度参数、最大 Token 数、超时时间等均可在线调整
 - **连通性测试** — 修改后可即时测试模型是否可用
 
-> 模型 ID 需使用火山引擎 ARK 平台的模型标识，如 `doubao-seed-2.0-lite`
+> 模型 ID 需使用对应平台的模型标识，如 `mimo-v2.5`。`mimo-v2.5` 为推理模型，代码中统一传 `reasoningEffort("none")` 关闭思考链，避免空回复。
 
 ### 异步任务配置
 

@@ -19,7 +19,7 @@
 
 ## 架构
 
-Spring Boot 3 + Vue 3 单体应用，前端通过 Vite 代理访问后端 API。AI 能力通过 ModelScope 平台（Qwen 模型）提供。异步任务用数据库轮询（非消息队列）。
+Spring Boot 3 + Vue 3 单体应用，前端通过 Vite 代理访问后端 API。AI 能力通过小米 MiMo（Chat/视觉，OpenAI 兼容接口）与 ModelScope（Embedding）提供。异步任务用数据库轮询（非消息队列）。
 
 ---
 
