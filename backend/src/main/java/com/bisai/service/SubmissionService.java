@@ -244,9 +244,13 @@ public class SubmissionService {
 
             // 任务级 allowedFileTypes 校验 (FILE-007)
             if (task.getAllowedFileTypes() != null && !task.getAllowedFileTypes().isEmpty()) {
-                String[] allowedTypes = task.getAllowedFileTypes().split(",");
-                boolean match = java.util.Arrays.stream(allowedTypes)
-                        .anyMatch(t -> t.trim().equalsIgnoreCase(extUpper));
+                // 兼容两种存法：大写无点（DOC,DOCX，前端 TaskEdit 的格式）
+                // 与带点小写（.doc,.docx，application.yml 白名单的格式）
+                boolean match = java.util.Arrays.stream(task.getAllowedFileTypes().split(","))
+                        .map(String::trim)
+                        .filter(t -> !t.isEmpty())
+                        .map(t -> t.startsWith(".") ? t.substring(1) : t)
+                        .anyMatch(t -> t.equalsIgnoreCase(extUpper));
                 if (!match) {
                     return Result.error(40001, "该任务不允许上传 " + extUpper + " 格式的文件");
                 }

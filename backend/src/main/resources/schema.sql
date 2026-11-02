@@ -13,6 +13,15 @@
 
  Date: 03/05/2026 14:32:30
 */
+
+-- ============================================================
+-- ⚠️ 危险：本文件含 DROP TABLE IF EXISTS 且硬编码 USE bisai，
+--    导入到任何实例都会清空该实例上的 bisai 库。
+--
+--    - 仅用于「从零初始化一个空库」，不要对着有数据的实例执行
+--    - 已有库升级请用 db/migration_*.sql（幂等）
+--    - 验证本文件请改掉下面两行的库名，或用临时实例
+-- ============================================================
 CREATE DATABASE IF NOT EXISTS bisai DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 USE bisai;
 
@@ -497,6 +506,12 @@ CREATE TABLE `score_result`  (
   `final_score` decimal(6, 2) NULL DEFAULT NULL COMMENT '最终得分',
   `reason` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '评分理由',
   `evidence` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '评分证据',
+  `sample_scores` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '多轮采样分数JSON数组, 如 [85,82,88]',
+  `coverage_details` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '结构化覆盖度分析JSON',
+  `cross_model_score` decimal(6, 2) NULL DEFAULT NULL COMMENT '交叉模型(备用模型)评分',
+  `cross_model_divergence` decimal(6, 2) NULL DEFAULT NULL COMMENT '交叉模型偏差(绝对值)',
+  `word_count` int NULL DEFAULT NULL COMMENT '提交内容字数(冗长偏差修正用)',
+  `verbosity_factor` decimal(5, 4) NULL DEFAULT NULL COMMENT '冗长偏差修正系数',
   `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -506,19 +521,20 @@ CREATE TABLE `score_result`  (
 
 -- ----------------------------
 -- Records of score_result
+-- 显式列名：避免新增列后位置错位导致 Column count doesn't match
 -- ----------------------------
-INSERT INTO `score_result` VALUES (1, 2, 1, 17.00, NULL, NULL, '需求描述较为完整，涵盖了项目背景、功能需求、非功能需求和用例分析，但用例分析较简单，未明确系统用户角色。', '一、需求分析中列出了5项功能需求（学生信息管理、成绩管理、课程管理、数据统计与分析、数据持久化）和8个用例（UC-01至UC-08）。', 1, '2026-05-03 12:54:46', '2026-05-03 13:29:40');
-INSERT INTO `score_result` VALUES (2, 2, 2, 15.00, NULL, NULL, '设计方案合理，采用三层架构和MVC、DAO模式，类图设计清晰，但数据库设计缺少课程表，且未提供架构图。', '二、系统设计中描述了三层架构，类图表格列出了Student、Course、Grade等核心类及其职责，数据库设计给出了student和grade表，但缺少course表定义。', 1, '2026-05-03 12:54:46', '2026-05-03 13:29:40');
-INSERT INTO `score_result` VALUES (3, 2, 3, 11.00, NULL, NULL, '仅展示了Student实体类的部分代码，其他核心类（如Course、Grade、DAO、Service）及界面代码缺失，代码规范但不够完整。', '三、代码实现中仅提供了Student类的代码片段（有省略号），未展示其他类实现和关键算法。', 1, '2026-05-03 12:54:46', '2026-05-03 13:29:40');
-INSERT INTO `score_result` VALUES (4, 2, 4, 0.00, NULL, NULL, '测试部分仅有标题，无具体测试用例、测试过程或结果，未进行任何测试验证。', '四、测试部分仅列出4.1单元测试、4.2集成测试、4.3测试结果标题，无实际内容。', 1, '2026-05-03 12:54:46', '2026-05-03 13:29:40');
-INSERT INTO `score_result` VALUES (5, 2, 5, 8.00, NULL, NULL, '文档结构清晰，有目录，格式规范，使用了表格和代码块，但代码块不完整，部分内容缺失。', '文档包含目录、章节标题、表格和代码片段，整体排版规范。', 1, '2026-05-03 12:54:46', '2026-05-03 13:29:40');
-INSERT INTO `score_result` VALUES (6, 2, 6, 0.00, NULL, NULL, '总结与反思部分仅有标题，无任何内容，未进行总结和反思。', '五、总结与反思标题下无正文内容。', 1, '2026-05-03 12:54:46', '2026-05-03 13:29:40');
-INSERT INTO `score_result` VALUES (7, 2, 1, 18.00, NULL, NULL, '需求描述较为完整，涵盖了背景、功能需求、非功能需求及用例分析。功能点明确（如 CRUD、成绩统计），但部分非功能需求的量化指标不够具体。', '1.2 功能需求 • 学生信息管理：支持学生信息的增删改查（CRUD）... 1.3 非功能需求 系统应具有良好的可扩展性... 1.4 用例分析 UC-01：管理员登录系统', 0, '2026-05-03 13:29:40', '2026-05-03 13:29:40');
-INSERT INTO `score_result` VALUES (8, 2, 2, 17.00, NULL, NULL, '设计方案合理，采用了标准的三层架构和 DAO 模式。类图和数据库设计清晰，表结构定义规范。但缺少具体的交互时序图或详细的数据流说明。', '2.1 系统架构设计 系统采用经典的三层架构（Three-Tier Architecture）进行设计... 2.3 数据库设计 学生表（student）字段名 id VARCHAR(20) PRIMARY KEY', 0, '2026-05-03 13:29:40', '2026-05-03 13:29:40');
-INSERT INTO `score_result` VALUES (9, 2, 3, 16.00, NULL, NULL, '代码片段展示了良好的面向对象编程实践（封装、重写方法）。但由于提交内容截断，无法验证业务逻辑层、持久化层及 UI 层的完整实现情况。', '3.1.1 Student 实体类 ... private String id; ... @Override public boolean equals(Object o) { ... } @Ov...', 0, '2026-05-03 13:29:40', '2026-05-03 13:29:40');
-INSERT INTO `score_result` VALUES (10, 2, 4, 5.00, NULL, NULL, '文档中仅列出了测试章节的标题和分类，未提供具体的测试用例、输入数据、预期结果及实际运行截图，无法评估测试覆盖度。', '四、测试 4.1 单元测试 4.2 集成测试 4.3 测试结果', 0, '2026-05-03 13:29:40', '2026-05-03 13:29:40');
-INSERT INTO `score_result` VALUES (11, 2, 5, 9.00, NULL, NULL, '文档结构清晰，包含封面信息、目录及分级标题。表格使用规范，排版整洁，符合实训报告的基本格式要求。', '目录 一、需求分析 二、系统设计 ... 学生表（student）字段名 类型 约束 说明', 0, '2026-05-03 13:29:40', '2026-05-03 13:29:40');
-INSERT INTO `score_result` VALUES (12, 2, 6, 2.00, NULL, NULL, '虽然设置了总结与反思章节，但提交内容中该部分为空，缺乏对项目难点、收获及改进措施的实质性反思内容。', '五、总结与反思', 0, '2026-05-03 13:29:40', '2026-05-03 13:29:40');
+INSERT INTO `score_result` (`id`, `submission_id`, `indicator_id`, `auto_score`, `teacher_score`, `final_score`, `reason`, `evidence`, `deleted`, `created_at`, `updated_at`) VALUES (1, 2, 1, 17.00, NULL, NULL, '需求描述较为完整，涵盖了项目背景、功能需求、非功能需求和用例分析，但用例分析较简单，未明确系统用户角色。', '一、需求分析中列出了5项功能需求（学生信息管理、成绩管理、课程管理、数据统计与分析、数据持久化）和8个用例（UC-01至UC-08）。', 1, '2026-05-03 12:54:46', '2026-05-03 13:29:40');
+INSERT INTO `score_result` (`id`, `submission_id`, `indicator_id`, `auto_score`, `teacher_score`, `final_score`, `reason`, `evidence`, `deleted`, `created_at`, `updated_at`) VALUES (2, 2, 2, 15.00, NULL, NULL, '设计方案合理，采用三层架构和MVC、DAO模式，类图设计清晰，但数据库设计缺少课程表，且未提供架构图。', '二、系统设计中描述了三层架构，类图表格列出了Student、Course、Grade等核心类及其职责，数据库设计给出了student和grade表，但缺少course表定义。', 1, '2026-05-03 12:54:46', '2026-05-03 13:29:40');
+INSERT INTO `score_result` (`id`, `submission_id`, `indicator_id`, `auto_score`, `teacher_score`, `final_score`, `reason`, `evidence`, `deleted`, `created_at`, `updated_at`) VALUES (3, 2, 3, 11.00, NULL, NULL, '仅展示了Student实体类的部分代码，其他核心类（如Course、Grade、DAO、Service）及界面代码缺失，代码规范但不够完整。', '三、代码实现中仅提供了Student类的代码片段（有省略号），未展示其他类实现和关键算法。', 1, '2026-05-03 12:54:46', '2026-05-03 13:29:40');
+INSERT INTO `score_result` (`id`, `submission_id`, `indicator_id`, `auto_score`, `teacher_score`, `final_score`, `reason`, `evidence`, `deleted`, `created_at`, `updated_at`) VALUES (4, 2, 4, 0.00, NULL, NULL, '测试部分仅有标题，无具体测试用例、测试过程或结果，未进行任何测试验证。', '四、测试部分仅列出4.1单元测试、4.2集成测试、4.3测试结果标题，无实际内容。', 1, '2026-05-03 12:54:46', '2026-05-03 13:29:40');
+INSERT INTO `score_result` (`id`, `submission_id`, `indicator_id`, `auto_score`, `teacher_score`, `final_score`, `reason`, `evidence`, `deleted`, `created_at`, `updated_at`) VALUES (5, 2, 5, 8.00, NULL, NULL, '文档结构清晰，有目录，格式规范，使用了表格和代码块，但代码块不完整，部分内容缺失。', '文档包含目录、章节标题、表格和代码片段，整体排版规范。', 1, '2026-05-03 12:54:46', '2026-05-03 13:29:40');
+INSERT INTO `score_result` (`id`, `submission_id`, `indicator_id`, `auto_score`, `teacher_score`, `final_score`, `reason`, `evidence`, `deleted`, `created_at`, `updated_at`) VALUES (6, 2, 6, 0.00, NULL, NULL, '总结与反思部分仅有标题，无任何内容，未进行总结和反思。', '五、总结与反思标题下无正文内容。', 1, '2026-05-03 12:54:46', '2026-05-03 13:29:40');
+INSERT INTO `score_result` (`id`, `submission_id`, `indicator_id`, `auto_score`, `teacher_score`, `final_score`, `reason`, `evidence`, `deleted`, `created_at`, `updated_at`) VALUES (7, 2, 1, 18.00, NULL, NULL, '需求描述较为完整，涵盖了背景、功能需求、非功能需求及用例分析。功能点明确（如 CRUD、成绩统计），但部分非功能需求的量化指标不够具体。', '1.2 功能需求 • 学生信息管理：支持学生信息的增删改查（CRUD）... 1.3 非功能需求 系统应具有良好的可扩展性... 1.4 用例分析 UC-01：管理员登录系统', 0, '2026-05-03 13:29:40', '2026-05-03 13:29:40');
+INSERT INTO `score_result` (`id`, `submission_id`, `indicator_id`, `auto_score`, `teacher_score`, `final_score`, `reason`, `evidence`, `deleted`, `created_at`, `updated_at`) VALUES (8, 2, 2, 17.00, NULL, NULL, '设计方案合理，采用了标准的三层架构和 DAO 模式。类图和数据库设计清晰，表结构定义规范。但缺少具体的交互时序图或详细的数据流说明。', '2.1 系统架构设计 系统采用经典的三层架构（Three-Tier Architecture）进行设计... 2.3 数据库设计 学生表（student）字段名 id VARCHAR(20) PRIMARY KEY', 0, '2026-05-03 13:29:40', '2026-05-03 13:29:40');
+INSERT INTO `score_result` (`id`, `submission_id`, `indicator_id`, `auto_score`, `teacher_score`, `final_score`, `reason`, `evidence`, `deleted`, `created_at`, `updated_at`) VALUES (9, 2, 3, 16.00, NULL, NULL, '代码片段展示了良好的面向对象编程实践（封装、重写方法）。但由于提交内容截断，无法验证业务逻辑层、持久化层及 UI 层的完整实现情况。', '3.1.1 Student 实体类 ... private String id; ... @Override public boolean equals(Object o) { ... } @Ov...', 0, '2026-05-03 13:29:40', '2026-05-03 13:29:40');
+INSERT INTO `score_result` (`id`, `submission_id`, `indicator_id`, `auto_score`, `teacher_score`, `final_score`, `reason`, `evidence`, `deleted`, `created_at`, `updated_at`) VALUES (10, 2, 4, 5.00, NULL, NULL, '文档中仅列出了测试章节的标题和分类，未提供具体的测试用例、输入数据、预期结果及实际运行截图，无法评估测试覆盖度。', '四、测试 4.1 单元测试 4.2 集成测试 4.3 测试结果', 0, '2026-05-03 13:29:40', '2026-05-03 13:29:40');
+INSERT INTO `score_result` (`id`, `submission_id`, `indicator_id`, `auto_score`, `teacher_score`, `final_score`, `reason`, `evidence`, `deleted`, `created_at`, `updated_at`) VALUES (11, 2, 5, 9.00, NULL, NULL, '文档结构清晰，包含封面信息、目录及分级标题。表格使用规范，排版整洁，符合实训报告的基本格式要求。', '目录 一、需求分析 二、系统设计 ... 学生表（student）字段名 类型 约束 说明', 0, '2026-05-03 13:29:40', '2026-05-03 13:29:40');
+INSERT INTO `score_result` (`id`, `submission_id`, `indicator_id`, `auto_score`, `teacher_score`, `final_score`, `reason`, `evidence`, `deleted`, `created_at`, `updated_at`) VALUES (12, 2, 6, 2.00, NULL, NULL, '虽然设置了总结与反思章节，但提交内容中该部分为空，缺乏对项目难点、收获及改进措施的实质性反思内容。', '五、总结与反思', 0, '2026-05-03 13:29:40', '2026-05-03 13:29:40');
 
 -- ----------------------------
 -- Table structure for submission
@@ -633,5 +649,45 @@ CREATE TABLE `user`  (
 INSERT INTO `user` VALUES (1, 'admin', '$2a$10$KwSxLKxk8N/cW5qHiFQRueyRNxdmJcBc0XwMKf0ZhRjCs9h4hjuL6', 'ADMIN', 'admin', NULL, 'ENABLED', 0, NULL, '2026-05-03 12:56:32', 0, '2026-04-28 17:48:05', '2026-04-28 17:51:00');
 INSERT INTO `user` VALUES (2, 'teacher', '$2a$10$KwSxLKxk8N/cW5qHiFQRueyRNxdmJcBc0XwMKf0ZhRjCs9h4hjuL6', 'TEACHER', '张老师', NULL, 'ENABLED', 0, NULL, '2026-05-03 13:24:42', 0, '2026-04-28 17:48:49', '2026-04-28 17:51:00');
 INSERT INTO `user` VALUES (3, 'student', '$2a$10$KwSxLKxk8N/cW5qHiFQRueyRNxdmJcBc0XwMKf0ZhRjCs9h4hjuL6', 'STUDENT', '李同学', 1, 'ENABLED', 0, NULL, '2026-05-03 10:48:57', 0, '2026-04-28 17:48:49', '2026-04-28 17:51:00');
+
+-- ----------------------------
+-- Table structure for score_pairwise
+-- ----------------------------
+DROP TABLE IF EXISTS `score_pairwise`;
+CREATE TABLE `score_pairwise`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `task_id` bigint NOT NULL COMMENT '任务ID',
+  `submission_a_id` bigint NOT NULL COMMENT '提交A的ID',
+  `submission_b_id` bigint NOT NULL COMMENT '提交B的ID',
+  `winner` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '比较结果: A/B/TIE',
+  `reasoning` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT 'AI比较理由',
+  `model` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '使用的模型',
+  `deleted` tinyint NOT NULL DEFAULT 0,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_task_id`(`task_id` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = 'Pairwise比较结果表' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for score_consistency_snapshot
+-- ----------------------------
+DROP TABLE IF EXISTS `score_consistency_snapshot`;
+CREATE TABLE `score_consistency_snapshot`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `task_id` bigint NULL DEFAULT NULL COMMENT '任务ID, NULL表示全局统计',
+  `total_evaluated` int NOT NULL DEFAULT 0 COMMENT '总评估数',
+  `total_teacher_confirmed` int NOT NULL DEFAULT 0 COMMENT '教师已确认数',
+  `pearson_correlation` decimal(6, 4) NULL DEFAULT NULL COMMENT 'Pearson相关系数',
+  `spearman_correlation` decimal(6, 4) NULL DEFAULT NULL COMMENT 'Spearman相关系数',
+  `rmse` decimal(8, 4) NULL DEFAULT NULL COMMENT '均方根误差',
+  `mae` decimal(8, 4) NULL DEFAULT NULL COMMENT '平均绝对误差',
+  `avg_divergence` decimal(8, 4) NULL DEFAULT NULL COMMENT 'AI与教师平均偏差',
+  `cross_model_agreement` decimal(6, 4) NULL DEFAULT NULL COMMENT '多模型一致率',
+  `snapshot_date` date NOT NULL COMMENT '快照日期',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `idx_task_date`(`task_id` ASC, `snapshot_date` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '评分一致性统计快照' ROW_FORMAT = Dynamic;
 
 SET FOREIGN_KEY_CHECKS = 1;
